@@ -10,11 +10,16 @@ use serde::{Deserialize, Serialize};
 pub struct Settings {
     /// From 0 to 1, as the volume slider shows it.
     pub volume: f64,
+    /// The now playing pane's width next to the library, in logical pixels.
+    pub pane_width: i32,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { volume: 1.0 }
+        Self {
+            volume: 1.0,
+            pane_width: 360,
+        }
     }
 }
 

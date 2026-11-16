@@ -294,7 +294,8 @@ impl Component for App {
 
     fn init((): (), root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let player = Player::new().expect("GStreamer and its playbin are installed");
-        player.set_volume(Settings::load().volume);
+        let settings = Settings::load();
+        player.set_volume(settings.volume);
         finish_playback_before_closing(&root, &player);
         play_pause_with_space(&root, &player);
         let model = Self {
@@ -322,6 +323,10 @@ impl Component for App {
         widgets
             .split
             .connect_collapsed(move |collapsed| input.emit(Msg::Collapsed(collapsed)));
+        widgets.split.set_pane_width(settings.pane_width);
+        widgets.split.connect_pane_resized(|width| {
+            Settings::update(|settings| settings.pane_width = width);
+        });
         follow_playback(&model.player, &sender);
 
         let mut actions = RelmActionGroup::<WindowActions>::new();
