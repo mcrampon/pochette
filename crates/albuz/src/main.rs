@@ -7,6 +7,7 @@ mod app;
 mod clamp;
 mod covers;
 mod format;
+mod library;
 mod now_playing;
 mod player;
 mod session_store;

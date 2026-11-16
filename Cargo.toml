@@ -20,6 +20,7 @@ gstreamer = "0.25"
 futures-util = "0.3"
 humantime = "2"
 uuid = { version = "1", features = ["v4"] }
+unicode-normalization = "0.1"
 regex = "1"
 reqwest = { version = "0.13", features = ["json", "query", "form"] }
 base64 = "0.23"
