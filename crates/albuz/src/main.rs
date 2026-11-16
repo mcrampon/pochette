@@ -1,9 +1,12 @@
 //! Albuz, a native Linux player for Qobuz, built around albums.
 
 mod account;
+mod album_page;
 mod albums;
 mod app;
+mod clamp;
 mod covers;
+mod format;
 mod session_store;
 
 use tracing_subscriber::EnvFilter;

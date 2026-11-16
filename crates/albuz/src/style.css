@@ -35,3 +35,68 @@
 .albuz-album-title {
   font-weight: 600;
 }
+
+.albuz-cover-large {
+  border-radius: 12px;
+}
+
+.albuz-kicker {
+  font-size: 0.8em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  opacity: 0.6;
+}
+
+.albuz-album-page-title {
+  font-size: 2.2em;
+  font-weight: 800;
+}
+
+.albuz-album-page-artist {
+  font-size: 1.3em;
+  font-weight: 600;
+}
+
+.albuz-badge {
+  font-size: 0.85em;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  background-color: alpha(currentColor, 0.1);
+}
+
+.albuz-numeric {
+  font-feature-settings: "tnum";
+}
+
+.albuz-tracks {
+  background: none;
+}
+
+.albuz-tracks > row {
+  border-radius: 8px;
+}
+
+.albuz-track {
+  padding: 8px 12px 8px 0;
+}
+
+.albuz-unavailable {
+  opacity: 0.45;
+}
+
+.albuz-disc {
+  font-weight: 700;
+  margin-top: 12px;
+}
+
+.albuz-work {
+  font-weight: 600;
+  font-style: italic;
+  margin-top: 12px;
+  opacity: 0.8;
+}
+
+.albuz-review {
+  line-height: 1.5;
+}

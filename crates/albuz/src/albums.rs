@@ -2,13 +2,16 @@
 
 use qobuz::{Client, models::Album};
 use relm4::{
-    Component, ComponentParts, ComponentSender,
+    Component, ComponentController, ComponentParts, ComponentSender, Controller,
     gtk::{self, pango, prelude::*},
     typed_view::grid::{RelmGridItem, TypedGridView},
 };
 use tokio::task::JoinHandle;
 
-use crate::covers::VisibleCovers;
+use crate::{
+    album_page::{AlbumPage, AlbumPageMsg, AlbumPageOutput},
+    covers::VisibleCovers,
+};
 
 /// The side of a cover in the grid, in logical pixels.
 const COVER_SIZE: i32 = 180;
@@ -28,6 +31,9 @@ pub struct AlbumsPage {
     error: String,
     task: Option<JoinHandle<()>>,
     covers: VisibleCovers,
+    album_page: Controller<AlbumPage>,
+    /// Whether the album page is shown instead of the grid.
+    showing_album: bool,
 }
 
 #[derive(Debug)]
@@ -38,6 +44,10 @@ pub enum AlbumsMsg {
     Clear,
     Reload,
     Loaded(qobuz::Result<Vec<Album>>),
+    /// Open the album at this position in the grid.
+    Open(u32),
+    CloseAlbum,
+    SessionExpired,
 }
 
 #[derive(Debug)]
@@ -54,7 +64,10 @@ impl Component for AlbumsPage {
     type CommandOutput = ();
 
     view! {
-        gtk::Box {
+        gtk::Stack {
+            set_transition_type: gtk::StackTransitionType::SlideLeftRight,
+
+            add_named[Some("albums")] = &gtk::Box {
             #[transition = "Crossfade"]
             match model.state {
                 State::Loading => gtk::Box {
@@ -125,11 +138,21 @@ impl Component for AlbumsPage {
                         grid_view -> gtk::GridView {
                             set_min_columns: 2,
                             set_max_columns: 16,
+                            set_single_click_activate: true,
                             add_css_class: "albuz-album-grid",
+                            connect_activate[sender] => move |_, position| {
+                                sender.input(AlbumsMsg::Open(position));
+                            },
                         },
                     },
                 },
             }
+            },
+
+            add_named: (model.album_page.widget(), Some("album")),
+
+            #[watch]
+            set_visible_child_name: if model.showing_album { "album" } else { "albums" },
         }
     }
 
@@ -141,6 +164,13 @@ impl Component for AlbumsPage {
             error: String::new(),
             task: None,
             covers: VisibleCovers::default(),
+            album_page: AlbumPage::builder()
+                .launch(())
+                .forward(sender.input_sender(), |output| match output {
+                    AlbumPageOutput::Back => AlbumsMsg::CloseAlbum,
+                    AlbumPageOutput::SessionExpired => AlbumsMsg::SessionExpired,
+                }),
+            showing_album: false,
         };
         let grid_view = &model.grid.view;
         let widgets = view_output!();
@@ -160,6 +190,20 @@ impl Component for AlbumsPage {
                 self.client = None;
                 self.grid.clear();
                 self.state = State::Loading;
+                self.showing_album = false;
+            }
+            AlbumsMsg::Open(position) => {
+                let (Some(client), Some(item)) = (self.client.clone(), self.grid.get(position))
+                else {
+                    return;
+                };
+                let album = item.borrow().album.clone();
+                self.album_page.emit(AlbumPageMsg::Show { client, album });
+                self.showing_album = true;
+            }
+            AlbumsMsg::CloseAlbum => self.showing_album = false,
+            AlbumsMsg::SessionExpired => {
+                let _ = sender.output(AlbumsOutput::SessionExpired);
             }
             // Albums of a user who signed out meanwhile.
             AlbumsMsg::Loaded(_) if self.client.is_none() => {}
@@ -236,6 +280,7 @@ impl RelmGridItem for AlbumItem {
                 set_spacing: 2,
                 set_width_request: COVER_SIZE,
                 set_halign: gtk::Align::Center,
+                set_cursor_from_name: Some("pointer"),
 
                 #[name = "cover"]
                 gtk::Picture {

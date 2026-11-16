@@ -87,6 +87,16 @@ impl Client {
         }
     }
 
+    /// An album, with its tracks and review.
+    pub async fn album(&self, id: &str) -> Result<Album> {
+        let response = self
+            .get("album/get")
+            .query(&[("album_id", id)])
+            .send()
+            .await?;
+        read_json(response).await
+    }
+
     fn get(&self, endpoint: &str) -> RequestBuilder {
         self.http
             .get(format!("{API_URL}{endpoint}"))
