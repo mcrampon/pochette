@@ -9,7 +9,7 @@ mod session_store;
 use tracing_subscriber::EnvFilter;
 
 /// The application id, which names the app to the desktop (D-Bus, `.desktop` file, Flatpak).
-const APP_ID: &str = "io.github.albuz.Albuz";
+const APP_ID: &str = "io.github.mcrampon.Albuz";
 
 fn main() {
     tracing_subscriber::fmt()
