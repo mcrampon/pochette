@@ -451,7 +451,9 @@ fn queue_row(track: &Track) -> gtk::ListBoxRow {
     content.append(&number);
     content.append(&title);
     content.append(&duration);
-    gtk::ListBoxRow::builder().child(&content).build()
+    let row = gtk::ListBoxRow::builder().child(&content).build();
+    row.set_cursor_from_name(Some("pointer"));
+    row
 }
 
 /// Whole seconds in `value`.

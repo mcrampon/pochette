@@ -659,6 +659,7 @@ fn track_row(track: &Track, album_artist: &str) -> gtk::ListBoxRow {
     relm4::view! {
         row = gtk::ListBoxRow {
             set_activatable: track.streamable,
+            set_cursor_from_name: track.streamable.then_some("pointer"),
 
             gtk::Box {
                 set_spacing: 12,

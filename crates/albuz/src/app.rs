@@ -294,6 +294,7 @@ impl Component for App {
     fn init((): (), root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let player = Player::new().expect("GStreamer and its playbin are installed");
         finish_playback_before_closing(&root, &player);
+        play_pause_with_space(&root, &player);
         let model = Self {
             screen: Screen::Starting,
             http: account::http_client(),
@@ -515,4 +516,43 @@ fn finish_playback_before_closing(window: &gtk::ApplicationWindow, player: &Play
         });
         gtk::glib::Propagation::Stop
     });
+}
+
+/// Space plays and pauses, wherever the focus is, except in text fields where it types
+/// a space. It does nothing else: not clicking the focused button, not playing the
+/// focused track.
+fn play_pause_with_space(window: &gtk::ApplicationWindow, player: &Player) {
+    let keys = gtk::EventControllerKey::new();
+    // Before the focused widget gets the key.
+    keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+    // Held down, the key repeats: only the first press counts.
+    let held = std::rc::Rc::new(std::cell::Cell::new(false));
+
+    let (player, window_ref, pressed) = (player.clone(), window.downgrade(), held.clone());
+    keys.connect_key_pressed(move |_, key, _, modifiers| {
+        let modifiers = modifiers
+            & (gtk::gdk::ModifierType::CONTROL_MASK
+                | gtk::gdk::ModifierType::ALT_MASK
+                | gtk::gdk::ModifierType::SUPER_MASK);
+        if key != gtk::gdk::Key::space || !modifiers.is_empty() {
+            return gtk::glib::Propagation::Proceed;
+        }
+        let typing = window_ref
+            .upgrade()
+            .and_then(|window| GtkWindowExt::focus(&window))
+            .is_some_and(|focus| focus.is::<gtk::Editable>() || focus.is::<gtk::TextView>());
+        if typing {
+            return gtk::glib::Propagation::Proceed;
+        }
+        if !pressed.replace(true) && player.status().borrow().state != State::Stopped {
+            player.toggle_pause();
+        }
+        gtk::glib::Propagation::Stop
+    });
+    keys.connect_key_released(move |_, key, _, _| {
+        if key == gtk::gdk::Key::space {
+            held.set(false);
+        }
+    });
+    window.add_controller(keys);
 }
