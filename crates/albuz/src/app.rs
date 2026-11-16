@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use relm4::{
-    Component, ComponentParts, ComponentSender,
+    Component, ComponentController, ComponentParts, ComponentSender, Controller, RelmWidgetExt,
     actions::{RelmAction, RelmActionGroup},
     gtk::{self, gio, prelude::*},
 };
@@ -11,6 +11,7 @@ use tokio::task::JoinHandle;
 
 use crate::{
     account::{self, Account},
+    albums::{AlbumsMsg, AlbumsOutput, AlbumsPage},
     session_store::SessionStore,
 };
 
@@ -38,6 +39,7 @@ pub struct App {
     sign_in_url: Option<String>,
     /// The start-up check or the sign-in in progress.
     task: Option<JoinHandle<()>>,
+    albums: Controller<AlbumsPage>,
 }
 
 #[derive(Debug)]
@@ -48,6 +50,7 @@ pub enum Msg {
     CopyLink,
     CancelSignIn,
     SignOut,
+    SessionExpired,
     // Results of background tasks.
     Started(Arc<SessionStore>, Result<Option<Account>, account::Error>),
     SignInPageReady(String),
@@ -68,6 +71,13 @@ impl Component for App {
 
             #[wrap(Some)]
             set_titlebar = &gtk::HeaderBar {
+                #[wrap(Some)]
+                set_title_widget = &gtk::StackSwitcher {
+                    set_stack: Some(&library),
+                    #[watch]
+                    set_visible: model.screen == Screen::SignedIn,
+                },
+
                 pack_end = &gtk::MenuButton {
                     set_icon_name: "open-menu-symbolic",
                     set_tooltip_text: Some("Main Menu"),
@@ -197,28 +207,40 @@ impl Component for App {
                     },
                 },
 
-                // Placeholder until the library exists.
                 Screen::SignedIn => gtk::Box {
                     set_orientation: gtk::Orientation::Vertical,
-                    set_spacing: 6,
-                    set_halign: gtk::Align::Center,
-                    set_valign: gtk::Align::Center,
 
-                    gtk::Label {
-                        #[watch]
-                        set_label: &model.greeting(),
-                        add_css_class: "albuz-heading",
-                    },
-                    gtk::Label {
-                        #[watch]
-                        set_label: &model.plan(),
-                        add_css_class: "dim-label",
-                    },
                     gtk::Label {
                         #[watch]
                         set_visible: model.account.as_ref().is_some_and(|a| !a.user.can_stream()),
                         set_label: "This account can only play 30-second previews.",
                         add_css_class: "warning",
+                        set_margin_all: 6,
+                    },
+
+                    #[name = "library"]
+                    gtk::Stack {
+                        set_vexpand: true,
+                        set_transition_type: gtk::StackTransitionType::Crossfade,
+
+                        add_titled[Some("discover"), "Discover"] = &gtk::Box {
+                            set_orientation: gtk::Orientation::Vertical,
+                            set_spacing: 12,
+                            set_halign: gtk::Align::Center,
+                            set_valign: gtk::Align::Center,
+
+                            gtk::Label {
+                                set_label: "Discover",
+                                add_css_class: "albuz-heading",
+                            },
+                            gtk::Label {
+                                set_label: "New releases and picks from Qobuz will show up here.",
+                                add_css_class: "dim-label",
+                            },
+                        },
+                        add_titled: (model.albums.widget(), Some("albums"), "Albums"),
+                        // Discover is empty for now.
+                        set_visible_child_name: "albums",
                     },
                 },
             }
@@ -240,6 +262,11 @@ impl Component for App {
             error: None,
             sign_in_url: None,
             task: None,
+            albums: AlbumsPage::builder()
+                .launch(())
+                .forward(sender.input_sender(), |output| match output {
+                    AlbumsOutput::SessionExpired => Msg::SessionExpired,
+                }),
         };
         let widgets = view_output!();
 
@@ -334,16 +361,11 @@ impl Component for App {
             // A sign-in that was cancelled meanwhile.
             Msg::SignInPageReady(_) | Msg::SignInFinished(_) => {}
 
-            Msg::SignOut => {
-                self.account = None;
-                self.screen = Screen::SignedOut;
-                if let Some(store) = self.store.clone() {
-                    relm4::spawn(async move {
-                        if let Err(err) = store.clear().await {
-                            tracing::error!("cannot forget the session: {err}");
-                        }
-                    });
-                }
+            Msg::SignOut => self.sign_out(),
+            Msg::SessionExpired => {
+                tracing::info!("Qobuz no longer accepts the session");
+                self.sign_out();
+                self.error = Some("Your session expired. Sign in again.".to_owned());
             }
         }
     }
@@ -364,22 +386,24 @@ impl App {
 
     fn signed_in(&mut self, account: Account) {
         tracing::info!("signed in as user {}", account.user.id);
+        self.albums.emit(AlbumsMsg::Show(account.client.clone()));
         self.account = Some(account);
         self.screen = Screen::SignedIn;
     }
 
-    fn greeting(&self) -> String {
-        self.account
-            .as_ref()
-            .map(|a| format!("Welcome, {}", a.user.name()))
-            .unwrap_or_default()
-    }
-
-    fn plan(&self) -> String {
-        self.account
-            .as_ref()
-            .and_then(|a| a.user.credential.as_ref()?.label.clone())
-            .unwrap_or_else(|| "No subscription".to_owned())
+    /// Back to the sign-in screen, forgetting the session.
+    fn sign_out(&mut self) {
+        self.stop_task();
+        self.account = None;
+        self.albums.emit(AlbumsMsg::Clear);
+        self.screen = Screen::SignedOut;
+        if let Some(store) = self.store.clone() {
+            relm4::spawn(async move {
+                if let Err(err) = store.clear().await {
+                    tracing::error!("cannot forget the session: {err}");
+                }
+            });
+        }
     }
 }
 

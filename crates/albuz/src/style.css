@@ -16,3 +16,22 @@
   border-radius: 9999px;
   padding: 10px 32px;
 }
+
+.albuz-album-grid {
+  padding: 12px 24px;
+  background: none;
+}
+
+.albuz-album-grid > child {
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.albuz-cover {
+  border-radius: 8px;
+  background-color: alpha(currentColor, 0.08);
+}
+
+.albuz-album-title {
+  font-weight: 600;
+}

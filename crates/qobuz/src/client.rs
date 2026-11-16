@@ -1,7 +1,11 @@
 use reqwest::{RequestBuilder, Response, StatusCode};
 use serde::{Deserialize, de::DeserializeOwned};
 
-use crate::{API_URL, Error, Result, auth::Session, models::User};
+use crate::{
+    API_URL, Error, Result,
+    auth::Session,
+    models::{Album, Page, User},
+};
 
 /// The Qobuz API, called as a signed-in user.
 #[derive(Debug, Clone)]
@@ -51,6 +55,36 @@ impl Client {
             self.session.user_auth_token = token;
         }
         Ok(response.user)
+    }
+
+    /// All the albums the user saved to their favorites, in the order Qobuz returns them.
+    pub async fn favorite_albums(&self) -> Result<Vec<Album>> {
+        #[derive(Deserialize)]
+        struct Response {
+            albums: Page<Album>,
+        }
+
+        /// The most Qobuz returns at once.
+        const PAGE_SIZE: usize = 500;
+
+        let mut albums = Vec::new();
+        loop {
+            let response = self
+                .get("favorite/getUserFavorites")
+                .query(&[
+                    ("type", "albums".to_owned()),
+                    ("limit", PAGE_SIZE.to_string()),
+                    ("offset", albums.len().to_string()),
+                ])
+                .send()
+                .await?;
+            let page = read_json::<Response>(response).await?.albums;
+            let last = page.items.is_empty() || albums.len() + page.items.len() >= page.total;
+            albums.extend(page.items);
+            if last {
+                return Ok(albums);
+            }
+        }
     }
 
     fn get(&self, endpoint: &str) -> RequestBuilder {

@@ -12,7 +12,6 @@ const LOGIN_TIMEOUT: Duration = Duration::from_mins(10);
 /// The signed-in user, and the client that calls the API on their behalf.
 #[derive(Debug, Clone)]
 pub struct Account {
-    #[expect(dead_code, reason = "the library screens will call the API through it")]
     pub client: Client,
     pub user: User,
 }
