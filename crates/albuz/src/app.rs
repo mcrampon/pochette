@@ -12,6 +12,7 @@ use tokio::task::JoinHandle;
 use crate::{
     account::{self, Account},
     albums::{AlbumsMsg, AlbumsOutput, AlbumsPage},
+    player::Player,
     session_store::SessionStore,
 };
 
@@ -40,6 +41,7 @@ pub struct App {
     /// The start-up check or the sign-in in progress.
     task: Option<JoinHandle<()>>,
     albums: Controller<AlbumsPage>,
+    player: Player,
 }
 
 #[derive(Debug)]
@@ -254,6 +256,8 @@ impl Component for App {
     }
 
     fn init((): (), root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
+        let player = Player::new().expect("GStreamer and its playbin are installed");
+        finish_playback_before_closing(&root, &player);
         let model = Self {
             screen: Screen::Starting,
             http: account::http_client(),
@@ -262,11 +266,13 @@ impl Component for App {
             error: None,
             sign_in_url: None,
             task: None,
-            albums: AlbumsPage::builder()
-                .launch(())
-                .forward(sender.input_sender(), |output| match output {
+            albums: AlbumsPage::builder().launch(player.clone()).forward(
+                sender.input_sender(),
+                |output| match output {
                     AlbumsOutput::SessionExpired => Msg::SessionExpired,
-                }),
+                },
+            ),
+            player,
         };
         let widgets = view_output!();
 
@@ -395,6 +401,7 @@ impl App {
     fn sign_out(&mut self) {
         self.stop_task();
         self.account = None;
+        self.player.stop();
         self.albums.emit(AlbumsMsg::Clear);
         self.screen = Screen::SignedOut;
         if let Some(store) = self.store.clone() {
@@ -413,5 +420,22 @@ fn open_in_browser(url: &str, window: &gtk::ApplicationWindow) {
         if let Err(err) = result {
             tracing::warn!("cannot open the browser: {err}");
         }
+    });
+}
+
+/// When the window closes during playback, stop first and let Qobuz hear about the
+/// listening so far, then close: quitting right away would drop those reports.
+fn finish_playback_before_closing(window: &gtk::ApplicationWindow, player: &Player) {
+    let player = player.clone();
+    window.connect_close_request(move |window| {
+        if player.status().borrow().state == crate::player::State::Stopped {
+            return gtk::glib::Propagation::Proceed;
+        }
+        let (window, player) = (window.clone(), player.clone());
+        relm4::spawn_local(async move {
+            player.shut_down().await;
+            window.close();
+        });
+        gtk::glib::Propagation::Stop
     });
 }

@@ -7,6 +7,7 @@ mod app;
 mod clamp;
 mod covers;
 mod format;
+mod player;
 mod session_store;
 
 use tracing_subscriber::EnvFilter;

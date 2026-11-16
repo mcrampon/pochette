@@ -1,10 +1,17 @@
+use std::{
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
 use reqwest::{RequestBuilder, Response, StatusCode};
-use serde::{Deserialize, de::DeserializeOwned};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use tokio::sync::Mutex;
 
 use crate::{
     API_URL, Error, Result,
     auth::Session,
     models::{Album, Page, User},
+    web_player::fetch_web_player,
 };
 
 /// The Qobuz API, called as a signed-in user.
@@ -12,12 +19,18 @@ use crate::{
 pub struct Client {
     http: reqwest::Client,
     session: Session,
+    /// The secret that signs streaming requests, once found. Shared by all clones.
+    secret: Arc<Mutex<Option<String>>>,
 }
 
 impl Client {
     #[must_use]
     pub fn new(http: reqwest::Client, session: Session) -> Self {
-        Self { http, session }
+        Self {
+            http,
+            session,
+            secret: Arc::default(),
+        }
     }
 
     #[must_use]
@@ -97,9 +110,114 @@ impl Client {
         read_json(response).await
     }
 
+    /// Where to stream a track from, in the best quality up to `quality` that the track and
+    /// the subscription allow.
+    ///
+    /// Signs the request with the web player's secret for the user's region, found on the
+    /// first call by trying each.
+    pub async fn file_url(&self, track_id: u64, quality: Quality) -> Result<FileUrl> {
+        let mut secret = self.secret.lock().await;
+        if let Some(known) = secret.as_deref() {
+            match self.signed_file_url(track_id, quality, known).await {
+                // The web player changed its secrets: find the new one.
+                Err(Error::Api {
+                    status: 400,
+                    message,
+                }) => {
+                    tracing::info!("the signing secret no longer works: {message}");
+                    *secret = None;
+                }
+                result => return result,
+            }
+        }
+
+        let web_player = fetch_web_player(&self.http).await?;
+        if web_player.app_id != self.session.app_id {
+            tracing::warn!("the web player's app id changed since signing in");
+        }
+        let mut last_error = None;
+        for candidate in web_player.secrets {
+            match self.signed_file_url(track_id, quality, &candidate).await {
+                Ok(file_url) => {
+                    *secret = Some(candidate);
+                    return Ok(file_url);
+                }
+                Err(err) => last_error = Some(err),
+            }
+        }
+        Err(last_error.unwrap_or(Error::NoSigningSecret))
+    }
+
+    async fn signed_file_url(
+        &self,
+        track_id: u64,
+        quality: Quality,
+        secret: &str,
+    ) -> Result<FileUrl> {
+        let timestamp = unix_time().to_string();
+        let track_id = track_id.to_string();
+        let format_id = (quality as u8).to_string();
+        let signature = format!(
+            "{:x}",
+            md5::compute(format!(
+                "trackgetFileUrlformat_id{format_id}intentstreamtrack_id{track_id}{timestamp}{secret}"
+            ))
+        );
+        let response = self
+            .get("track/getFileUrl")
+            .query(&[
+                ("request_ts", timestamp.as_str()),
+                ("request_sig", signature.as_str()),
+                ("track_id", track_id.as_str()),
+                ("format_id", format_id.as_str()),
+                ("intent", "stream"),
+            ])
+            .send()
+            .await?;
+        read_json(response).await
+    }
+
+    /// Tell Qobuz a track started streaming, once per track, as the web player does.
+    pub async fn report_streaming_start(&self, track_id: u64, format_id: u32) -> Result<()> {
+        let events = serde_json::json!([{
+            "track_id": track_id,
+            "date": unix_time(),
+            "user_id": self.session.user_id,
+            "format_id": format_id,
+        }]);
+        let response = self
+            .post("track/reportStreamingStart")
+            .form(&[("events", events.to_string())])
+            .send()
+            .await?;
+        read_json::<serde_json::Value>(response).await.map(drop)
+    }
+
+    /// Tell Qobuz how long a track was streamed without interruption, which is what pays
+    /// the artists.
+    pub async fn report_streaming_end(&self, event: &StreamingEnd) -> Result<()> {
+        let report = serde_json::json!({
+            "events": [event],
+            "renderer_context": {"software_version": concat!("albuz-", env!("CARGO_PKG_VERSION"))},
+        });
+        let response = self
+            .post("track/reportStreamingEndJson")
+            .json(&report)
+            .send()
+            .await?;
+        read_json::<serde_json::Value>(response).await.map(drop)
+    }
+
     fn get(&self, endpoint: &str) -> RequestBuilder {
         self.http
             .get(format!("{API_URL}{endpoint}"))
+            .header("X-App-Id", &self.session.app_id)
+            .header("X-User-Auth-Token", &self.session.user_auth_token)
+    }
+
+    fn post(&self, endpoint: &str) -> RequestBuilder {
+        self.http
+            .post(format!("{API_URL}{endpoint}"))
             .header("X-App-Id", &self.session.app_id)
             .header("X-User-Auth-Token", &self.session.user_auth_token)
     }
@@ -132,4 +250,58 @@ pub(crate) async fn read_json<T: DeserializeOwned>(response: Response) -> Result
             message,
         },
     })
+}
+
+fn unix_time() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs())
+}
+
+/// The best quality to ask for. Qobuz answers with the best that the track and the
+/// subscription allow, up to it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum Quality {
+    Mp3 = 5,
+    /// FLAC, 16-bit / 44.1 kHz.
+    Cd = 6,
+    /// FLAC, up to 24-bit / 96 kHz.
+    HiRes96 = 7,
+    /// FLAC, up to 24-bit / 192 kHz.
+    HiRes192 = 27,
+}
+
+/// Where a track streams from.
+#[derive(Debug, Clone, Deserialize)]
+pub struct FileUrl {
+    pub url: String,
+    /// The [`Quality`] Qobuz picked.
+    pub format_id: u32,
+    pub mime_type: Option<String>,
+    /// In kHz.
+    pub sampling_rate: Option<f32>,
+    pub bit_depth: Option<u32>,
+    /// Identifies this stream in the streaming reports.
+    pub blob: Option<String>,
+    /// Whether it's only a 30-second preview, as for free accounts.
+    #[serde(default)]
+    pub sample: bool,
+}
+
+/// A stretch of a track streamed without interruption.
+#[derive(Debug, Clone, Serialize)]
+pub struct StreamingEnd {
+    /// The [`FileUrl::blob`] of the stream.
+    pub blob: String,
+    /// Tells the stretches of one play of a track apart from those of another.
+    pub track_context_uuid: String,
+    /// When the stretch started, as `2026-11-16T19:00:00.000Z`.
+    pub start_stream: String,
+    /// Always true: streamed, not played from a download.
+    pub online: bool,
+    /// Always false: played here, not on another device.
+    pub local: bool,
+    /// In seconds.
+    pub duration: u64,
 }

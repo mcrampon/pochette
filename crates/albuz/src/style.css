@@ -100,3 +100,19 @@
 .albuz-review {
   line-height: 1.5;
 }
+
+.albuz-play {
+  border-radius: 9999px;
+  padding: 10px 28px;
+  font-size: 1.1em;
+  font-weight: 700;
+}
+
+.albuz-tracks > row.albuz-playing {
+  background-color: alpha(@accent_bg_color, 0.15);
+}
+
+.albuz-tracks > row.albuz-playing label {
+  color: @accent_color;
+  opacity: 1;
+}

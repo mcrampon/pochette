@@ -11,6 +11,7 @@ use tokio::task::JoinHandle;
 use crate::{
     album_page::{AlbumPage, AlbumPageMsg, AlbumPageOutput},
     covers::VisibleCovers,
+    player::Player,
 };
 
 /// The side of a cover in the grid, in logical pixels.
@@ -58,7 +59,7 @@ pub enum AlbumsOutput {
 
 #[relm4::component(pub)]
 impl Component for AlbumsPage {
-    type Init = ();
+    type Init = Player;
     type Input = AlbumsMsg;
     type Output = AlbumsOutput;
     type CommandOutput = ();
@@ -156,7 +157,11 @@ impl Component for AlbumsPage {
         }
     }
 
-    fn init((): (), root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
+    fn init(
+        player: Player,
+        root: Self::Root,
+        sender: ComponentSender<Self>,
+    ) -> ComponentParts<Self> {
         let model = Self {
             state: State::Loading,
             grid: TypedGridView::new(),
@@ -164,12 +169,13 @@ impl Component for AlbumsPage {
             error: String::new(),
             task: None,
             covers: VisibleCovers::default(),
-            album_page: AlbumPage::builder()
-                .launch(())
-                .forward(sender.input_sender(), |output| match output {
+            album_page: AlbumPage::builder().launch(player).forward(
+                sender.input_sender(),
+                |output| match output {
                     AlbumPageOutput::Back => AlbumsMsg::CloseAlbum,
                     AlbumPageOutput::SessionExpired => AlbumsMsg::SessionExpired,
-                }),
+                },
+            ),
             showing_album: false,
         };
         let grid_view = &model.grid.view;

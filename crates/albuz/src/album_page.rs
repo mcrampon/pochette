@@ -1,5 +1,7 @@
 //! An album's page: its cover and details, its tracks, then its review.
 
+use std::{cell::RefCell, rc::Rc};
+
 use qobuz::{
     Client,
     models::{Album, Track},
@@ -10,7 +12,11 @@ use relm4::{
 };
 use tokio::task::JoinHandle;
 
-use crate::{clamp::Clamp, covers, format};
+use crate::{
+    clamp::Clamp,
+    covers, format,
+    player::{Player, State, Status},
+};
 
 /// The widest the page's content gets, so it stays readable in a wide window.
 const MAX_WIDTH: i32 = 960;
@@ -34,6 +40,10 @@ pub struct AlbumPage {
     task: Option<JoinHandle<()>>,
     cover: gtk::Picture,
     track_list: gtk::Box,
+    /// The track rows, with the id of their track.
+    rows: Vec<(u64, gtk::ListBoxRow)>,
+    player: Player,
+    playback: Status,
 }
 
 #[derive(Debug)]
@@ -53,6 +63,11 @@ pub enum AlbumPageMsg {
         url: String,
         texture: Option<gdk::Texture>,
     },
+    /// Play the album, or pause or resume it if it's the one playing.
+    PlayPressed,
+    /// Play the album from this track.
+    PlayTrack(u64),
+    PlaybackChanged(Status),
 }
 
 #[derive(Debug)]
@@ -63,7 +78,7 @@ pub enum AlbumPageOutput {
 
 #[relm4::component(pub)]
 impl Component for AlbumPage {
-    type Init = ();
+    type Init = Player;
     type Input = AlbumPageMsg;
     type Output = AlbumPageOutput;
     type CommandOutput = ();
@@ -132,6 +147,41 @@ impl Component for AlbumPage {
                             set_valign: gtk::Align::End,
                             set_hexpand: true,
 
+                            gtk::Button {
+                                set_halign: gtk::Align::Start,
+                                set_margin_bottom: 12,
+                                add_css_class: "suggested-action",
+                                add_css_class: "albuz-play",
+                                #[watch]
+                                set_sensitive: model.can_play(),
+                                connect_clicked => AlbumPageMsg::PlayPressed,
+
+                                gtk::Box {
+                                    set_spacing: 8,
+
+                                    gtk::Image {
+                                        #[watch]
+                                        set_icon_name: Some(if model.is_playing() {
+                                            "media-playback-pause-symbolic"
+                                        } else {
+                                            "media-playback-start-symbolic"
+                                        }),
+                                    },
+                                    gtk::Label {
+                                        #[watch]
+                                        set_label: if model.is_playing() { "Pause" } else { "Play" },
+                                    },
+                                },
+                            },
+                            gtk::Label {
+                                #[watch]
+                                set_label: &model.playback_error(),
+                                #[watch]
+                                set_visible: !model.playback_error().is_empty(),
+                                set_xalign: 0.0,
+                                set_wrap: true,
+                                add_css_class: "error",
+                            },
                             gtk::Label {
                                 #[watch]
                                 set_label: &model.kicker(),
@@ -264,7 +314,12 @@ impl Component for AlbumPage {
         }
     }
 
-    fn init((): (), root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
+    fn init(
+        player: Player,
+        root: Self::Root,
+        sender: ComponentSender<Self>,
+    ) -> ComponentParts<Self> {
+        follow_playback(&player, &sender);
         let model = Self {
             client: None,
             album: None,
@@ -273,6 +328,9 @@ impl Component for AlbumPage {
             task: None,
             cover: gtk::Picture::new(),
             track_list: gtk::Box::default(),
+            rows: Vec::new(),
+            playback: player.status().borrow().clone(),
+            player,
         };
         let cover = &model.cover;
         let track_list = &model.track_list;
@@ -301,7 +359,8 @@ impl Component for AlbumPage {
                 self.task = None;
                 match result {
                     Ok(album) => {
-                        fill_track_list(&self.track_list, &album);
+                        self.rows = fill_track_list(&self.track_list, &album, &sender);
+                        self.highlight_playing_track();
                         self.album = Some(album);
                         self.tracks = Tracks::Loaded;
                     }
@@ -325,11 +384,76 @@ impl Component for AlbumPage {
                     self.cover.set_paintable(texture.as_ref());
                 }
             }
+            AlbumPageMsg::PlayPressed => {
+                let is_current = self
+                    .album
+                    .as_ref()
+                    .is_some_and(|album| self.playback.is_current(&album.id));
+                if is_current {
+                    self.player.toggle_pause();
+                } else {
+                    self.play(None);
+                }
+            }
+            AlbumPageMsg::PlayTrack(track_id) => self.play(Some(track_id)),
+            AlbumPageMsg::PlaybackChanged(status) => {
+                self.playback = status;
+                self.highlight_playing_track();
+            }
         }
     }
 }
 
 impl AlbumPage {
+    fn play(&self, track_id: Option<u64>) {
+        if let (Some(client), Some(album)) = (&self.client, &self.album) {
+            self.player
+                .play_album(client.clone(), album.clone(), track_id);
+        }
+    }
+
+    /// Whether the album has tracks to play.
+    fn can_play(&self) -> bool {
+        self.tracks == Tracks::Loaded
+            && self
+                .album
+                .as_ref()
+                .and_then(|album| album.tracks.as_ref())
+                .is_some_and(|tracks| tracks.items.iter().any(|track| track.streamable))
+    }
+
+    /// Whether this album is playing, or about to.
+    fn is_playing(&self) -> bool {
+        self.album.as_ref().is_some_and(|album| {
+            self.playback.is_current(&album.id)
+                && matches!(self.playback.state, State::Playing | State::Loading)
+        })
+    }
+
+    fn playback_error(&self) -> String {
+        let ours =
+            self.album.as_ref().map(|album| album.id.as_str()) == self.playback.album_id.as_deref();
+        match &self.playback.error {
+            Some(error) if ours => error.clone(),
+            _ => String::new(),
+        }
+    }
+
+    fn highlight_playing_track(&self) {
+        let playing = self
+            .album
+            .as_ref()
+            .filter(|album| self.playback.is_current(&album.id))
+            .and(self.playback.track_id);
+        for (track_id, row) in &self.rows {
+            if Some(*track_id) == playing {
+                row.add_css_class("albuz-playing");
+            } else {
+                row.remove_css_class("albuz-playing");
+            }
+        }
+    }
+
     fn load(&mut self, sender: &ComponentSender<Self>) {
         let (Some(client), Some(album)) = (self.client.clone(), self.album.as_ref()) else {
             return;
@@ -449,8 +573,14 @@ fn release_type_name(release_type: &str) -> &str {
 }
 
 /// List the tracks, under a heading per disc when there are several, and per work when
-/// tracks are movements of a larger piece.
-fn fill_track_list(list: &gtk::Box, album: &Album) {
+/// tracks are movements of a larger piece. Activating a track plays the album from it.
+///
+/// Returns the rows, with the id of their track.
+fn fill_track_list(
+    list: &gtk::Box,
+    album: &Album,
+    sender: &ComponentSender<AlbumPage>,
+) -> Vec<(u64, gtk::ListBoxRow)> {
     while let Some(child) = list.first_child() {
         list.remove(&child);
     }
@@ -462,7 +592,9 @@ fn fill_track_list(list: &gtk::Box, album: &Album) {
 
     let mut disc = None;
     let mut work = None;
-    let mut rows: Option<gtk::ListBox> = None;
+    let mut all_rows = Vec::new();
+    // The current list of rows, with the ids of its tracks by position.
+    let mut rows: Option<(gtk::ListBox, Rc<RefCell<Vec<u64>>>)> = None;
     for track in tracks {
         if disc != Some(track.media_number) {
             disc = Some(track.media_number);
@@ -483,15 +615,29 @@ fn fill_track_list(list: &gtk::Box, album: &Album) {
             ));
             rows = None;
         }
-        let rows = rows.get_or_insert_with(|| {
+        let (rows, ids) = rows.get_or_insert_with(|| {
             let rows = gtk::ListBox::new();
             rows.set_selection_mode(gtk::SelectionMode::None);
             rows.add_css_class("albuz-tracks");
+            let ids: Rc<RefCell<Vec<u64>>> = Rc::default();
+            let (sender, row_ids) = (sender.clone(), ids.clone());
+            rows.connect_row_activated(move |_, row| {
+                let id = usize::try_from(row.index())
+                    .ok()
+                    .and_then(|index| row_ids.borrow().get(index).copied());
+                if let Some(id) = id {
+                    sender.input(AlbumPageMsg::PlayTrack(id));
+                }
+            });
             list.append(&rows);
-            rows
+            (rows, ids)
         });
-        rows.append(&track_row(track, &album.artist.name));
+        let row = track_row(track, &album.artist.name);
+        rows.append(&row);
+        ids.borrow_mut().push(track.id);
+        all_rows.push((track.id, row));
     }
+    all_rows
 }
 
 fn heading(text: &str, css_class: &str) -> gtk::Label {
@@ -512,8 +658,7 @@ fn track_row(track: &Track, album_artist: &str) -> gtk::ListBoxRow {
 
     relm4::view! {
         row = gtk::ListBoxRow {
-            // Nothing happens on activation until there's a player.
-            set_activatable: false,
+            set_activatable: track.streamable,
 
             gtk::Box {
                 set_spacing: 12,
@@ -560,4 +705,16 @@ fn track_row(track: &Track, album_artist: &str) -> gtk::ListBoxRow {
         row.set_tooltip_text(Some("Not available for streaming"));
     }
     row
+}
+
+/// Pass the player's status changes on to the page.
+fn follow_playback(player: &Player, sender: &ComponentSender<AlbumPage>) {
+    let mut status = player.status();
+    let sender = sender.clone();
+    relm4::spawn(async move {
+        while status.changed().await.is_ok() {
+            let current = status.borrow_and_update().clone();
+            sender.input(AlbumPageMsg::PlaybackChanged(current));
+        }
+    });
 }

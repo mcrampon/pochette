@@ -18,6 +18,9 @@ pub enum Error {
     #[error("could not find the app id in the Qobuz web player")]
     AppIdNotFound,
 
+    #[error("none of the web player's secrets signs streaming requests")]
+    NoSigningSecret,
+
     #[error("the browser login failed: {0}")]
     Login(String),
 
