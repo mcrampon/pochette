@@ -143,3 +143,8 @@
 .albuz-skip image {
   -gtk-icon-size: 20px;
 }
+
+/* Selectable labels can't be typed in, so they need no text cursor. */
+label {
+  caret-color: transparent;
+}
