@@ -15,6 +15,7 @@ use crate::{
     now_playing::NowPlaying,
     player::{Player, State},
     session_store::SessionStore,
+    settings::Settings,
     split_view::SplitView,
 };
 
@@ -293,6 +294,7 @@ impl Component for App {
 
     fn init((): (), root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let player = Player::new().expect("GStreamer and its playbin are installed");
+        player.set_volume(Settings::load().volume);
         finish_playback_before_closing(&root, &player);
         play_pause_with_space(&root, &player);
         let model = Self {

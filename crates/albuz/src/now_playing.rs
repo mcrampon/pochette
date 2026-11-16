@@ -15,6 +15,7 @@ use crate::{
     clamp::Clamp,
     covers, format,
     player::{Player, State, Status},
+    settings::Settings,
 };
 
 /// The side of the cover, in logical pixels.
@@ -29,6 +30,10 @@ const SCRUB_DELAY: Duration = Duration::from_millis(200);
 /// How long the progress bar trusts the user over the player after a seek, which takes
 /// a moment to land.
 const SEEK_SETTLE: Duration = Duration::from_millis(800);
+
+/// How long the volume must stay put before it is saved, so dragging the slider doesn't
+/// write the settings at every step.
+const VOLUME_SAVE_DELAY: Duration = Duration::from_millis(500);
 
 pub struct NowPlaying {
     player: Player,
@@ -45,6 +50,8 @@ pub struct NowPlaying {
     scrub: Option<f64>,
     /// Tells the latest scrub from the earlier ones.
     scrubs: u64,
+    /// Tells the latest volume change from the earlier ones.
+    volume_changes: u64,
     seeked_at: Option<Instant>,
 }
 
@@ -64,6 +71,9 @@ pub enum NowPlayingMsg {
     /// Seek to where the user moved the progress bar, unless they moved it again since.
     Seek(u64),
     Tick,
+    Volume(f64),
+    /// Save the volume, unless it changed again since.
+    SaveVolume(u64),
 }
 
 #[relm4::component(pub)]
@@ -222,8 +232,8 @@ impl Component for NowPlaying {
                                 set_draw_value: false,
                                 set_tooltip_text: Some("Volume"),
                                 set_value: model.player.volume(),
-                                connect_value_changed[player = model.player.clone()] => move |scale| {
-                                    player.set_volume(scale.value());
+                                connect_value_changed[sender] => move |scale| {
+                                    sender.input(NowPlayingMsg::Volume(scale.value()));
                                 },
                             },
                             gtk::Image {
@@ -278,6 +288,7 @@ impl Component for NowPlaying {
             listed: Arc::default(),
             scrub: None,
             scrubs: 0,
+            volume_changes: 0,
             seeked_at: None,
         };
         let cover = &model.cover;
@@ -332,6 +343,20 @@ impl Component for NowPlaying {
             NowPlayingMsg::Tick => {
                 if self.status.state != State::Stopped {
                     self.show_progress();
+                }
+            }
+            NowPlayingMsg::Volume(volume) => {
+                self.player.set_volume(volume);
+                self.volume_changes += 1;
+                let (changes, sender) = (self.volume_changes, sender.clone());
+                glib::timeout_add_local_once(VOLUME_SAVE_DELAY, move || {
+                    sender.input(NowPlayingMsg::SaveVolume(changes));
+                });
+            }
+            NowPlayingMsg::SaveVolume(changes) => {
+                if changes == self.volume_changes {
+                    let volume = self.player.volume();
+                    Settings::update(|settings| settings.volume = volume);
                 }
             }
         }
