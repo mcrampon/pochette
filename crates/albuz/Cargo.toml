@@ -4,6 +4,7 @@ description = "A native Linux player for Qobuz, built around albums"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+license.workspace = true
 
 [lints]
 workspace = true

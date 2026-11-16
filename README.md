@@ -30,3 +30,7 @@ in your keyring through the Secret Service API (GNOME Keyring, KWallet, KeePassX
 nix develop          # or any Rust ≥ 1.95 toolchain
 cargo test           # add `-- --include-ignored` to also check against the live web player
 ```
+
+## License
+
+[GPL-3.0-or-later](LICENSE)
