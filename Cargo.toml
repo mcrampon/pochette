@@ -12,7 +12,10 @@ repository = "https://github.com/albuz/albuz"
 [workspace.dependencies]
 qobuz = { path = "crates/qobuz" }
 oo7 = "0.7"
-open = "5"
+# Plain GTK, no libadwaita: 4.14 is what current distributions ship.
+gtk = { package = "gtk4", version = "0.11", features = ["v4_14"] }
+# Default features only: the gnome_4x ones also pull in libadwaita.
+relm4 = "0.11"
 regex = "1"
 reqwest = { version = "0.13", features = ["json", "query"] }
 serde = { version = "1", features = ["derive"] }

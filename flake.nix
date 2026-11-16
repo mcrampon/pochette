@@ -17,6 +17,7 @@
             clippy
             rustfmt
             rust-analyzer
+            gtk4
             # aws-lc-rs (reqwest's TLS crypto) builds C sources
             cmake
             pkg-config

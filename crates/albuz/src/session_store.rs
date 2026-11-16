@@ -31,9 +31,19 @@ type Result<T> = std::result::Result<T, Error>;
 
 const LABEL: &str = "Albuz Qobuz session";
 
+/// Where the session is kept.
 pub enum SessionStore {
     Keyring(oo7::Keyring),
     File(PathBuf),
+}
+
+impl std::fmt::Debug for SessionStore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Keyring(_) => f.write_str("SessionStore::Keyring"),
+            Self::File(path) => write!(f, "SessionStore::File({})", path.display()),
+        }
+    }
 }
 
 impl SessionStore {

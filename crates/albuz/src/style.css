@@ -1,0 +1,18 @@
+.albuz-title {
+  font-size: 2.5em;
+  font-weight: 800;
+}
+
+.albuz-heading {
+  font-size: 1.5em;
+  font-weight: 700;
+}
+
+.albuz-caption {
+  font-size: 0.9em;
+}
+
+.albuz-pill {
+  border-radius: 9999px;
+  padding: 10px 32px;
+}
