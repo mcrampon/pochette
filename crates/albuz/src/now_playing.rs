@@ -31,6 +31,9 @@ const SCRUB_DELAY: Duration = Duration::from_millis(200);
 /// a moment to land.
 const SEEK_SETTLE: Duration = Duration::from_millis(800);
 
+/// How much one notch of the mouse wheel changes the volume.
+const VOLUME_STEP: f64 = 0.05;
+
 /// How long the volume must stay put before it is saved, so dragging the slider doesn't
 /// write the settings at every step.
 const VOLUME_SAVE_DELAY: Duration = Duration::from_millis(500);
@@ -234,6 +237,16 @@ impl Component for NowPlaying {
                                 set_value: model.player.volume(),
                                 connect_value_changed[sender] => move |scale| {
                                     sender.input(NowPlayingMsg::Volume(scale.value()));
+                                },
+                                // GTK's own step is far too big on so short a range.
+                                add_controller = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL) {
+                                    set_propagation_phase: gtk::PropagationPhase::Capture,
+                                    connect_scroll => move |controller, _, dy| {
+                                        if let Some(scale) = controller.widget().and_downcast::<gtk::Scale>() {
+                                            scale.set_value((scale.value() - dy * VOLUME_STEP).clamp(0.0, 1.0));
+                                        }
+                                        glib::Propagation::Stop
+                                    },
                                 },
                             },
                             gtk::Image {
