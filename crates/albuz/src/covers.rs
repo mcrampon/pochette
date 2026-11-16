@@ -7,6 +7,7 @@ use std::{
     path::{Path, PathBuf},
     rc::Rc,
     sync::OnceLock,
+    time::{Duration, SystemTime},
 };
 
 use relm4::gtk::{self, gdk, glib, prelude::*};
@@ -14,6 +15,9 @@ use tokio::sync::Semaphore;
 
 /// How many covers download at once.
 const MAX_DOWNLOADS: usize = 6;
+
+/// How long a cover stays on disk.
+const MAX_AGE: Duration = Duration::from_hours(30 * 24);
 
 /// How many decoded covers stay in memory.
 const MEMORY_CAPACITY: usize = 200;
@@ -102,6 +106,46 @@ async fn save(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let partial = path.with_extension("part");
     tokio::fs::write(&partial, bytes).await?;
     tokio::fs::rename(&partial, path).await
+}
+
+/// Delete the covers cached [`MAX_AGE`] ago or more, in the background.
+///
+/// Covers still in use are downloaded again; the others no longer take space.
+pub fn prune_cache() {
+    relm4::spawn_blocking(|| {
+        let dir = cache_dir();
+        match prune(&dir, MAX_AGE, SystemTime::now()) {
+            Ok(0) => {}
+            Ok(removed) => tracing::debug!("removed {removed} old covers from {}", dir.display()),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err) => tracing::warn!("cannot clean up the cover cache: {err}"),
+        }
+    });
+}
+
+/// Delete the files in `dir` written `max_age` before `now` or earlier, and return how many.
+///
+/// Half-written `.part` files are deleted the same way, which leaves alone those still being
+/// written and removes those a crash left behind.
+fn prune(dir: &Path, max_age: Duration, now: SystemTime) -> std::io::Result<usize> {
+    let mut removed = 0;
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let metadata = entry.metadata()?;
+        // Files written in the future (a clock that moved back) count as new.
+        let age = metadata
+            .modified()
+            .map(|written| now.duration_since(written).unwrap_or_default())?;
+        if metadata.is_file() && age >= max_age {
+            match std::fs::remove_file(entry.path()) {
+                Ok(()) => removed += 1,
+                // Someone else removed it already.
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+                Err(err) => return Err(err),
+            }
+        }
+    }
+    Ok(removed)
 }
 
 fn cache_dir() -> PathBuf {
@@ -295,5 +339,31 @@ mod tests {
             None
         );
         assert_eq!(file_name("https://example.com/cover.jpg"), None);
+    }
+
+    #[test]
+    fn prunes_covers_cached_for_too_long() {
+        let dir = std::env::temp_dir().join(format!("albuz-prune-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let now = SystemTime::now();
+        let day = Duration::from_hours(24);
+        let write = |name: &str, age: Duration| {
+            let file = std::fs::File::create(dir.join(name)).unwrap();
+            file.set_modified(now - age).unwrap();
+        };
+        write("fresh.jpg", day);
+        write("old.jpg", 31 * day);
+        write("just-expired.jpg", 30 * day);
+        write("crashed.part", 40 * day);
+
+        assert_eq!(prune(&dir, MAX_AGE, now).unwrap(), 3);
+        let mut left: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        left.sort();
+        assert_eq!(left, ["fresh.jpg"]);
+
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

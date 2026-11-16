@@ -18,5 +18,6 @@ fn main() {
 
     let relm = relm4::RelmApp::new(APP_ID);
     relm4::set_global_css(include_str!("style.css"));
+    covers::prune_cache();
     relm.run::<app::App>(());
 }
