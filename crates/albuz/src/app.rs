@@ -12,8 +12,10 @@ use tokio::task::JoinHandle;
 use crate::{
     account::{self, Account},
     albums::{AlbumsMsg, AlbumsOutput, AlbumsPage},
-    player::Player,
+    now_playing::NowPlaying,
+    player::{Player, State},
     session_store::SessionStore,
+    split_view::SplitView,
 };
 
 relm4::new_action_group!(WindowActions, "win");
@@ -41,7 +43,15 @@ pub struct App {
     /// The start-up check or the sign-in in progress.
     task: Option<JoinHandle<()>>,
     albums: Controller<AlbumsPage>,
+    now_playing: Controller<NowPlaying>,
     player: Player,
+    /// Whether something is playing or paused.
+    playing: bool,
+    /// Whether the user wants the now playing pane, while something plays.
+    pane_open: bool,
+    /// Whether the window is too narrow for the pane next to the library, which it
+    /// then replaces.
+    collapsed: bool,
 }
 
 #[derive(Debug)]
@@ -53,6 +63,11 @@ pub enum Msg {
     CancelSignIn,
     SignOut,
     SessionExpired,
+    PlayingChanged(bool),
+    ShowPane(bool),
+    Collapsed(bool),
+    /// The user picked a tab.
+    LibraryShown,
     // Results of background tasks.
     Started(Arc<SessionStore>, Result<Option<Account>, account::Error>),
     SignInPageReady(String),
@@ -86,6 +101,19 @@ impl Component for App {
                     set_menu_model: Some(&main_menu),
                     #[watch]
                     set_visible: model.screen == Screen::SignedIn,
+                },
+
+                pack_end = &gtk::ToggleButton {
+                    set_icon_name: "audio-x-generic-symbolic",
+                    set_tooltip_text: Some("Now Playing"),
+                    #[watch]
+                    set_visible: model.screen == Screen::SignedIn && model.playing,
+                    #[watch]
+                    #[block_signal(pane_toggled)]
+                    set_active: model.pane_open,
+                    connect_toggled[sender] => move |button| {
+                        sender.input(Msg::ShowPane(button.is_active()));
+                    } @pane_toggled,
                 },
             },
 
@@ -220,9 +248,15 @@ impl Component for App {
                         set_margin_all: 6,
                     },
 
-                    #[name = "library"]
-                    gtk::Stack {
+                    #[name = "split"]
+                    SplitView {
                         set_vexpand: true,
+                        set_pane: model.now_playing.widget(),
+                        #[watch]
+                        set_show_pane: model.playing && model.pane_open,
+
+                        #[name = "library"]
+                        set_content = &gtk::Stack {
                         set_transition_type: gtk::StackTransitionType::Crossfade,
 
                         add_titled[Some("discover"), "Discover"] = &gtk::Box {
@@ -243,6 +277,8 @@ impl Component for App {
                         add_titled: (model.albums.widget(), Some("albums"), "Albums"),
                         // Discover is empty for now.
                         set_visible_child_name: "albums",
+                        connect_visible_child_notify => Msg::LibraryShown,
+                        },
                     },
                 },
             }
@@ -272,9 +308,18 @@ impl Component for App {
                     AlbumsOutput::SessionExpired => Msg::SessionExpired,
                 },
             ),
+            now_playing: NowPlaying::builder().launch(player.clone()).detach(),
             player,
+            playing: false,
+            pane_open: false,
+            collapsed: false,
         };
         let widgets = view_output!();
+        let input = sender.input_sender().clone();
+        widgets
+            .split
+            .connect_collapsed(move |collapsed| input.emit(Msg::Collapsed(collapsed)));
+        follow_playback(&model.player, &sender);
 
         let mut actions = RelmActionGroup::<WindowActions>::new();
         let input = sender.input_sender().clone();
@@ -373,8 +418,40 @@ impl Component for App {
                 self.sign_out();
                 self.error = Some("Your session expired. Sign in again.".to_owned());
             }
+
+            Msg::PlayingChanged(playing) => {
+                if playing && !self.playing {
+                    // Open the pane when playback starts, unless it would hide what the
+                    // user is looking at.
+                    self.pane_open = !self.collapsed;
+                }
+                self.playing = playing;
+            }
+            Msg::ShowPane(show) => self.pane_open = show,
+            Msg::Collapsed(collapsed) => self.collapsed = collapsed,
+            Msg::LibraryShown => {
+                // Over the library, the pane hides the tab the user just picked.
+                if self.collapsed {
+                    self.pane_open = false;
+                }
+            }
         }
     }
+}
+
+fn follow_playback(player: &Player, sender: &ComponentSender<App>) {
+    let mut status = player.status();
+    let sender = sender.clone();
+    relm4::spawn(async move {
+        let mut playing = false;
+        while status.changed().await.is_ok() {
+            let now = status.borrow_and_update().state != State::Stopped;
+            if now != playing {
+                playing = now;
+                sender.input(Msg::PlayingChanged(playing));
+            }
+        }
+    });
 }
 
 impl App {

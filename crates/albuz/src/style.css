@@ -116,3 +116,30 @@
   color: @accent_color;
   opacity: 1;
 }
+
+.albuz-now-playing {
+  background-color: alpha(currentColor, 0.03);
+}
+
+.albuz-now-playing-title {
+  font-size: 1.3em;
+  font-weight: 700;
+}
+
+.albuz-play-pause {
+  min-width: 56px;
+  min-height: 56px;
+}
+
+.albuz-play-pause image {
+  -gtk-icon-size: 24px;
+}
+
+.albuz-skip {
+  min-width: 40px;
+  min-height: 40px;
+}
+
+.albuz-skip image {
+  -gtk-icon-size: 20px;
+}

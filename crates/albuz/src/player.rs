@@ -23,8 +23,12 @@ use tokio::{
 /// The best quality to ask Qobuz for.
 const QUALITY: Quality = Quality::HiRes192;
 
+/// Within this much of a track's start, "previous" goes to the previous track rather than
+/// back to the start of this one.
+const RESTART_WITHIN: Duration = Duration::from_secs(3);
+
 /// What the player is doing.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default)]
 pub struct Status {
     pub state: State,
     /// The album being played, or paused.
@@ -33,6 +37,14 @@ pub struct Status {
     pub track_id: Option<u64>,
     /// Why playback stopped, if it failed.
     pub error: Option<String>,
+    /// The album being played, without its tracks: they're in `queue`.
+    pub album: Option<Arc<Album>>,
+    /// The album's tracks that can be streamed, in order.
+    pub queue: Arc<[Track]>,
+    /// The track being played, as an index in `queue`.
+    pub index: Option<usize>,
+    /// The quality of the stream being played: "24-bit / 96 kHz".
+    pub quality: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -50,6 +62,15 @@ impl Status {
     pub fn is_current(&self, album_id: &str) -> bool {
         self.state != State::Stopped && self.album_id.as_deref() == Some(album_id)
     }
+
+    /// The track being played, or paused.
+    pub fn track(&self) -> Option<&Track> {
+        self.queue.get(self.index?)
+    }
+
+    pub fn has_next(&self) -> bool {
+        self.index.is_some_and(|index| index + 1 < self.queue.len())
+    }
 }
 
 /// Drives the player. Cheap to clone: every clone drives the same player.
@@ -57,6 +78,8 @@ impl Status {
 pub struct Player {
     commands: mpsc::UnboundedSender<Command>,
     status: watch::Receiver<Status>,
+    /// To read the position and set the volume, which needs no help from the actor.
+    playbin: gst::Element,
 }
 
 impl std::fmt::Debug for Player {
@@ -75,6 +98,12 @@ enum Command {
         track_id: Option<u64>,
     },
     TogglePause,
+    Next,
+    /// Back to the start of the track, or to the previous track near its start.
+    Previous,
+    /// Play the track at this index in the queue.
+    PlayIndex(usize),
+    Seek(Duration),
     /// Stop, and answer once the last listening is reported.
     Stop(Option<oneshot::Sender<()>>),
 }
@@ -87,9 +116,13 @@ impl Player {
             .map_err(|err| gst::glib::Error::new(gst::CoreError::MissingPlugin, &err.message))?;
         let (commands, receiver) = mpsc::unbounded_channel();
         let (status_sender, status) = watch::channel(Status::default());
-        let actor = Actor::new(playbin, status_sender);
+        let actor = Actor::new(playbin.clone(), status_sender);
         relm4::spawn(actor.run(receiver));
-        Ok(Self { commands, status })
+        Ok(Self {
+            commands,
+            status,
+            playbin,
+        })
     }
 
     /// Play `album`, from `track_id` or from the start.
@@ -103,6 +136,38 @@ impl Player {
 
     pub fn toggle_pause(&self) {
         self.send(Command::TogglePause);
+    }
+
+    pub fn next(&self) {
+        self.send(Command::Next);
+    }
+
+    pub fn previous(&self) {
+        self.send(Command::Previous);
+    }
+
+    /// Play the track at `index` in the queue.
+    pub fn play_index(&self, index: usize) {
+        self.send(Command::PlayIndex(index));
+    }
+
+    pub fn seek(&self, position: Duration) {
+        self.send(Command::Seek(position));
+    }
+
+    /// Where playback is in the current track.
+    pub fn position(&self) -> Option<Duration> {
+        position(&self.playbin)
+    }
+
+    /// The volume, from 0 to 1, on the cubic scale people hear, as sliders show it.
+    pub fn volume(&self) -> f64 {
+        self.playbin.property::<f64>("volume").cbrt()
+    }
+
+    pub fn set_volume(&self, volume: f64) {
+        self.playbin
+            .set_property("volume", volume.clamp(0.0, 1.0).powi(3));
     }
 
     pub fn stop(&self) {
@@ -136,9 +201,12 @@ struct Actor {
     playbin: gst::Element,
     status: watch::Sender<Status>,
     client: Option<Client>,
-    album_id: Option<String>,
+    /// The album playing, without its tracks.
+    album: Option<Arc<Album>>,
     /// The album's tracks that can be streamed, in order.
-    queue: Vec<Track>,
+    queue: Arc<[Track]>,
+    /// The quality of the stream playing.
+    quality: Option<String>,
     /// The track playing, as an index in the queue.
     current: Option<usize>,
     /// The track asked to play, until its stream starts.
@@ -151,6 +219,8 @@ struct Actor {
     /// Whether the user wants sound: buffering pauses the stream, but not the user.
     wants_playing: bool,
     report: Option<Report>,
+    /// Reports of tracks no longer playing that may still be on their way to Qobuz.
+    sending: Vec<JoinHandle<()>>,
 }
 
 impl Actor {
@@ -176,8 +246,9 @@ impl Actor {
             playbin,
             status,
             client: None,
-            album_id: None,
-            queue: Vec::new(),
+            album: None,
+            queue: Arc::default(),
+            quality: None,
             current: None,
             starting: None,
             upcoming,
@@ -185,6 +256,7 @@ impl Actor {
             prefetch: None,
             wants_playing: false,
             report: None,
+            sending: Vec::new(),
         }
     }
 
@@ -206,12 +278,13 @@ impl Actor {
         match command {
             Command::PlayAlbum {
                 client,
-                album,
+                mut album,
                 track_id,
             } => {
                 self.stop().await;
                 self.queue = album
                     .tracks
+                    .take()
                     .map(|page| page.items)
                     .unwrap_or_default()
                     .into_iter()
@@ -221,13 +294,33 @@ impl Actor {
                     .and_then(|id| self.queue.iter().position(|track| track.id == id))
                     .unwrap_or(0);
                 self.client = Some(client);
-                self.album_id = Some(album.id);
+                self.album = Some(Arc::new(*album));
                 self.play(start).await;
             }
             Command::TogglePause => self.toggle_pause(),
+            Command::Next => {
+                let next = self.current.map(|index| index + 1);
+                if let Some(next) = next.filter(|&next| next < self.queue.len()) {
+                    self.skip_to(next).await;
+                }
+            }
+            Command::Previous => match self.current {
+                Some(index) if index > 0 && self.position() < RESTART_WITHIN => {
+                    self.skip_to(index - 1).await;
+                }
+                Some(_) => self.seek(Duration::ZERO),
+                None => {}
+            },
+            Command::PlayIndex(index) => {
+                if index < self.queue.len() {
+                    self.skip_to(index).await;
+                }
+            }
+            Command::Seek(position) => self.seek(position),
             Command::Stop(done) => {
                 self.stop().await;
-                self.album_id = None;
+                self.album = None;
+                self.queue = Arc::default();
                 self.publish(State::Stopped, None);
                 if let Some(done) = done {
                     let _ = done.send(());
@@ -242,11 +335,14 @@ impl Actor {
             self.publish(State::Stopped, None);
             return;
         };
+        let track_id = track.id;
+        self.forget_next();
         self.current = Some(index);
+        self.quality = None;
         self.wants_playing = true;
         self.publish(State::Loading, None);
 
-        match client.file_url(track.id, QUALITY).await {
+        match client.file_url(track_id, QUALITY).await {
             Ok(file) => {
                 let _ = self.playbin.set_state(gst::State::Null);
                 self.playbin.set_property("uri", &file.url);
@@ -255,10 +351,68 @@ impl Actor {
                     self.fail(&format!("Can't start playback: {err}"));
                 }
             }
-            Err(err) => self.fail(&format!(
-                "Can't stream \u{201c}{}\u{201d}: {err}",
-                track.title
-            )),
+            Err(err) => {
+                let title = self.queue[index].title.clone();
+                self.fail(&format!("Can't stream \u{201c}{title}\u{201d}: {err}"));
+            }
+        }
+    }
+
+    /// Leave the track playing for the one at `index`.
+    async fn skip_to(&mut self, index: usize) {
+        self.retire_report(false);
+        self.play(index).await;
+    }
+
+    fn seek(&mut self, position: Duration) {
+        if self.current.is_none() {
+            return;
+        }
+        let from = self.position();
+        if let Some(report) = &mut self.report {
+            report.stretch_ended(from);
+        }
+        let to =
+            gst::ClockTime::from_nseconds(u64::try_from(position.as_nanos()).unwrap_or(u64::MAX));
+        if let Err(err) = self
+            .playbin
+            .seek_simple(gst::SeekFlags::FLUSH | gst::SeekFlags::KEY_UNIT, to)
+        {
+            tracing::warn!("cannot seek: {err}");
+        }
+        if self.wants_playing
+            && let Some(report) = &mut self.report
+        {
+            report.stretch_started(position);
+        }
+    }
+
+    /// Done with the current track's report: end it, and keep what it still sends so
+    /// quitting can wait for it.
+    fn retire_report(&mut self, played_to_the_end: bool) {
+        let position = self.position();
+        let Some(mut report) = self.report.take() else {
+            return;
+        };
+        if played_to_the_end {
+            report.finished();
+        } else {
+            report.stretch_ended(position);
+        }
+        self.sending.retain(|sending| !sending.is_finished());
+        self.sending.append(&mut report.sending);
+    }
+
+    /// Drop the next track's stream: what plays next is changing.
+    fn forget_next(&mut self) {
+        if let Some(prefetch) = self.prefetch.take() {
+            prefetch.abort();
+        }
+        if let Ok(mut upcoming) = self.upcoming.lock() {
+            *upcoming = None;
+        }
+        if let Ok(mut switched) = self.switched.lock() {
+            *switched = None;
         }
     }
 
@@ -288,20 +442,11 @@ impl Actor {
 
     /// Stop the stream, reporting what was listened to.
     async fn stop(&mut self) {
-        let position = self.position();
-        if let Some(mut report) = self.report.take() {
-            report.stretch_ended(position);
-            report.flush().await;
+        self.retire_report(false);
+        for sending in self.sending.drain(..) {
+            let _ = tokio::time::timeout(Duration::from_secs(5), sending).await;
         }
-        if let Some(prefetch) = self.prefetch.take() {
-            prefetch.abort();
-        }
-        if let Ok(mut upcoming) = self.upcoming.lock() {
-            *upcoming = None;
-        }
-        if let Ok(mut switched) = self.switched.lock() {
-            *switched = None;
-        }
+        self.forget_next();
         let _ = self.playbin.set_state(gst::State::Null);
         self.starting = None;
         self.current = None;
@@ -317,9 +462,7 @@ impl Actor {
                 if let Some(next) = switched {
                     tracing::debug!("moved on to the next track without a gap");
                     // GStreamer moved on to the next track: the last one played to its end.
-                    if let Some(mut report) = self.report.take() {
-                        report.finished();
-                    }
+                    self.retire_report(true);
                     self.track_started(&next);
                 } else if let Some(starting) = self.starting.take() {
                     self.track_started(&starting);
@@ -328,9 +471,7 @@ impl Actor {
             MessageView::Eos(_) => {
                 // The next stream wasn't ready in time, or this was the last track.
                 tracing::debug!("the stream ended");
-                if let Some(mut report) = self.report.take() {
-                    report.finished();
-                }
+                self.retire_report(true);
                 let next = self.current.map(|index| index + 1);
                 if let Some(next) = next.filter(|&next| next < self.queue.len()) {
                     self.play(next).await;
@@ -378,6 +519,8 @@ impl Actor {
             }
         );
         self.current = Some(started.index);
+        self.quality =
+            crate::format::audio_quality(started.file.bit_depth, started.file.sampling_rate);
         if let Some(client) = &self.client {
             self.report = Report::start(client.clone(), track, &started.file);
         }
@@ -407,10 +550,7 @@ impl Actor {
     }
 
     fn fail(&mut self, error: &str) {
-        let position = self.position();
-        if let Some(mut report) = self.report.take() {
-            report.stretch_ended(position);
-        }
+        self.retire_report(false);
         let _ = self.playbin.set_state(gst::State::Null);
         self.wants_playing = false;
         self.publish(State::Stopped, Some(error.to_owned()));
@@ -423,19 +563,24 @@ impl Actor {
             .map(|track| track.id);
         self.status.send_replace(Status {
             state,
-            album_id: self.album_id.clone(),
+            album_id: self.album.as_ref().map(|album| album.id.clone()),
             track_id,
             error,
+            album: self.album.clone(),
+            queue: self.queue.clone(),
+            index: self.current,
+            quality: self.quality.clone(),
         });
     }
 
     fn position(&self) -> Duration {
-        self.playbin
-            .query_position::<gst::ClockTime>()
-            .map_or(Duration::ZERO, |position| {
-                Duration::from_nanos(position.nseconds())
-            })
+        position(&self.playbin).unwrap_or_default()
     }
+}
+
+fn position(playbin: &gst::Element) -> Option<Duration> {
+    let position = playbin.query_position::<gst::ClockTime>()?;
+    Some(Duration::from_nanos(position.nseconds()))
 }
 
 /// What we tell Qobuz about the listening of one track: that it started, then each stretch
@@ -514,12 +659,5 @@ impl Report {
     /// The track played to its end.
     fn finished(&mut self) {
         self.stretch_ended(self.duration);
-    }
-
-    /// Wait for the reports to reach Qobuz.
-    async fn flush(&mut self) {
-        for sending in self.sending.drain(..) {
-            let _ = tokio::time::timeout(Duration::from_secs(5), sending).await;
-        }
     }
 }
