@@ -1,0 +1,21 @@
+[package]
+name = "albuz"
+description = "A native Linux player for Qobuz, built around albums"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+qobuz.workspace = true
+reqwest.workspace = true
+oo7.workspace = true
+open.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
