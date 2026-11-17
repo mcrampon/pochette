@@ -122,7 +122,7 @@ struct HeartInner {
 impl Heart {
     pub fn new() -> Self {
         let icon = HeartIcon::default();
-        icon.set_size_request(18, 18);
+        icon.set_size_request(20, 20);
         icon.set_halign(gtk::Align::Center);
         icon.set_valign(gtk::Align::Center);
         let button = gtk::Button::builder()
@@ -186,11 +186,14 @@ impl Heart {
         let favorite = favorites.contains(&album.id);
         inner.icon.set_filled(favorite);
         inner.button.set_visible(true);
-        inner.button.set_tooltip_text(Some(if favorite {
-            "Remove From Your Albums"
-        } else {
-            "Add to Your Albums"
-        }));
+        // No tooltip, which got in the way over covers, but a name for screen readers.
+        inner
+            .button
+            .update_property(&[gtk::accessible::Property::Label(if favorite {
+                "Remove From Your Albums"
+            } else {
+                "Add to Your Albums"
+            })]);
         if favorite {
             inner.button.add_css_class("pochette-favorite");
         } else {

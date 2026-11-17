@@ -22,9 +22,19 @@
   background: none;
 }
 
+/* The padding is on the tile rather than its cell, which can be wider, so that the hover
+   frame hugs the tile as in the rows of the Discover tab. */
 .pochette-album-grid > child {
+  border-radius: 12px;
+}
+
+.pochette-album-grid .pochette-album-tile {
   padding: 12px;
   border-radius: 12px;
+}
+
+.pochette-album-grid .pochette-album-tile:hover {
+  background-color: alpha(currentColor, 0.07);
 }
 
 .pochette-cover {
@@ -169,20 +179,27 @@ label {
   outline-offset: -2px;
 }
 
-/* The heart over a cover, which adds the album to the favorites or removes it. It shows
-   when the pointer is over the tile or cover, or when it has the keyboard focus. */
-.pochette-heart {
-  min-width: 34px;
-  min-height: 34px;
+/* The heart and play buttons over a cover: round and white, in light and dark mode alike, as
+   they sit on the cover rather than the window. No theme border or shadow, which look
+   jagged over a cover. They show when the pointer is over the tile or cover, or when they
+   have the keyboard focus. */
+.pochette-heart,
+.pochette-cover-play {
+  min-width: 40px;
+  min-height: 40px;
   padding: 0;
-  color: white;
-  background-color: alpha(black, 0.55);
+  color: #2e3436;
+  background-color: #f6f5f4;
+  background-image: none;
+  border: none;
+  box-shadow: none;
   opacity: 0;
   transition: opacity 120ms ease-out, background-color 120ms ease-out;
 }
 
-.pochette-heart:hover {
-  background-color: alpha(black, 0.75);
+.pochette-heart:hover,
+.pochette-cover-play:hover {
+  background-color: #e0dfdd;
 }
 
 .pochette-heart.pochette-favorite {
@@ -191,16 +208,28 @@ label {
 
 .pochette-cover-hover:hover .pochette-heart,
 .pochette-cover-hover:hover .pochette-cover-play,
+.pochette-cover-hover:hover .pochette-cover-shade,
 .pochette-cover-play:focus-visible,
 .pochette-heart:focus-visible {
   opacity: 1;
 }
 
-/* The play button over a cover, which shows with the heart. */
-.pochette-cover-play {
-  min-width: 40px;
-  min-height: 40px;
-  padding: 0;
+/* Darkens a tile's cover on hover, under its genre and release date. */
+.pochette-cover-shade {
+  padding: 10px;
+  border-radius: 8px;
+  background-color: alpha(#323232, 0.5);
+  color: white;
   opacity: 0;
   transition: opacity 120ms ease-out;
+}
+
+.pochette-cover-genre {
+  font-weight: 600;
+}
+
+.pochette-cover-genre,
+.pochette-cover-date {
+  font-size: 0.9em;
+  text-shadow: 0 1px 2px alpha(black, 0.5);
 }

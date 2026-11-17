@@ -12,6 +12,7 @@ use relm4::{
 use crate::{
     covers::VisibleCovers,
     favorites::{Heart, with_heart},
+    format,
     playback::{CoverActions, PlayButton},
 };
 
@@ -31,6 +32,8 @@ pub struct AlbumItem {
 
 pub struct AlbumWidgets {
     cover: gtk::Picture,
+    genre: gtk::Label,
+    date: gtk::Label,
     heart: Heart,
     play: PlayButton,
     title: gtk::Label,
@@ -47,8 +50,9 @@ pub fn tile() -> (gtk::Box, AlbumWidgets) {
         .overflow(gtk::Overflow::Hidden)
         .css_classes(["pochette-cover"])
         .build();
+    let (shaded, genre, date) = with_shade(&CoverFrame::new(&cover));
     let heart = Heart::new();
-    let cover_box = with_heart(&CoverFrame::new(&cover), &heart);
+    let cover_box = with_heart(&shaded, &heart);
     let play = PlayButton::new();
     cover_box.add_overlay(play.widget());
 
@@ -62,6 +66,7 @@ pub fn tile() -> (gtk::Box, AlbumWidgets) {
             set_cursor_from_name: Some("pointer"),
             // The buttons over the cover show when the pointer is anywhere on the tile.
             add_css_class: "pochette-cover-hover",
+            add_css_class: "pochette-album-tile",
 
             append: &cover_box,
             #[name = "title"]
@@ -92,6 +97,8 @@ pub fn tile() -> (gtk::Box, AlbumWidgets) {
 
     let widgets = AlbumWidgets {
         cover,
+        genre,
+        date,
         heart,
         play,
         title,
@@ -104,7 +111,6 @@ pub fn tile() -> (gtk::Box, AlbumWidgets) {
 impl AlbumWidgets {
     pub fn show(
         &self,
-        root: &gtk::Box,
         album: &Rc<Album>,
         caption: Option<&str>,
         covers: &VisibleCovers,
@@ -115,12 +121,15 @@ impl AlbumWidgets {
         self.artist.set_label(&album.artist.name);
         self.caption.set_label(caption.unwrap_or_default());
         self.caption.set_visible(caption.is_some());
-        let tooltip = [Some(title.as_str()), Some(&album.artist.name), caption]
-            .into_iter()
-            .flatten()
-            .collect::<Vec<_>>()
-            .join("\n");
-        root.set_tooltip_text(Some(&tooltip));
+        let genre = album.genre.as_ref().map(|genre| genre.name.as_str());
+        self.genre.set_label(genre.unwrap_or_default());
+        self.genre.set_visible(genre.is_some());
+        let date = album
+            .release_date_original
+            .as_deref()
+            .map(format::release_date);
+        self.date.set_label(date.as_deref().unwrap_or_default());
+        self.date.set_visible(date.is_some());
         self.heart.show(Some(album.clone()), &actions.favorites);
         self.play.show(Some(album.clone()), &actions.playback);
 
@@ -145,9 +154,8 @@ impl RelmGridItem for AlbumItem {
         tile()
     }
 
-    fn bind(&mut self, widgets: &mut AlbumWidgets, root: &mut gtk::Box) {
+    fn bind(&mut self, widgets: &mut AlbumWidgets, _root: &mut gtk::Box) {
         widgets.show(
-            root,
             &self.album,
             self.caption.as_deref(),
             &self.covers,
@@ -158,6 +166,33 @@ impl RelmGridItem for AlbumItem {
     fn unbind(&mut self, widgets: &mut AlbumWidgets, _root: &mut gtk::Box) {
         widgets.hide(&self.covers);
     }
+}
+
+/// `cover` with a shade over it that shows on hover, with the album's genre and release
+/// date in its top left corner: the overlay, then the genre and date labels.
+fn with_shade(cover: &impl IsA<gtk::Widget>) -> (gtk::Overlay, gtk::Label, gtk::Label) {
+    let label = |class: &str| {
+        gtk::Label::builder()
+            .xalign(0.0)
+            // Lets the label shrink to the cover instead of widening it.
+            .max_width_chars(1)
+            .ellipsize(pango::EllipsizeMode::End)
+            .css_classes([class])
+            .build()
+    };
+    let (genre, date) = (label("pochette-cover-genre"), label("pochette-cover-date"));
+    let shade = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(2)
+        .css_classes(["pochette-cover-shade"])
+        // Clicks go through to the tile, which opens the album.
+        .can_target(false)
+        .build();
+    shade.append(&genre);
+    shade.append(&date);
+    let overlay = gtk::Overlay::builder().child(cover).build();
+    overlay.add_overlay(&shade);
+    (overlay, genre, date)
 }
 
 /// The smallest cover that stays sharp at the screen's scale.

@@ -128,10 +128,11 @@ impl PlayButton {
     pub fn new() -> Self {
         let button = gtk::Button::builder()
             .icon_name("media-playback-start-symbolic")
-            .css_classes(["pochette-cover-play", "circular", "suggested-action"])
-            .halign(gtk::Align::Start)
+            .css_classes(["pochette-cover-play", "circular"])
+            // Left of the heart, which is as big and 8px from the corner.
+            .halign(gtk::Align::End)
             .valign(gtk::Align::End)
-            .margin_start(8)
+            .margin_end(8 + 40 + 6)
             .margin_bottom(8)
             .visible(false)
             .build();
@@ -188,9 +189,14 @@ impl PlayButton {
         } else {
             "media-playback-start-symbolic"
         });
+        // No tooltip, which got in the way over covers, but a name for screen readers.
         inner
             .button
-            .set_tooltip_text(Some(if playing { "Pause" } else { "Play" }));
+            .update_property(&[gtk::accessible::Property::Label(if playing {
+                "Pause"
+            } else {
+                "Play"
+            })]);
         inner.button.set_visible(album.streamable);
     }
 }

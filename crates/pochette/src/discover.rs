@@ -718,13 +718,7 @@ fn row(
     let mut tiles = Vec::new();
     for (index, album) in albums.iter().enumerate() {
         let (tile, widgets) = album_tile::tile();
-        widgets.show(
-            &tile,
-            album,
-            caption(section, album).as_deref(),
-            covers,
-            actions,
-        );
+        widgets.show(album, caption(section, album).as_deref(), covers, actions);
         strip.append(&row_tile(&tile, sender, section, index));
         tiles.push(widgets);
     }

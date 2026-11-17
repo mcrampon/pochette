@@ -111,9 +111,36 @@ fn decode_entity(entity: &str) -> Option<char> {
     })
 }
 
+/// A release date from Qobuz's `YYYY-MM-DD`: "13 Nov 2026". Whatever doesn't parse stays as is.
+pub fn release_date(date: &str) -> String {
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    let mut parts = date.splitn(3, '-');
+    let (Some(year), Some(month), Some(day)) = (parts.next(), parts.next(), parts.next()) else {
+        return date.to_owned();
+    };
+    let month = month
+        .parse::<usize>()
+        .ok()
+        .and_then(|month| MONTHS.get(month.checked_sub(1)?));
+    match (month, day.parse::<u8>()) {
+        (Some(month), Ok(day)) => format!("{day} {month} {year}"),
+        _ => date.to_owned(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn formats_release_dates() {
+        assert_eq!(release_date("2026-11-13"), "13 Nov 2026");
+        assert_eq!(release_date("1969-01-05"), "5 Jan 1969");
+        assert_eq!(release_date("1969-00-05"), "1969-00-05");
+        assert_eq!(release_date("1969"), "1969");
+    }
 
     #[test]
     fn formats_durations() {
