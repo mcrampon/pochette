@@ -49,6 +49,22 @@ fn show_icon() {
 }
 
 fn main() {
+    // Before GTK, which would need a display and reject these options.
+    match std::env::args().nth(1).as_deref() {
+        Some("--version" | "-V") => {
+            println!("pochette {}", env!("CARGO_PKG_VERSION"));
+            return;
+        }
+        Some("--help" | "-h") => {
+            println!(
+                "Usage: pochette [--version | --help]\n\n\
+                 A native Linux player for Qobuz, built around albums."
+            );
+            return;
+        }
+        _ => {}
+    }
+
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .init();
