@@ -1,5 +1,6 @@
 //! Pochette, a native Linux player for Qobuz, built around albums.
 
+mod accent;
 mod account;
 mod album_page;
 mod album_tile;
@@ -32,15 +33,27 @@ use tracing_subscriber::EnvFilter;
 /// The application id, which names the app to the desktop (D-Bus, `.desktop` file, Flatpak).
 const APP_ID: &str = "io.github.mcrampon.Pochette";
 
+/// Give the windows the icon installed under the app id, from `data/icons`. Only when it
+/// is installed: title bars that show the icon would show a missing one instead.
+fn show_icon() {
+    use relm4::gtk::{self, gdk};
+
+    let installed = gdk::Display::default()
+        .is_some_and(|display| gtk::IconTheme::for_display(&display).has_icon(APP_ID));
+    if installed {
+        gtk::Window::set_default_icon_name(APP_ID);
+    }
+}
+
 fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .init();
 
     let relm = relm4::RelmApp::new(APP_ID);
-    // The icon installed under the app id, from `data/icons`.
-    relm4::gtk::Window::set_default_icon_name(APP_ID);
+    show_icon();
     relm4::set_global_css(include_str!("style.css"));
+    accent::follow();
     covers::prune_cache();
     relm.run::<app::App>(());
 }

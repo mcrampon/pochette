@@ -145,11 +145,11 @@
 }
 
 .pochette-tracks > row.pochette-playing {
-  background-color: alpha(@accent_bg_color, 0.15);
+  background-color: alpha(@pochette_accent, 0.15);
 }
 
 .pochette-tracks > row.pochette-playing label {
-  color: @accent_color;
+  color: @pochette_accent;
   opacity: 1;
 }
 
@@ -197,7 +197,7 @@ label {
 
 .pochette-tile-caption {
   font-size: 0.85em;
-  color: @accent_color;
+  color: @pochette_accent;
 }
 
 .pochette-row-tile {
@@ -211,7 +211,7 @@ label {
 }
 
 .pochette-row-tile:focus-visible {
-  outline: 2px solid alpha(@accent_color, 0.6);
+  outline: 2px solid alpha(@pochette_accent, 0.6);
   outline-offset: -2px;
 }
 
@@ -268,4 +268,57 @@ label {
 .pochette-cover-date {
   font-size: 0.9em;
   text-shadow: 0 1px 2px alpha(black, 0.5);
+}
+
+/* GTK's theme paints these in a fixed blue: the desktop's accent instead, which `accent.rs`
+   defines. */
+button.suggested-action {
+  color: @pochette_accent_fg;
+  background-color: @pochette_accent;
+  background-image: none;
+  border-color: shade(@pochette_accent, 0.85);
+  box-shadow: none;
+  text-shadow: none;
+  -gtk-icon-shadow: none;
+}
+
+button.suggested-action:hover {
+  background-color: shade(@pochette_accent, 1.08);
+}
+
+button.suggested-action:active {
+  background-color: shade(@pochette_accent, 0.9);
+}
+
+button.suggested-action:disabled {
+  color: alpha(@pochette_accent_fg, 0.5);
+  background-color: alpha(@pochette_accent, 0.5);
+}
+
+scale highlight {
+  background-color: @pochette_accent;
+  background-image: none;
+  border-color: @pochette_accent;
+}
+
+checkbutton check:checked,
+checkbutton check:indeterminate {
+  color: @pochette_accent_fg;
+  background-color: @pochette_accent;
+  background-image: none;
+  border-color: @pochette_accent;
+}
+
+selection {
+  color: @pochette_accent_fg;
+  background-color: @pochette_accent;
+}
+
+*:focus-visible {
+  outline-color: alpha(@pochette_accent, 0.6);
+}
+
+/* The ring around a search bar being typed in. */
+entry:focus-within {
+  outline-color: alpha(@pochette_accent, 0.6);
 }
