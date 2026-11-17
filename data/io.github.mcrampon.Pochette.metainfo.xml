@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 Matthieu Crampon -->
+<component type="desktop-application">
+  <id>io.github.mcrampon.Pochette</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+
+  <name>Pochette</name>
+  <summary>Listen to Qobuz, album by album</summary>
+  <developer id="io.github.mcrampon">
+    <name>Matthieu Crampon</name>
+  </developer>
+
+  <description>
+    <p>
+      Pochette is a native player for Qobuz, built around albums: your library of whole albums,
+      played from the first track to the last.
+    </p>
+    <ul>
+      <li>Albums: your saved albums, to search, filter by genre and decade, sort, or play at random</li>
+      <li>Discover: Qobuz's new releases, press awards and ideal discography, by genre</li>
+      <li>Lyrics that follow the song, looked up on LRCLIB while you show them</li>
+      <li>Hi-Res streaming, up to what your subscription allows</li>
+      <li>Media keys and desktop media controls, through MPRIS</li>
+      <li>Your desktop's accent color, light and dark modes</li>
+    </ul>
+    <p>
+      Pochette requires a paid Qobuz subscription. It is not certified by Qobuz and not
+      affiliated with Qobuz.
+    </p>
+  </description>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>Discover, in light mode</caption>
+      <image>https://raw.githubusercontent.com/mcrampon/pochette/master/data/screenshots/discover-light.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Playing an album, in dark mode</caption>
+      <image>https://raw.githubusercontent.com/mcrampon/pochette/master/data/screenshots/playing-dark.png</image>
+    </screenshot>
+  </screenshots>
+
+  <launchable type="desktop-id">io.github.mcrampon.Pochette.desktop</launchable>
+  <provides>
+    <binary>pochette</binary>
+  </provides>
+
+  <url type="homepage">https://github.com/mcrampon/pochette</url>
+  <url type="bugtracker">https://github.com/mcrampon/pochette/issues</url>
+  <url type="vcs-browser">https://github.com/mcrampon/pochette</url>
+
+  <categories>
+    <category>Audio</category>
+    <category>AudioVideo</category>
+    <category>Player</category>
+  </categories>
+  <keywords>
+    <keyword>Qobuz</keyword>
+    <keyword>Music</keyword>
+    <keyword>Album</keyword>
+    <keyword>Streaming</keyword>
+    <keyword>Hi-Res</keyword>
+  </keywords>
+
+  <requires>
+    <internet>always</internet>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
+
+  <content_rating type="oars-1.1"/>
+
+  <releases>
+    <release version="0.1.0" date="2026-11-17">
+      <description>
+        <p>The first release.</p>
+      </description>
+    </release>
+  </releases>
+</component>
