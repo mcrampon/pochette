@@ -19,8 +19,8 @@ use tokio::task::JoinHandle;
 use crate::{
     album_page::{AlbumPage, AlbumPageMsg, AlbumPageOutput},
     album_tile::{self, AlbumItem, AlbumWidgets},
+    checklist::Checklist,
     covers::VisibleCovers,
-    genre_picker::GenrePicker,
     playback::CoverActions,
     player::Player,
     settings::Settings,
@@ -60,7 +60,7 @@ pub struct DiscoverPage {
     error: String,
     genres: Vec<Genre>,
     genre_ids: Vec<u64>,
-    genre_picker: GenrePicker,
+    genre_picker: Checklist,
     /// The rows, refilled when the genre changes.
     rows: gtk::Box,
     /// The albums of each row, in order.
@@ -334,7 +334,7 @@ impl Component for DiscoverPage {
             error: String::new(),
             genres: Vec::new(),
             genre_ids: Settings::load().discover_genres,
-            genre_picker: GenrePicker::new(),
+            genre_picker: Checklist::new("Genres"),
             rows: gtk::Box::default(),
             row_albums: Vec::new(),
             row_tiles: Vec::new(),

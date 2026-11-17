@@ -112,7 +112,8 @@ pub struct View {
     pub query: String,
     /// The genres to show, or all of them when empty.
     pub genres: Vec<String>,
-    pub decade: Option<u16>,
+    /// The decades to show, or all of them when empty.
+    pub decades: Vec<u16>,
     pub sort: Sort,
     /// The other way round from the sort's natural order.
     pub reversed: bool,
@@ -133,7 +134,12 @@ impl View {
                         .genre()
                         .is_some_and(|genre| self.genres.iter().any(|picked| picked == genre))
             })
-            .filter(|entry| self.decade.is_none() || entry.decade == self.decade)
+            .filter(|entry| {
+                self.decades.is_empty()
+                    || entry
+                        .decade
+                        .is_some_and(|decade| self.decades.contains(&decade))
+            })
             .collect();
         self.sort(&mut shown);
         shown
@@ -156,7 +162,7 @@ impl View {
 
     /// Whether anything hides some of the albums.
     pub fn is_filtered(&self) -> bool {
-        !self.query.trim().is_empty() || !self.genres.is_empty() || self.decade.is_some()
+        !self.query.trim().is_empty() || !self.genres.is_empty() || !self.decades.is_empty()
     }
 
     /// How the order reads: "Newest First", "A to Z"…
@@ -253,12 +259,24 @@ mod tests {
         let library = library();
         let view = View {
             genres: vec!["Jazz".into()],
-            decade: Some(1950),
+            decades: vec![1950],
             ..View::default()
         };
         assert_eq!(titles(&view.apply(&library)), ["Kind of Blue"]);
     }
 
+    #[test]
+    fn filters_by_several_decades() {
+        let library = library();
+        let view = View {
+            decades: vec![1950, 1970],
+            ..View::default()
+        };
+        assert_eq!(
+            titles(&view.apply(&library)),
+            ["Bitches Brew", "Kind of Blue"]
+        );
+    }
     #[test]
     fn filters_by_several_genres() {
         let library = library();

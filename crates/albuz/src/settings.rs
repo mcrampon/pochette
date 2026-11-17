@@ -16,7 +16,10 @@ pub struct Settings {
     pub pane_width: i32,
     /// The genres picked in the Albums tab, by name: they come from the albums.
     pub album_genres: Vec<String>,
-    /// The decade picked in the Albums tab.
+    /// The decades picked in the Albums tab.
+    pub album_decades: Vec<u16>,
+    /// The one decade the Albums tab used to pick, read to carry it over.
+    #[serde(skip_serializing)]
     pub album_decade: Option<u16>,
     /// How the Albums tab sorts, and whether the other way round.
     pub album_sort: Sort,
@@ -31,6 +34,7 @@ impl Default for Settings {
             volume: 1.0,
             pane_width: 360,
             album_genres: Vec::new(),
+            album_decades: Vec::new(),
             album_decade: None,
             album_sort: Sort::default(),
             album_sort_reversed: false,
@@ -42,17 +46,27 @@ impl Default for Settings {
 impl Settings {
     /// The saved settings, or the defaults when there are none or they can't be read.
     pub fn load() -> Self {
-        match std::fs::read(path()) {
-            Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or_else(|err| {
-                tracing::warn!("cannot read the settings, using the defaults: {err}");
-                Self::default()
-            }),
+        let read =
+            std::fs::read(path()).and_then(|bytes| Self::parse(&bytes).map_err(io::Error::other));
+        match read {
+            Ok(settings) => settings,
             Err(err) if err.kind() == io::ErrorKind::NotFound => Self::default(),
             Err(err) => {
                 tracing::warn!("cannot read the settings, using the defaults: {err}");
                 Self::default()
             }
         }
+    }
+
+    fn parse(bytes: &[u8]) -> serde_json::Result<Self> {
+        let mut settings: Self = serde_json::from_slice(bytes)?;
+        // Older settings had one decade.
+        if let Some(decade) = settings.album_decade.take()
+            && settings.album_decades.is_empty()
+        {
+            settings.album_decades.push(decade);
+        }
+        Ok(settings)
     }
 
     /// Change the saved settings with `change`.
@@ -91,6 +105,17 @@ mod tests {
     fn reads_older_files_with_missing_settings() {
         let settings: Settings = serde_json::from_str("{}").unwrap();
         assert_eq!(settings, Settings::default());
+    }
+
+    #[test]
+    fn carries_the_one_decade_of_older_settings_over() {
+        let settings = Settings::parse(br#"{"album_decade": 1970}"#).unwrap();
+        assert_eq!(settings.album_decades, [1970]);
+        assert!(
+            !serde_json::to_string(&settings)
+                .unwrap()
+                .contains("album_decade\"")
+        );
     }
 
     #[test]

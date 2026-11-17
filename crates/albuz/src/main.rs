@@ -5,13 +5,14 @@ mod album_page;
 mod album_tile;
 mod albums;
 mod app;
+mod checklist;
 mod clamp;
 mod covers;
 mod discover;
 mod dropdown;
 mod favorites;
 mod format;
-mod genre_picker;
+
 mod library;
 mod now_playing;
 mod playback;

@@ -38,13 +38,3 @@ fn label_factory(shorten: bool) -> gtk::SignalListItemFactory {
     });
     factory
 }
-
-/// Offer `labels` instead, with the one at `selected` picked.
-pub fn replace_choices(dropdown: &gtk::DropDown, labels: &[String], selected: u32) {
-    let Some(list) = dropdown.model().and_downcast::<gtk::StringList>() else {
-        return;
-    };
-    let labels: Vec<&str> = labels.iter().map(String::as_str).collect();
-    list.splice(0, list.n_items(), &labels);
-    dropdown.set_selected(selected);
-}

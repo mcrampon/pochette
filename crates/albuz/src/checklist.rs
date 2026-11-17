@@ -1,4 +1,5 @@
-//! A button that picks any number of genres from a checklist.
+//! A button that picks any number of choices, such as genres or decades, from a
+//! checklist.
 
 use std::{
     cell::{Cell, RefCell},
@@ -9,7 +10,7 @@ use relm4::gtk::{self, prelude::*};
 
 /// Cheap to clone: every clone is the same picker.
 #[derive(Clone)]
-pub struct GenrePicker(Rc<Inner>);
+pub struct Checklist(Rc<Inner>);
 
 struct Inner {
     button: gtk::MenuButton,
@@ -19,12 +20,16 @@ struct Inner {
     choices: RefCell<Vec<(String, gtk::CheckButton)>>,
     /// Set while the picker changes its own checks, which isn't the user picking.
     quiet: Cell<bool>,
+    /// What the choices are, in the plural: "Genres".
+    what: String,
     #[expect(clippy::type_complexity)]
     on_change: RefCell<Option<Box<dyn Fn(Vec<usize>)>>>,
 }
 
-impl GenrePicker {
-    pub fn new() -> Self {
+impl Checklist {
+    /// A checklist of `what`, in the plural: "Genres".
+    pub fn new(what: &str) -> Self {
+        let all_label = format!("All {what}");
         let list = gtk::Box::new(gtk::Orientation::Vertical, 0);
         let scroller = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
@@ -34,7 +39,7 @@ impl GenrePicker {
             .child(&list)
             .build();
         let all = gtk::Button::builder()
-            .label("All Genres")
+            .label(&all_label)
             .css_classes(["flat"])
             .build();
         let content = gtk::Box::new(gtk::Orientation::Vertical, 6);
@@ -43,14 +48,14 @@ impl GenrePicker {
         content.append(&scroller);
         let popover = gtk::Popover::builder().child(&content).build();
         let label = gtk::Label::builder()
-            .label("All Genres")
+            .label(&all_label)
             .ellipsize(gtk::pango::EllipsizeMode::End)
             .max_width_chars(14)
             .build();
         let button = gtk::MenuButton::builder()
             .child(&label)
             .always_show_arrow(true)
-            .tooltip_text("Genres")
+            .tooltip_text(what)
             .popover(&popover)
             .build();
 
@@ -60,6 +65,7 @@ impl GenrePicker {
             list,
             choices: RefCell::default(),
             quiet: Cell::new(false),
+            what: what.to_owned(),
             on_change: RefCell::default(),
         }));
         let weak = Rc::downgrade(&picker.0);
@@ -114,7 +120,7 @@ impl GenrePicker {
         }
     }
 
-    /// Call `f` with the positions of the genres checked, whenever the user changes them.
+    /// Call `f` with the positions of the choices checked, whenever the user changes them.
     pub fn connect_changed(&self, f: impl Fn(Vec<usize>) + 'static) {
         self.0.on_change.replace(Some(Box::new(f)));
     }
@@ -146,13 +152,13 @@ impl GenrePicker {
             .map(|&index| choices[index].0.as_str())
             .collect();
         let label = match names.as_slice() {
-            [] => "All Genres".to_owned(),
+            [] => format!("All {}", self.0.what),
             [name] => (*name).to_owned(),
-            names => format!("{} Genres", names.len()),
+            names => format!("{} {}", names.len(), self.0.what),
         };
         self.0.label.set_label(&label);
         let tooltip = if names.is_empty() {
-            "Genres".to_owned()
+            self.0.what.clone()
         } else {
             names.join("\n")
         };

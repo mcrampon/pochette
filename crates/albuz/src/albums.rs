@@ -19,10 +19,10 @@ use tokio::task::JoinHandle;
 use crate::{
     album_page::{AlbumPage, AlbumPageMsg, AlbumPageOutput},
     album_tile::{self, AlbumItem},
+    checklist::Checklist,
     covers::VisibleCovers,
-    dropdown::{dropdown, replace_choices},
+    dropdown::dropdown,
     favorites::Favorites,
-    genre_picker::GenrePicker,
     library::{self, Entry, Sort, View},
     playback::CoverActions,
     player::Player,
@@ -42,7 +42,7 @@ pub struct AlbumsPage {
     /// Every saved album.
     entries: Vec<Entry>,
     view: View,
-    /// The genres and decades the filters offer; the decades after "All".
+    /// The genres and decades the filters offer.
     genres: Vec<String>,
     decades: Vec<u16>,
     /// How many albums the grid shows.
@@ -52,8 +52,8 @@ pub struct AlbumsPage {
     /// The albums the search and filters let through, by id.
     visible: Rc<RefCell<HashSet<String>>>,
     search: gtk::SearchEntry,
-    genre_picker: GenrePicker,
-    decade_filter: gtk::DropDown,
+    genre_picker: Checklist,
+    decade_picker: Checklist,
     sort_menu: gtk::DropDown,
     scroller: Option<gtk::ScrolledWindow>,
     client: Option<Client>,
@@ -87,8 +87,8 @@ pub enum AlbumsMsg {
     FocusSearch,
     /// The positions of the genres picked, none meaning all of them.
     Genres(Vec<usize>),
-    /// The position picked in the decade filter, 0 being all of them.
-    Decade(u32),
+    /// The positions of the decades picked, none meaning all of them.
+    Decades(Vec<usize>),
     Sort(u32),
     Reverse,
     ClearFilters,
@@ -203,9 +203,7 @@ impl Component for AlbumsPage {
                         #[local_ref]
                         genre_button -> gtk::MenuButton {},
                         #[local_ref]
-                        decade_filter -> gtk::DropDown {
-                            set_tooltip_text: Some("Decade"),
-                        },
+                        decade_button -> gtk::MenuButton {},
                         #[local_ref]
                         sort_menu -> gtk::DropDown {
                             set_tooltip_text: Some("Sort By"),
@@ -310,7 +308,7 @@ impl Component for AlbumsPage {
             entries: Vec::new(),
             view: View {
                 genres: settings.album_genres,
-                decade: settings.album_decade,
+                decades: settings.album_decades,
                 sort: settings.album_sort,
                 reversed: settings.album_sort_reversed,
                 ..View::default()
@@ -321,8 +319,8 @@ impl Component for AlbumsPage {
             grid: TypedGridView::new(),
             visible: Rc::default(),
             search: gtk::SearchEntry::new(),
-            genre_picker: GenrePicker::new(),
-            decade_filter: dropdown(&["All Decades"]),
+            genre_picker: Checklist::new("Genres"),
+            decade_picker: Checklist::new("Decades"),
             sort_menu,
             scroller: None,
             client: None,
@@ -344,7 +342,7 @@ impl Component for AlbumsPage {
         let grid_view = &model.grid.view;
         let search = &model.search;
         let genre_button = model.genre_picker.widget();
-        let decade_filter = &model.decade_filter;
+        let decade_button = model.decade_picker.widget();
         let sort_menu = &model.sort_menu;
         let widgets = view_output!();
 
@@ -357,17 +355,14 @@ impl Component for AlbumsPage {
         model
             .genre_picker
             .connect_changed(move |picked| input.emit(AlbumsMsg::Genres(picked)));
-        for (dropdown, msg) in [
-            (
-                &model.decade_filter,
-                AlbumsMsg::Decade as fn(u32) -> AlbumsMsg,
-            ),
-            (&model.sort_menu, AlbumsMsg::Sort),
-        ] {
-            let sender = sender.clone();
-            dropdown
-                .connect_selected_notify(move |dropdown| sender.input(msg(dropdown.selected())));
-        }
+        let input = sender.input_sender().clone();
+        model
+            .decade_picker
+            .connect_changed(move |picked| input.emit(AlbumsMsg::Decades(picked)));
+        let input = sender.input_sender().clone();
+        model
+            .sort_menu
+            .connect_selected_notify(move |menu| input.emit(AlbumsMsg::Sort(menu.selected())));
         // Typing anywhere in the grid searches.
         model.search.set_key_capture_widget(Some(&widgets.scroller));
         add_search_shortcut(&root, &sender);
@@ -447,7 +442,7 @@ impl Component for AlbumsPage {
             msg @ (AlbumsMsg::Search(_)
             | AlbumsMsg::FocusSearch
             | AlbumsMsg::Genres(_)
-            | AlbumsMsg::Decade(_)
+            | AlbumsMsg::Decades(_)
             | AlbumsMsg::Sort(_)
             | AlbumsMsg::Reverse
             | AlbumsMsg::ClearFilters) => self.change_view(msg),
@@ -519,10 +514,13 @@ impl AlbumsPage {
                     self.show_albums();
                 }
             }
-            AlbumsMsg::Decade(position) => {
-                let decade = pick(&self.decades, position);
-                if decade != self.view.decade {
-                    self.view.decade = decade;
+            AlbumsMsg::Decades(picked) => {
+                let decades: Vec<u16> = picked
+                    .into_iter()
+                    .filter_map(|index| self.decades.get(index).copied())
+                    .collect();
+                if decades != self.view.decades {
+                    self.view.decades = decades;
                     self.save_view();
                     self.show_albums();
                 }
@@ -551,7 +549,7 @@ impl AlbumsPage {
                 // Each change comes back as a message, which shows the albums.
                 self.search.set_text("");
                 self.genre_picker.clear();
-                self.decade_filter.set_selected(0);
+                self.decade_picker.clear();
             }
             // Not about the view.
             _ => {}
@@ -590,21 +588,32 @@ impl AlbumsPage {
             .collect();
         self.genre_picker.set_choices(&self.genres, &picked);
 
-        let decade_labels: Vec<String> = std::iter::once("All Decades".to_owned())
-            .chain(self.decades.iter().map(|decade| format!("{decade}s")))
+        self.view
+            .decades
+            .retain(|decade| self.decades.contains(decade));
+        let labels: Vec<String> = self
+            .decades
+            .iter()
+            .map(|decade| format!("{decade}s"))
             .collect();
-        let decade = position(&self.decades, self.view.decade.as_ref());
-        replace_choices(&self.decade_filter, &decade_labels, decade);
-        // The selection change above comes back as a message after this one, and finds
-        // the view already up to date.
-        self.view.decade = pick(&self.decades, decade);
+        let picked: Vec<usize> = self
+            .view
+            .decades
+            .iter()
+            .filter_map(|decade| self.decades.iter().position(|d| d == decade))
+            .collect();
+        self.decade_picker.set_choices(&labels, &picked);
     }
 
-    /// Remember the decade and order picked, for the next run.
+    /// Remember the decades and order picked, for the next run.
     fn save_view(&self) {
-        let (decade, sort, reversed) = (self.view.decade, self.view.sort, self.view.reversed);
+        let (decades, sort, reversed) = (
+            self.view.decades.clone(),
+            self.view.sort,
+            self.view.reversed,
+        );
         Settings::update(|settings| {
-            settings.album_decade = decade;
+            settings.album_decades = decades;
             settings.album_sort = sort;
             settings.album_sort_reversed = reversed;
         });
@@ -684,20 +693,6 @@ impl AlbumsPage {
             sender.input(AlbumsMsg::RandomLoaded(Box::new(client.album(&id).await)));
         }));
     }
-}
-
-/// The choice at `position` in a filter, where 0 is "All".
-fn pick<T: Clone>(choices: &[T], position: u32) -> Option<T> {
-    let index = usize::try_from(position).ok()?.checked_sub(1)?;
-    choices.get(index).cloned()
-}
-
-/// Where `choice` is in a filter, where 0 is "All".
-fn position<T: PartialEq>(choices: &[T], choice: Option<&T>) -> u32 {
-    choice
-        .and_then(|choice| choices.iter().position(|c| c == choice))
-        .and_then(|index| u32::try_from(index + 1).ok())
-        .unwrap_or(0)
 }
 
 /// Ctrl+F searches the albums.
