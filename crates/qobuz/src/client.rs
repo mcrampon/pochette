@@ -218,7 +218,7 @@ impl Client {
     pub async fn report_streaming_end(&self, event: &StreamingEnd) -> Result<()> {
         let report = serde_json::json!({
             "events": [event],
-            "renderer_context": {"software_version": concat!("albuz-", env!("CARGO_PKG_VERSION"))},
+            "renderer_context": {"software_version": concat!("pochette-", env!("CARGO_PKG_VERSION"))},
         });
         let response = self
             .post("track/reportStreamingEndJson")

@@ -167,7 +167,7 @@ impl Component for DiscoverPage {
 
                         gtk::Label {
                             set_label: "Can't Load Discover",
-                            add_css_class: "albuz-heading",
+                            add_css_class: "pochette-heading",
                         },
                         gtk::Label {
                             #[watch]
@@ -243,7 +243,7 @@ impl Component for DiscoverPage {
                     gtk::Label {
                         #[watch]
                         set_label: model.section.map_or("", title),
-                        add_css_class: "albuz-heading",
+                        add_css_class: "pochette-heading",
                     },
                     gtk::Label {
                         #[watch]
@@ -265,7 +265,7 @@ impl Component for DiscoverPage {
                         set_min_columns: 2,
                         set_max_columns: 16,
                         set_single_click_activate: true,
-                        add_css_class: "albuz-album-grid",
+                        add_css_class: "pochette-album-grid",
                         connect_activate[sender] => move |_, position| {
                             sender.input(DiscoverMsg::OpenGridAlbum(position));
                         },
@@ -296,7 +296,7 @@ impl Component for DiscoverPage {
                         } else {
                             "No Albums Here"
                         },
-                        add_css_class: "albuz-heading",
+                        add_css_class: "pochette-heading",
                     },
                     gtk::Label {
                         #[watch]
@@ -738,7 +738,7 @@ fn row(
         .label(title(section))
         .xalign(0.0)
         .hexpand(true)
-        .css_classes(["albuz-heading"])
+        .css_classes(["pochette-heading"])
         .build();
     let scroll_button = |icon: &str, tooltip: &str, direction: f64| {
         let button = gtk::Button::builder()
@@ -788,7 +788,7 @@ fn row_tile(
     index: usize,
 ) -> gtk::Box {
     let item = gtk::Box::builder()
-        .css_classes(["albuz-row-tile"])
+        .css_classes(["pochette-row-tile"])
         .focusable(true)
         .build();
     item.append(tile);

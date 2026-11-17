@@ -94,7 +94,7 @@ impl Component for NowPlaying {
 
     view! {
         gtk::ScrolledWindow {
-            add_css_class: "albuz-now-playing",
+            add_css_class: "pochette-now-playing",
             set_hscrollbar_policy: gtk::PolicyType::Never,
 
             Clamp {
@@ -119,7 +119,7 @@ impl Component for NowPlaying {
                         gtk::Label {
                             #[watch]
                             set_label: &model.status.track().map(Track::full_title).unwrap_or_default(),
-                            add_css_class: "albuz-now-playing-title",
+                            add_css_class: "pochette-now-playing-title",
                             set_wrap: true,
                             set_justify: gtk::Justification::Center,
                         },
@@ -141,7 +141,7 @@ impl Component for NowPlaying {
                             set_visible: model.status.quality.is_some(),
                             #[watch]
                             set_label: model.status.quality.as_deref().unwrap_or_default(),
-                            add_css_class: "albuz-badge",
+                            add_css_class: "pochette-badge",
                             set_halign: gtk::Align::Center,
                             set_margin_top: 6,
                         },
@@ -168,15 +168,15 @@ impl Component for NowPlaying {
                                     set_hexpand: true,
                                     set_xalign: 0.0,
                                     add_css_class: "dim-label",
-                                    add_css_class: "albuz-caption",
-                                    add_css_class: "albuz-numeric",
+                                    add_css_class: "pochette-caption",
+                                    add_css_class: "pochette-numeric",
                                 },
                                 #[local_ref]
                                 remaining -> gtk::Label {
                                     set_xalign: 1.0,
                                     add_css_class: "dim-label",
-                                    add_css_class: "albuz-caption",
-                                    add_css_class: "albuz-numeric",
+                                    add_css_class: "pochette-caption",
+                                    add_css_class: "pochette-numeric",
                                 },
                             },
                         },
@@ -191,7 +191,7 @@ impl Component for NowPlaying {
                                 set_valign: gtk::Align::Center,
                                 add_css_class: "circular",
                                 add_css_class: "flat",
-                                add_css_class: "albuz-skip",
+                                add_css_class: "pochette-skip",
                                 connect_clicked => NowPlayingMsg::Previous,
                             },
                             gtk::Button {
@@ -205,7 +205,7 @@ impl Component for NowPlaying {
                                 set_tooltip_text: Some(if model.is_playing() { "Pause" } else { "Play" }),
                                 add_css_class: "circular",
                                 add_css_class: "suggested-action",
-                                add_css_class: "albuz-play-pause",
+                                add_css_class: "pochette-play-pause",
                                 connect_clicked => NowPlayingMsg::TogglePause,
                             },
                             gtk::Button {
@@ -214,7 +214,7 @@ impl Component for NowPlaying {
                                 set_valign: gtk::Align::Center,
                                 add_css_class: "circular",
                                 add_css_class: "flat",
-                                add_css_class: "albuz-skip",
+                                add_css_class: "pochette-skip",
                                 #[watch]
                                 set_sensitive: model.status.has_next(),
                                 connect_clicked => NowPlayingMsg::Next,
@@ -265,11 +265,11 @@ impl Component for NowPlaying {
                         gtk::Label {
                             set_label: "Tracks",
                             set_xalign: 0.0,
-                            add_css_class: "albuz-kicker",
+                            add_css_class: "pochette-kicker",
                         },
                         #[local_ref]
                         queue_list -> gtk::ListBox {
-                            add_css_class: "albuz-tracks",
+                            add_css_class: "pochette-tracks",
                             set_selection_mode: gtk::SelectionMode::None,
                             connect_row_activated[sender] => move |_, row| {
                                 if let Ok(index) = usize::try_from(row.index()) {
@@ -298,7 +298,7 @@ impl Component for NowPlaying {
                 .height_request(COVER_SIZE)
                 .content_fit(gtk::ContentFit::Cover)
                 .overflow(gtk::Overflow::Hidden)
-                .css_classes(["albuz-cover", "albuz-cover-large"])
+                .css_classes(["pochette-cover", "pochette-cover-large"])
                 .build(),
             heart: Heart::new(),
             favorites,
@@ -442,9 +442,9 @@ impl NowPlaying {
         while let Some(row) = self.queue_list.row_at_index(index) {
             let current = usize::try_from(index).ok() == self.status.index;
             if current {
-                row.add_css_class("albuz-playing");
+                row.add_css_class("pochette-playing");
             } else {
-                row.remove_css_class("albuz-playing");
+                row.remove_css_class("pochette-playing");
             }
             index += 1;
         }
@@ -480,7 +480,7 @@ fn queue_row(track: &Track) -> gtk::ListBoxRow {
         .label(track.track_number.to_string())
         .width_chars(2)
         .xalign(1.0)
-        .css_classes(["dim-label", "albuz-numeric"])
+        .css_classes(["dim-label", "pochette-numeric"])
         .build();
     let title = gtk::Label::builder()
         .label(track.full_title())
@@ -491,11 +491,11 @@ fn queue_row(track: &Track) -> gtk::ListBoxRow {
         .build();
     let duration = gtk::Label::builder()
         .label(format::track_duration(track.duration))
-        .css_classes(["dim-label", "albuz-numeric"])
+        .css_classes(["dim-label", "pochette-numeric"])
         .build();
     let content = gtk::Box::builder()
         .spacing(12)
-        .css_classes(["albuz-track"])
+        .css_classes(["pochette-track"])
         .build();
     content.append(&number);
     content.append(&title);

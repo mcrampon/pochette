@@ -29,7 +29,7 @@ pub enum Error {
 
 type Result<T> = std::result::Result<T, Error>;
 
-const LABEL: &str = "Albuz Qobuz session";
+const LABEL: &str = "Pochette Qobuz session";
 
 /// Where the session is kept.
 pub enum SessionStore {
@@ -132,7 +132,7 @@ async fn keyring() -> Result<oo7::Keyring> {
 }
 
 fn attributes() -> HashMap<&'static str, &'static str> {
-    HashMap::from([("application", "albuz"), ("kind", "qobuz-session")])
+    HashMap::from([("application", "pochette"), ("kind", "qobuz-session")])
 }
 
 fn session_file() -> PathBuf {
@@ -142,7 +142,7 @@ fn session_file() -> PathBuf {
             || PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(".local/share"),
             PathBuf::from,
         );
-    data_home.join("albuz").join("session.json")
+    data_home.join("pochette").join("session.json")
 }
 
 /// Write a file that only the user can read, in a directory only they can enter.

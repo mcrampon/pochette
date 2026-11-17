@@ -24,29 +24,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "albuz"
-version = "0.1.0"
-dependencies = [
- "futures-util",
- "gstreamer",
- "gtk4",
- "humantime",
- "mpris-server",
- "oo7",
- "qobuz",
- "relm4",
- "reqwest",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "unicode-normalization",
- "uuid",
-]
-
-[[package]]
 name = "ashpd"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1677,6 +1654,29 @@ name = "pkg-config"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
+
+[[package]]
+name = "pochette"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "gstreamer",
+ "gtk4",
+ "humantime",
+ "mpris-server",
+ "oo7",
+ "qobuz",
+ "relm4",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "unicode-normalization",
+ "uuid",
+]
 
 [[package]]
 name = "potential_utf"

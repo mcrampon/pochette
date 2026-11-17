@@ -214,7 +214,7 @@ mod imp {
 
     #[glib::object_subclass]
     impl ObjectSubclass for SplitView {
-        const NAME: &'static str = "AlbuzSplitView";
+        const NAME: &'static str = "PochetteSplitView";
         type Type = super::SplitView;
         type ParentType = gtk::Widget;
     }

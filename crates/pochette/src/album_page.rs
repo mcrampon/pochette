@@ -155,7 +155,7 @@ impl Component for AlbumPage {
                                 set_halign: gtk::Align::Start,
                                 set_margin_bottom: 12,
                                 add_css_class: "suggested-action",
-                                add_css_class: "albuz-play",
+                                add_css_class: "pochette-play",
                                 #[watch]
                                 set_sensitive: model.can_play(),
                                 connect_clicked => AlbumPageMsg::PlayPressed,
@@ -190,7 +190,7 @@ impl Component for AlbumPage {
                                 #[watch]
                                 set_label: &model.kicker(),
                                 set_xalign: 0.0,
-                                add_css_class: "albuz-kicker",
+                                add_css_class: "pochette-kicker",
                             },
                             gtk::Label {
                                 #[watch]
@@ -199,14 +199,14 @@ impl Component for AlbumPage {
                                 set_wrap: true,
                                 set_wrap_mode: pango::WrapMode::WordChar,
                                 set_selectable: true,
-                                add_css_class: "albuz-album-page-title",
+                                add_css_class: "pochette-album-page-title",
                             },
                             gtk::Label {
                                 #[watch]
                                 set_label: &model.text(|album| album.artist.name.clone()),
                                 set_xalign: 0.0,
                                 set_wrap: true,
-                                add_css_class: "albuz-album-page-artist",
+                                add_css_class: "pochette-album-page-artist",
                             },
                             gtk::Label {
                                 #[watch]
@@ -231,7 +231,7 @@ impl Component for AlbumPage {
                                 set_visible: !model.quality().is_empty(),
                                 set_halign: gtk::Align::Start,
                                 set_margin_top: 6,
-                                add_css_class: "albuz-badge",
+                                add_css_class: "pochette-badge",
                             },
                         },
                     },
@@ -291,7 +291,7 @@ impl Component for AlbumPage {
                         gtk::Label {
                             set_label: "About This Album",
                             set_xalign: 0.0,
-                            add_css_class: "albuz-heading",
+                            add_css_class: "pochette-heading",
                         },
                         gtk::Label {
                             #[watch]
@@ -299,7 +299,7 @@ impl Component for AlbumPage {
                             set_xalign: 0.0,
                             set_wrap: true,
                             set_selectable: true,
-                            add_css_class: "albuz-review",
+                            add_css_class: "pochette-review",
                         },
                     },
 
@@ -311,7 +311,7 @@ impl Component for AlbumPage {
                         set_xalign: 0.0,
                         set_wrap: true,
                         add_css_class: "dim-label",
-                        add_css_class: "albuz-caption",
+                        add_css_class: "pochette-caption",
                     },
                 },
             },
@@ -335,7 +335,7 @@ impl Component for AlbumPage {
                 .height_request(COVER_SIZE)
                 .content_fit(gtk::ContentFit::Cover)
                 .overflow(gtk::Overflow::Hidden)
-                .css_classes(["albuz-cover", "albuz-cover-large"])
+                .css_classes(["pochette-cover", "pochette-cover-large"])
                 .build(),
             heart: Heart::new(),
             favorites,
@@ -461,9 +461,9 @@ impl AlbumPage {
             .and(self.playback.track_id);
         for (track_id, row) in &self.rows {
             if Some(*track_id) == playing {
-                row.add_css_class("albuz-playing");
+                row.add_css_class("pochette-playing");
             } else {
-                row.remove_css_class("albuz-playing");
+                row.remove_css_class("pochette-playing");
             }
         }
     }
@@ -616,7 +616,7 @@ fn fill_track_list(
             if several_discs {
                 list.append(&heading(
                     &format!("Disc {}", track.media_number),
-                    "albuz-disc",
+                    "pochette-disc",
                 ));
             }
             rows = None;
@@ -625,14 +625,14 @@ fn fill_track_list(
             work.clone_from(&track.work);
             list.append(&heading(
                 track.work.as_deref().unwrap_or_default(),
-                "albuz-work",
+                "pochette-work",
             ));
             rows = None;
         }
         let (rows, ids) = rows.get_or_insert_with(|| {
             let rows = gtk::ListBox::new();
             rows.set_selection_mode(gtk::SelectionMode::None);
-            rows.add_css_class("albuz-tracks");
+            rows.add_css_class("pochette-tracks");
             let ids: Rc<RefCell<Vec<u64>>> = Rc::default();
             let (sender, row_ids) = (sender.clone(), ids.clone());
             rows.connect_row_activated(move |_, row| {
@@ -677,14 +677,14 @@ fn track_row(track: &Track, album_artist: &str) -> gtk::ListBoxRow {
 
             gtk::Box {
                 set_spacing: 12,
-                add_css_class: "albuz-track",
+                add_css_class: "pochette-track",
 
                 gtk::Label {
                     set_label: &track.track_number.to_string(),
                     set_width_chars: 3,
                     set_xalign: 1.0,
                     add_css_class: "dim-label",
-                    add_css_class: "albuz-numeric",
+                    add_css_class: "pochette-numeric",
                 },
                 gtk::Box {
                     set_orientation: gtk::Orientation::Vertical,
@@ -703,20 +703,20 @@ fn track_row(track: &Track, album_artist: &str) -> gtk::ListBoxRow {
                         set_xalign: 0.0,
                         set_wrap: true,
                         add_css_class: "dim-label",
-                        add_css_class: "albuz-caption",
+                        add_css_class: "pochette-caption",
                     },
                 },
                 gtk::Label {
                     set_label: &format::track_duration(track.duration),
                     add_css_class: "dim-label",
-                    add_css_class: "albuz-numeric",
+                    add_css_class: "pochette-numeric",
                 },
             },
         }
     }
 
     if !track.streamable {
-        row.add_css_class("albuz-unavailable");
+        row.add_css_class("pochette-unavailable");
         row.set_tooltip_text(Some("Not available for streaming"));
     }
     row

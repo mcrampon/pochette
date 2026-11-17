@@ -143,7 +143,7 @@ impl Component for AlbumsPage {
 
                     gtk::Label {
                         set_label: "Can't Load Your Albums",
-                        add_css_class: "albuz-heading",
+                        add_css_class: "pochette-heading",
                     },
                     gtk::Label {
                         #[watch]
@@ -170,7 +170,7 @@ impl Component for AlbumsPage {
 
                     gtk::Label {
                         set_label: "No Saved Albums",
-                        add_css_class: "albuz-heading",
+                        add_css_class: "pochette-heading",
                     },
                     gtk::Label {
                         set_label: "Albums you add to your favorites on Qobuz appear here.",
@@ -248,7 +248,7 @@ impl Component for AlbumsPage {
                             set_min_columns: 2,
                             set_max_columns: 16,
                             set_single_click_activate: true,
-                            add_css_class: "albuz-album-grid",
+                            add_css_class: "pochette-album-grid",
                             connect_activate[sender] => move |_, position| {
                                 sender.input(AlbumsMsg::Open(position));
                             },
@@ -266,7 +266,7 @@ impl Component for AlbumsPage {
 
                         gtk::Label {
                             set_label: "No Matching Albums",
-                            add_css_class: "albuz-heading",
+                            add_css_class: "pochette-heading",
                         },
                         gtk::Button {
                             set_label: "Clear Search and Filters",

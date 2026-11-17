@@ -127,7 +127,7 @@ impl Heart {
         icon.set_valign(gtk::Align::Center);
         let button = gtk::Button::builder()
             .child(&icon)
-            .css_classes(["albuz-heart", "circular"])
+            .css_classes(["pochette-heart", "circular"])
             .halign(gtk::Align::End)
             .valign(gtk::Align::End)
             .margin_end(8)
@@ -192,9 +192,9 @@ impl Heart {
             "Add to Your Albums"
         }));
         if favorite {
-            inner.button.add_css_class("albuz-favorite");
+            inner.button.add_css_class("pochette-favorite");
         } else {
-            inner.button.remove_css_class("albuz-favorite");
+            inner.button.remove_css_class("pochette-favorite");
         }
     }
 }
@@ -203,7 +203,7 @@ impl Heart {
 pub fn with_heart(child: &impl IsA<gtk::Widget>, heart: &Heart) -> gtk::Overlay {
     let overlay = gtk::Overlay::builder()
         .child(child)
-        .css_classes(["albuz-cover-hover"])
+        .css_classes(["pochette-cover-hover"])
         .build();
     overlay.add_overlay(heart.widget());
     overlay
@@ -254,7 +254,7 @@ mod icon {
 
         #[glib::object_subclass]
         impl ObjectSubclass for HeartIcon {
-            const NAME: &'static str = "AlbuzHeartIcon";
+            const NAME: &'static str = "PochetteHeartIcon";
             type Type = super::HeartIcon;
             type ParentType = gtk::Widget;
         }

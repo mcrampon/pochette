@@ -28,7 +28,7 @@ pub enum Error {
 
 pub fn http_client() -> reqwest::Client {
     reqwest::Client::builder()
-        .user_agent(concat!("Albuz/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("Pochette/", env!("CARGO_PKG_VERSION")))
         .build()
         .expect("the TLS backend initializes")
 }

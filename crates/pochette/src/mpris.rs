@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// The bus name is `org.mpris.MediaPlayer2.` and this.
-const BUS_NAME: &str = "Albuz";
+const BUS_NAME: &str = "Pochette";
 
 /// How often the position the desktop shows is brought up to date.
 const POSITION_EVERY: Duration = Duration::from_secs(1);
@@ -52,7 +52,7 @@ pub fn start(player: Player, raise: impl Fn() + Send + 'static) {
 
 async fn serve(player: Player, raise: impl Fn() + 'static) -> mpris_server::zbus::Result<()> {
     let mpris = mpris_server::Player::builder(BUS_NAME)
-        .identity("Albuz")
+        .identity("Pochette")
         .desktop_entry(crate::APP_ID)
         .can_raise(true)
         .can_control(true)
@@ -193,7 +193,7 @@ fn art_url(album: &Album) -> Option<String> {
 
 /// The D-Bus object path that names a track.
 fn track_path(track_id: u64) -> TrackId {
-    TrackId::try_from(format!("/io/github/mcrampon/Albuz/track/{track_id}"))
+    TrackId::try_from(format!("/io/github/mcrampon/Pochette/track/{track_id}"))
         .unwrap_or(TrackId::NO_TRACK)
 }
 
@@ -213,7 +213,7 @@ mod tests {
     fn names_tracks_with_valid_paths() {
         assert_eq!(
             track_path(446_392_172).as_str(),
-            "/io/github/mcrampon/Albuz/track/446392172"
+            "/io/github/mcrampon/Pochette/track/446392172"
         );
     }
 

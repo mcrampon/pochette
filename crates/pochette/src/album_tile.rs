@@ -43,7 +43,7 @@ pub fn tile() -> (gtk::Box, AlbumWidgets) {
         .height_request(COVER_SIZE)
         .content_fit(gtk::ContentFit::Cover)
         .overflow(gtk::Overflow::Hidden)
-        .css_classes(["albuz-cover"])
+        .css_classes(["pochette-cover"])
         .build();
     let heart = Heart::new();
     let cover_box = with_heart(&cover, &heart);
@@ -59,7 +59,7 @@ pub fn tile() -> (gtk::Box, AlbumWidgets) {
             set_valign: gtk::Align::Start,
             set_cursor_from_name: Some("pointer"),
             // The buttons over the cover show when the pointer is anywhere on the tile.
-            add_css_class: "albuz-cover-hover",
+            add_css_class: "pochette-cover-hover",
 
             append: &cover_box,
             #[name = "title"]
@@ -69,7 +69,7 @@ pub fn tile() -> (gtk::Box, AlbumWidgets) {
                 set_max_width_chars: 1,
                 set_ellipsize: pango::EllipsizeMode::End,
                 set_margin_top: 6,
-                add_css_class: "albuz-album-title",
+                add_css_class: "pochette-album-title",
             },
             #[name = "artist"]
             gtk::Label {
@@ -83,7 +83,7 @@ pub fn tile() -> (gtk::Box, AlbumWidgets) {
                 set_xalign: 0.0,
                 set_max_width_chars: 1,
                 set_ellipsize: pango::EllipsizeMode::End,
-                add_css_class: "albuz-tile-caption",
+                add_css_class: "pochette-tile-caption",
             },
         }
     }
@@ -183,7 +183,7 @@ pub fn awards(album: &Album) -> Option<String> {
 const MAX_COLUMNS: u32 = 16;
 
 /// How wide a tile is in a grid, with the padding around it, and how much padding the
-/// grid adds on its sides: see `.albuz-album-grid` in the style sheet.
+/// grid adds on its sides: see `.pochette-album-grid` in the style sheet.
 const GRID_TILE_WIDTH: i32 = COVER_SIZE + 2 * 12;
 const GRID_SIDE_PADDING: i32 = 2 * 24;
 

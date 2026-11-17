@@ -1,4 +1,4 @@
-//! What Albuz remembers between runs, in `$XDG_CONFIG_HOME/albuz/settings.json`.
+//! What Pochette remembers between runs, in `$XDG_CONFIG_HOME/pochette/settings.json`.
 
 use std::{io, path::PathBuf};
 
@@ -94,7 +94,9 @@ impl Settings {
 }
 
 fn path() -> PathBuf {
-    glib::user_config_dir().join("albuz").join("settings.json")
+    glib::user_config_dir()
+        .join("pochette")
+        .join("settings.json")
 }
 
 #[cfg(test)]

@@ -95,7 +95,7 @@ impl Component for App {
 
     view! {
         gtk::ApplicationWindow {
-            set_title: Some("Albuz"),
+            set_title: Some("Pochette"),
             set_default_size: (1100, 760),
 
             #[wrap(Some)]
@@ -149,7 +149,7 @@ impl Component for App {
 
                     gtk::Label {
                         set_label: "Can't Reach Qobuz",
-                        add_css_class: "albuz-heading",
+                        add_css_class: "pochette-heading",
                     },
                     gtk::Label {
                         #[watch]
@@ -173,8 +173,8 @@ impl Component for App {
                     set_valign: gtk::Align::Center,
 
                     gtk::Label {
-                        set_label: "Albuz",
-                        add_css_class: "albuz-title",
+                        set_label: "Pochette",
+                        add_css_class: "pochette-title",
                     },
                     gtk::Label {
                         set_label: "Your Qobuz library, album by album.",
@@ -184,7 +184,7 @@ impl Component for App {
                         set_label: "Sign In with Qobuz",
                         set_halign: gtk::Align::Center,
                         add_css_class: "suggested-action",
-                        add_css_class: "albuz-pill",
+                        add_css_class: "pochette-pill",
                         connect_clicked => Msg::SignIn,
                     },
                     gtk::Label {
@@ -200,7 +200,7 @@ impl Component for App {
                     gtk::Label {
                         set_label: "Signing in opens Qobuz in your browser.\nRequires a Qobuz subscription.",
                         add_css_class: "dim-label",
-                        add_css_class: "albuz-caption",
+                        add_css_class: "pochette-caption",
                         set_justify: gtk::Justification::Center,
                     },
                 },
@@ -217,10 +217,10 @@ impl Component for App {
                     },
                     gtk::Label {
                         set_label: "Continue in Your Browser",
-                        add_css_class: "albuz-heading",
+                        add_css_class: "pochette-heading",
                     },
                     gtk::Label {
-                        set_label: "Sign in to Qobuz in the browser tab that just opened.\nAlbuz continues as soon as you're done.",
+                        set_label: "Sign in to Qobuz in the browser tab that just opened.\nPochette continues as soon as you're done.",
                         add_css_class: "dim-label",
                         set_justify: gtk::Justification::Center,
                     },

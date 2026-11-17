@@ -1,5 +1,5 @@
 [package]
-name = "albuz"
+name = "pochette"
 description = "A native Linux player for Qobuz, built around albums"
 version.workspace = true
 edition.workspace = true

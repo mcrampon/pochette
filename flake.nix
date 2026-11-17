@@ -1,5 +1,5 @@
 {
-  description = "Albuz: a native Linux player for Qobuz, built around albums";
+  description = "Pochette: a native Linux player for Qobuz, built around albums";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 

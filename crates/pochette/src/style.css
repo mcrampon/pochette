@@ -1,63 +1,63 @@
-.albuz-title {
+.pochette-title {
   font-size: 2.5em;
   font-weight: 800;
 }
 
-.albuz-heading {
+.pochette-heading {
   font-size: 1.5em;
   font-weight: 700;
 }
 
-.albuz-caption {
+.pochette-caption {
   font-size: 0.9em;
 }
 
-.albuz-pill {
+.pochette-pill {
   border-radius: 9999px;
   padding: 10px 32px;
 }
 
-.albuz-album-grid {
+.pochette-album-grid {
   padding: 12px 24px;
   background: none;
 }
 
-.albuz-album-grid > child {
+.pochette-album-grid > child {
   padding: 12px;
   border-radius: 12px;
 }
 
-.albuz-cover {
+.pochette-cover {
   border-radius: 8px;
   background-color: alpha(currentColor, 0.08);
 }
 
-.albuz-album-title {
+.pochette-album-title {
   font-weight: 600;
 }
 
-.albuz-cover-large {
+.pochette-cover-large {
   border-radius: 12px;
 }
 
-.albuz-kicker {
+.pochette-kicker {
   font-size: 0.8em;
   font-weight: 700;
   letter-spacing: 0.08em;
   opacity: 0.6;
 }
 
-.albuz-album-page-title {
+.pochette-album-page-title {
   font-size: 2.2em;
   font-weight: 800;
 }
 
-.albuz-album-page-artist {
+.pochette-album-page-artist {
   font-size: 1.3em;
   font-weight: 600;
 }
 
-.albuz-badge {
+.pochette-badge {
   font-size: 0.85em;
   font-weight: 600;
   padding: 3px 10px;
@@ -65,82 +65,82 @@
   background-color: alpha(currentColor, 0.1);
 }
 
-.albuz-numeric {
+.pochette-numeric {
   font-feature-settings: "tnum";
 }
 
-.albuz-tracks {
+.pochette-tracks {
   background: none;
 }
 
-.albuz-tracks > row {
+.pochette-tracks > row {
   border-radius: 8px;
 }
 
-.albuz-track {
+.pochette-track {
   padding: 8px 12px 8px 0;
 }
 
-.albuz-unavailable {
+.pochette-unavailable {
   opacity: 0.45;
 }
 
-.albuz-disc {
+.pochette-disc {
   font-weight: 700;
   margin-top: 12px;
 }
 
-.albuz-work {
+.pochette-work {
   font-weight: 600;
   font-style: italic;
   margin-top: 12px;
   opacity: 0.8;
 }
 
-.albuz-review {
+.pochette-review {
   line-height: 1.5;
 }
 
-.albuz-play {
+.pochette-play {
   border-radius: 9999px;
   padding: 10px 28px;
   font-size: 1.1em;
   font-weight: 700;
 }
 
-.albuz-tracks > row.albuz-playing {
+.pochette-tracks > row.pochette-playing {
   background-color: alpha(@accent_bg_color, 0.15);
 }
 
-.albuz-tracks > row.albuz-playing label {
+.pochette-tracks > row.pochette-playing label {
   color: @accent_color;
   opacity: 1;
 }
 
-.albuz-now-playing {
+.pochette-now-playing {
   background-color: alpha(currentColor, 0.03);
 }
 
-.albuz-now-playing-title {
+.pochette-now-playing-title {
   font-size: 1.3em;
   font-weight: 700;
 }
 
-.albuz-play-pause {
+.pochette-play-pause {
   min-width: 56px;
   min-height: 56px;
 }
 
-.albuz-play-pause image {
+.pochette-play-pause image {
   -gtk-icon-size: 24px;
 }
 
-.albuz-skip {
+.pochette-skip {
   min-width: 40px;
   min-height: 40px;
 }
 
-.albuz-skip image {
+.pochette-skip image {
   -gtk-icon-size: 20px;
 }
 
@@ -149,29 +149,29 @@ label {
   caret-color: transparent;
 }
 
-.albuz-tile-caption {
+.pochette-tile-caption {
   font-size: 0.85em;
   color: @accent_color;
 }
 
-.albuz-row-tile {
+.pochette-row-tile {
   padding: 12px;
   border-radius: 12px;
 }
 
 /* Row tiles aren't buttons, so they get the hover and focus looks of one here. */
-.albuz-row-tile:hover {
+.pochette-row-tile:hover {
   background-color: alpha(currentColor, 0.07);
 }
 
-.albuz-row-tile:focus-visible {
+.pochette-row-tile:focus-visible {
   outline: 2px solid alpha(@accent_color, 0.6);
   outline-offset: -2px;
 }
 
 /* The heart over a cover, which adds the album to the favorites or removes it. It shows
    when the pointer is over the tile or cover, or when it has the keyboard focus. */
-.albuz-heart {
+.pochette-heart {
   min-width: 34px;
   min-height: 34px;
   padding: 0;
@@ -181,23 +181,23 @@ label {
   transition: opacity 120ms ease-out, background-color 120ms ease-out;
 }
 
-.albuz-heart:hover {
+.pochette-heart:hover {
   background-color: alpha(black, 0.75);
 }
 
-.albuz-heart.albuz-favorite {
+.pochette-heart.pochette-favorite {
   color: #ff5f78;
 }
 
-.albuz-cover-hover:hover .albuz-heart,
-.albuz-cover-hover:hover .albuz-cover-play,
-.albuz-cover-play:focus-visible,
-.albuz-heart:focus-visible {
+.pochette-cover-hover:hover .pochette-heart,
+.pochette-cover-hover:hover .pochette-cover-play,
+.pochette-cover-play:focus-visible,
+.pochette-heart:focus-visible {
   opacity: 1;
 }
 
 /* The play button over a cover, which shows with the heart. */
-.albuz-cover-play {
+.pochette-cover-play {
   min-width: 40px;
   min-height: 40px;
   padding: 0;

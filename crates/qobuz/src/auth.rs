@@ -196,9 +196,9 @@ async fn respond(stream: &mut TcpStream, status: &str, body: &str) -> std::io::R
 }
 
 const SUCCESS_TITLE: &str = "You're signed in";
-const SUCCESS_TEXT: &str = "You can close this tab and go back to Albuz.";
+const SUCCESS_TEXT: &str = "You can close this tab and go back to Pochette.";
 const FAILURE_TITLE: &str = "Sign-in failed";
-const FAILURE_TEXT: &str = "Qobuz didn't sign you in. Go back to Albuz to try again.";
+const FAILURE_TEXT: &str = "Qobuz didn't sign you in. Go back to Pochette to try again.";
 
 fn page(title: &str, text: &str) -> String {
     format!(
@@ -207,7 +207,7 @@ fn page(title: &str, text: &str) -> String {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Albuz · {title}</title>
+<title>Pochette · {title}</title>
 <style>
   :root {{ color-scheme: light dark; font-family: system-ui, sans-serif; }}
   body {{ margin: 0; min-height: 100vh; display: grid; place-items: center; }}

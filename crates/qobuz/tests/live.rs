@@ -1,4 +1,4 @@
-//! Checks against the real API, as a real user: run them with a session from Albuz's
+//! Checks against the real API, as a real user: run them with a session from Pochette's
 //! keyring item in `QOBUZ_SESSION`, as JSON, and `cargo test -- --ignored`.
 
 use qobuz::{Client, Quality, auth::Session};

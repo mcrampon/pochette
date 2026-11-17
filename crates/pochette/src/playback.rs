@@ -128,7 +128,7 @@ impl PlayButton {
     pub fn new() -> Self {
         let button = gtk::Button::builder()
             .icon_name("media-playback-start-symbolic")
-            .css_classes(["albuz-cover-play", "circular", "suggested-action"])
+            .css_classes(["pochette-cover-play", "circular", "suggested-action"])
             .halign(gtk::Align::Start)
             .valign(gtk::Align::End)
             .margin_start(8)

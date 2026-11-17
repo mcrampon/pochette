@@ -155,7 +155,7 @@ fn cache_dir() -> PathBuf {
             || PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(".cache"),
             PathBuf::from,
         )
-        .join("albuz")
+        .join("pochette")
         .join("covers")
 }
 
@@ -354,7 +354,7 @@ mod tests {
 
     #[test]
     fn prunes_covers_cached_for_too_long() {
-        let dir = std::env::temp_dir().join(format!("albuz-prune-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("pochette-prune-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let now = SystemTime::now();
         let day = Duration::from_hours(24);
