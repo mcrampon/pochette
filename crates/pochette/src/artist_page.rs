@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use qobuz::{
     Client,
-    artist::{Artist, ReleaseKind, SimilarArtist},
+    artist::{Artist, ArtistPreview, ReleaseKind},
     models::Album,
 };
 use relm4::{
@@ -52,7 +52,7 @@ pub struct ArtistPage {
     /// The rows of releases, then of similar artists.
     rows: gtk::Box,
     releases: Vec<(ReleaseKind, Vec<Rc<Album>>)>,
-    similar: Vec<SimilarArtist>,
+    similar: Vec<ArtistPreview>,
     tiles: Vec<AlbumWidgets>,
     covers: VisibleCovers,
     actions: CoverActions,
@@ -427,7 +427,14 @@ impl ArtistPage {
 
         self.similar = artist.similar;
         if !self.similar.is_empty() {
-            self.rows.append(&similar_row(&self.similar, sender));
+            let sender = sender.clone();
+            self.rows.append(&artist_row(
+                "Similar Artists",
+                &self.similar,
+                move |index| {
+                    sender.input(ArtistPageMsg::OpenSimilar(index));
+                },
+            ));
         }
         self.state = State::Loaded;
     }
@@ -444,12 +451,18 @@ pub fn release_kind_title(kind: ReleaseKind) -> &'static str {
     }
 }
 
-/// A row of artists like this one, each opening their page.
-fn similar_row(similar: &[SimilarArtist], sender: &ComponentSender<ArtistPage>) -> gtk::Box {
+/// A row of `artists` under `title`, as many as fit, as round portraits with their names.
+/// Clicking one, or pressing Enter on it, calls `open` with its index.
+pub fn artist_row(
+    title: &str,
+    artists: &[ArtistPreview],
+    open: impl Fn(usize) + 'static,
+) -> gtk::Box {
+    let open = Rc::new(open);
     let strip = TileStrip::default();
     strip.set_margin_start(24);
     strip.set_margin_end(24);
-    for (index, artist) in similar.iter().enumerate() {
+    for (index, artist) in artists.iter().enumerate() {
         let picture = round_picture();
         let initial = initial_label("pochette-similar-initial");
         initial.set_label(&initial_of(&artist.name));
@@ -473,14 +486,12 @@ fn similar_row(similar: &[SimilarArtist], sender: &ComponentSender<ArtistPage>) 
         item.set_cursor_from_name(Some("pointer"));
         item.append(&overlay);
         item.append(&name);
-        let sender = sender.clone();
-        strip.append(&album_tile::row_tile(&item, move || {
-            sender.input(ArtistPageMsg::OpenSimilar(index));
-        }));
+        let open = open.clone();
+        strip.append(&album_tile::row_tile(&item, move || open(index)));
     }
 
     let row = gtk::Box::new(gtk::Orientation::Vertical, 6);
-    row.append(&album_tile::row_header("Similar Artists"));
+    row.append(&album_tile::row_header(title));
     row.append(&strip);
     row
 }

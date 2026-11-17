@@ -123,3 +123,25 @@ async fn reads_an_artist_page_and_their_releases() {
     assert!(first.has_more);
     assert_ne!(first.albums[0].id, next.albums[0].id);
 }
+
+#[tokio::test]
+#[ignore = "needs a Qobuz session"]
+async fn searches_albums_and_artists() {
+    let client = client();
+    let artists = client.search_artists("gorillaz", 5).await.unwrap();
+    println!(
+        "artists: {:?}",
+        artists.iter().map(|a| &a.name).collect::<Vec<_>>()
+    );
+    assert_eq!(artists[0].name, "Gorillaz");
+
+    let first = client.search_albums("gorillaz", 0, 5).await.unwrap();
+    let next = client.search_albums("gorillaz", 5, 5).await.unwrap();
+    println!(
+        "albums: {:?}, then {:?}",
+        first.albums.iter().map(|a| &a.title).collect::<Vec<_>>(),
+        next.albums.iter().map(|a| &a.title).collect::<Vec<_>>()
+    );
+    assert!(first.has_more);
+    assert_ne!(first.albums[0].id, next.albums[0].id);
+}

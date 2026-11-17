@@ -20,6 +20,8 @@ mod now_playing;
 mod playback;
 mod player;
 mod releases_page;
+mod search_page;
+mod search_view;
 mod session_store;
 mod settings;
 mod split_view;

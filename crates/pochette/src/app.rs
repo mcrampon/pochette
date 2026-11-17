@@ -18,6 +18,7 @@ use crate::{
     now_playing::NowPlaying,
     playback::{CoverActions, Playback},
     player::{Player, State},
+    search_view::{SearchView, SearchViewMsg, SearchViewOutput},
     session_store::SessionStore,
     settings::Settings,
     split_view::SplitView,
@@ -50,6 +51,12 @@ pub struct App {
     albums: Controller<AlbumsPage>,
     discover: Controller<DiscoverPage>,
     now_playing: Controller<NowPlaying>,
+    /// Search results, beside the tabs.
+    search_view: Controller<SearchView>,
+    /// The tabs and the search results.
+    library: Option<gtk::Stack>,
+    /// The tab to go back to when the search results close.
+    last_tab: String,
     player: Player,
     /// The albums in the user's library, which hearts add and remove.
     favorites: Favorites,
@@ -78,6 +85,10 @@ pub enum Msg {
     Collapsed(bool),
     /// The user picked a tab.
     LibraryShown,
+    /// Search the catalog, from the top bar.
+    Search(String),
+    /// The search results were closed.
+    SearchClosed,
     /// Bring the window to the front, as the desktop's media controls ask.
     Raise,
     // Results of background tasks.
@@ -100,6 +111,23 @@ impl Component for App {
 
             #[wrap(Some)]
             set_titlebar = &gtk::HeaderBar {
+                pack_start = &gtk::SearchEntry {
+                    set_placeholder_text: Some("Search Qobuz"),
+                    set_width_request: 260,
+                    // Each search is a request: wait for the typing to pause.
+                    set_search_delay: 300,
+                    #[watch]
+                    set_visible: model.screen == Screen::SignedIn,
+                    connect_search_changed[sender] => move |entry| {
+                        sender.input(Msg::Search(entry.text().into()));
+                    },
+                    // Enter shows the results again, after picking a tab.
+                    connect_activate[sender] => move |entry| {
+                        sender.input(Msg::Search(entry.text().into()));
+                    },
+                    connect_stop_search => |entry| entry.set_text(""),
+                },
+
                 #[wrap(Some)]
                 set_title_widget = &gtk::StackSwitcher {
                     set_stack: Some(&library),
@@ -273,6 +301,8 @@ impl Component for App {
 
                         add_titled: (model.discover.widget(), Some("discover"), "Discover"),
                         add_titled: (model.albums.widget(), Some("albums"), "Albums"),
+                        // Without a title, so without a button: the search bar shows it.
+                        add_named: (model.search_view.widget(), Some("search")),
                         // The library first: Discover is for when there's time to explore.
                         set_visible_child_name: "albums",
                         connect_visible_child_notify => Msg::LibraryShown,
@@ -301,9 +331,10 @@ impl Component for App {
         player.set_volume(settings.volume);
         finish_playback_before_closing(&root, &player);
         play_pause_with_space(&root, &player);
+        leave_search_bars_on_click(&root);
         let raise = sender.input_sender().clone();
         mpris::start(player.clone(), move || raise.emit(Msg::Raise));
-        let model = Self {
+        let mut model = Self {
             screen: Screen::Starting,
             http: account::http_client(),
             store: None,
@@ -324,6 +355,14 @@ impl Component for App {
             now_playing: NowPlaying::builder()
                 .launch((player.clone(), favorites.clone()))
                 .detach(),
+            search_view: SearchView::builder()
+                .launch((player.clone(), actions.clone()))
+                .forward(sender.input_sender(), |output| match output {
+                    SearchViewOutput::Closed => Msg::SearchClosed,
+                    SearchViewOutput::SessionExpired => Msg::SessionExpired,
+                }),
+            library: None,
+            last_tab: "albums".to_owned(),
             player,
             favorites,
             playback,
@@ -332,6 +371,7 @@ impl Component for App {
             collapsed: false,
         };
         let widgets = view_output!();
+        model.library = Some(widgets.library.clone());
         let input = sender.input_sender().clone();
         widgets
             .split
@@ -451,12 +491,13 @@ impl Component for App {
             Msg::ShowPane(show) => self.pane_open = show,
             Msg::Collapsed(collapsed) => self.collapsed = collapsed,
             Msg::Raise => root.present(),
-            Msg::LibraryShown => {
-                // Over the library, the pane hides the tab the user just picked.
-                if self.collapsed {
-                    self.pane_open = false;
+            Msg::Search(query) => self.search(query),
+            Msg::SearchClosed => {
+                if let Some(library) = &self.library {
+                    library.set_visible_child_name(&self.last_tab);
                 }
             }
+            Msg::LibraryShown => self.library_shown(),
         }
     }
 }
@@ -477,6 +518,31 @@ fn follow_playback(player: &Player, sender: &ComponentSender<App>) {
 }
 
 impl App {
+    /// Search the catalog in the tab shown.
+    /// A tab, or the search results, was shown.
+    fn library_shown(&mut self) {
+        let shown = self
+            .library
+            .as_ref()
+            .and_then(gtk::Stack::visible_child_name);
+        if let Some(tab) = shown.filter(|name| name != "search") {
+            self.last_tab = tab.to_string();
+        }
+        // Over the library, the pane hides the tab the user just picked.
+        if self.collapsed {
+            self.pane_open = false;
+        }
+    }
+
+    /// Show what `query` finds, beside the tabs; or close the results if it's empty.
+    fn search(&self, query: String) {
+        let close = query.trim().is_empty();
+        self.search_view.emit(SearchViewMsg::Search(query));
+        if let Some(library) = self.library.as_ref().filter(|_| !close) {
+            library.set_visible_child_name("search");
+        }
+    }
+
     /// Run `task` in the background, in place of the current one.
     fn run(&mut self, task: impl Future<Output = ()> + Send + 'static) {
         self.stop_task();
@@ -496,6 +562,8 @@ impl App {
         self.albums.emit(AlbumsMsg::Show(account.client.clone()));
         self.discover
             .emit(DiscoverMsg::Show(account.client.clone()));
+        self.search_view
+            .emit(SearchViewMsg::SetClient(Some(account.client.clone())));
         self.account = Some(account);
         self.screen = Screen::SignedIn;
     }
@@ -509,6 +577,7 @@ impl App {
         self.playback.set_client(None);
         self.albums.emit(AlbumsMsg::Clear);
         self.discover.emit(DiscoverMsg::Clear);
+        self.search_view.emit(SearchViewMsg::SetClient(None));
         self.screen = Screen::SignedOut;
         if let Some(store) = self.store.clone() {
             relm4::spawn(async move {
@@ -549,6 +618,33 @@ fn finish_playback_before_closing(window: &gtk::ApplicationWindow, player: &Play
 /// Space plays and pauses, wherever the focus is, except in text fields where it types
 /// a space. It does nothing else: not clicking the focused button, not playing the
 /// focused track.
+/// A click anywhere outside the search bar being typed in takes the focus from it: the top
+/// bar's, or the Albums tab's. Clicks on what takes no focus would leave it there.
+fn leave_search_bars_on_click(window: &gtk::ApplicationWindow) {
+    let click = gtk::GestureClick::new();
+    // Any button, seen before the widget clicked, which still gets the click.
+    click.set_button(0);
+    click.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let window_ref = window.downgrade();
+    click.connect_pressed(move |_, _, x, y| {
+        let Some(window) = window_ref.upgrade() else {
+            return;
+        };
+        let Some(search) = GtkWindowExt::focus(&window)
+            .and_then(|focus| focus.ancestor(gtk::SearchEntry::static_type()))
+        else {
+            return;
+        };
+        let in_search = window
+            .pick(x, y, gtk::PickFlags::DEFAULT)
+            .is_some_and(|target| target == search || target.is_ancestor(&search));
+        if !in_search {
+            GtkWindowExt::set_focus(&window, None::<&gtk::Widget>);
+        }
+    });
+    window.add_controller(click);
+}
+
 fn play_pause_with_space(window: &gtk::ApplicationWindow, player: &Player) {
     let keys = gtk::EventControllerKey::new();
     // Before the focused widget gets the key.

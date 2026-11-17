@@ -55,11 +55,12 @@ pub struct Artist {
     pub biography: Option<String>,
     /// The first releases of each kind that has some, in the order of [`ReleaseKind::ALL`].
     pub releases: Vec<(ReleaseKind, Albums)>,
-    pub similar: Vec<SimilarArtist>,
+    pub similar: Vec<ArtistPreview>,
 }
 
+/// An artist as lists show them: among similar artists, in search results.
 #[derive(Debug, Clone)]
-pub struct SimilarArtist {
+pub struct ArtistPreview {
     pub id: u64,
     pub name: String,
     /// A square portrait, 360 px, when Qobuz has one.
@@ -199,7 +200,7 @@ impl From<ArtistPage> for Artist {
                 .map(|similar| similar.items)
                 .unwrap_or_default()
                 .into_iter()
-                .map(|artist| SimilarArtist {
+                .map(|artist| ArtistPreview {
                     portrait: portrait(artist.images.as_ref()),
                     id: artist.id,
                     name: artist.name.display,

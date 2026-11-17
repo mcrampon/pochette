@@ -15,6 +15,7 @@ use crate::{
     playback::CoverActions,
     player::Player,
     releases_page::{ReleasesPage, ReleasesPageMsg},
+    search_page::{SearchPage, SearchPageMsg},
 };
 
 /// A page to open.
@@ -31,6 +32,8 @@ pub enum Destination {
         artist_name: String,
         kind: ReleaseKind,
     },
+    /// What a search of the catalog finds.
+    Search(String),
 }
 
 /// What a page asks of the navigator.
@@ -53,6 +56,7 @@ enum Page {
     Album(Controller<AlbumPage>),
     Artist(Controller<ArtistPage>),
     Releases(Controller<ReleasesPage>),
+    Search(Controller<SearchPage>),
 }
 
 impl Page {
@@ -61,6 +65,7 @@ impl Page {
             Self::Album(page) => page.widget().clone().upcast(),
             Self::Artist(page) => page.widget().clone().upcast(),
             Self::Releases(page) => page.widget().clone().upcast(),
+            Self::Search(page) => page.widget().clone().upcast(),
         }
     }
 }
@@ -184,11 +189,44 @@ impl Navigator {
                 });
                 Page::Releases(page)
             }
+            Destination::Search(query) => {
+                let page = SearchPage::builder()
+                    .launch(self.actions.clone())
+                    .connect_receiver(to_navigator(&self.forward));
+                page.emit(SearchPageMsg::Show { client, query });
+                Page::Search(page)
+            }
         };
         let widget = page.widget();
         self.stack.add_child(&widget);
         self.stack.set_visible_child(&widget);
         self.pages.push(page);
+    }
+
+    /// Search the catalog for `query`, in results at the bottom of the pages: back to them
+    /// if they're there, from whatever was opened from them, or opened.
+    pub fn search(&mut self, query: String) {
+        let results = match self.pages.first() {
+            Some(Page::Search(page)) => Some(page.sender().clone()),
+            _ => None,
+        };
+        match (results, self.client.clone()) {
+            (Some(results), Some(client)) => {
+                results.emit(SearchPageMsg::Show { client, query });
+                if self.pages.len() > 1 {
+                    self.leaving.extend(self.pages.drain(1..));
+                    self.stack.set_visible_child(&self.pages[0].widget());
+                    self.settle_unless_sliding();
+                }
+            }
+            (None, _) => self.open(Destination::Search(query)),
+            (Some(_), None) => {}
+        }
+    }
+
+    /// Whether no page is open over the home page.
+    pub fn is_home(&self) -> bool {
+        self.pages.is_empty()
     }
 
     /// Back to the page under the one shown.

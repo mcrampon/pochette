@@ -9,6 +9,7 @@ mod client;
 pub mod discover;
 mod error;
 pub mod models;
+pub mod search;
 mod web_player;
 
 pub use client::{Client, FileUrl, Quality, StreamingEnd};
