@@ -14,6 +14,7 @@ mod favorites;
 mod format;
 
 mod library;
+mod mpris;
 mod now_playing;
 mod playback;
 mod player;

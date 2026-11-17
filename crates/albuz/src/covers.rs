@@ -159,6 +159,12 @@ fn cache_dir() -> PathBuf {
         .join("covers")
 }
 
+/// Where the cover at `url` is on disk, if it was downloaded.
+pub fn cached_file(url: &str) -> Option<PathBuf> {
+    let path = cache_dir().join(file_name(url)?);
+    path.exists().then_some(path)
+}
+
 /// The cache file for a cover URL such as
 /// `https://static.qobuz.com/images/covers/a3/t2/dpqdxzmrwt2a3_230.jpg`: `a3-t2-dpqdxzmrwt2a3_230.jpg`.
 ///

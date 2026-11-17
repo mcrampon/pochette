@@ -14,6 +14,7 @@ use crate::{
     albums::{AlbumsMsg, AlbumsOutput, AlbumsPage},
     discover::{DiscoverMsg, DiscoverOutput, DiscoverPage},
     favorites::Favorites,
+    mpris,
     now_playing::NowPlaying,
     playback::{CoverActions, Playback},
     player::{Player, State},
@@ -77,6 +78,8 @@ pub enum Msg {
     Collapsed(bool),
     /// The user picked a tab.
     LibraryShown,
+    /// Bring the window to the front, as the desktop's media controls ask.
+    Raise,
     // Results of background tasks.
     Started(Arc<SessionStore>, Result<Option<Account>, account::Error>),
     SignInPageReady(String),
@@ -298,6 +301,8 @@ impl Component for App {
         player.set_volume(settings.volume);
         finish_playback_before_closing(&root, &player);
         play_pause_with_space(&root, &player);
+        let raise = sender.input_sender().clone();
+        mpris::start(player.clone(), move || raise.emit(Msg::Raise));
         let model = Self {
             screen: Screen::Starting,
             http: account::http_client(),
@@ -445,6 +450,7 @@ impl Component for App {
             }
             Msg::ShowPane(show) => self.pane_open = show,
             Msg::Collapsed(collapsed) => self.collapsed = collapsed,
+            Msg::Raise => root.present(),
             Msg::LibraryShown => {
                 // Over the library, the pane hides the tab the user just picked.
                 if self.collapsed {
