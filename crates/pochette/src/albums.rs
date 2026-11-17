@@ -10,20 +10,20 @@ use std::{
 
 use qobuz::{Client, models::Album};
 use relm4::{
-    Component, ComponentController, ComponentParts, ComponentSender, Controller,
+    Component, ComponentParts, ComponentSender,
     gtk::{self, glib, prelude::*},
     typed_view::grid::TypedGridView,
 };
 use tokio::task::JoinHandle;
 
 use crate::{
-    album_page::{AlbumPage, AlbumPageMsg, AlbumPageOutput},
     album_tile::{self, AlbumItem},
     checklist::Checklist,
     covers::VisibleCovers,
     dropdown::dropdown,
     favorites::Favorites,
     library::{self, Entry, Sort, View},
+    navigation::{Destination, Navigator, NavigatorMsg},
     playback::CoverActions,
     player::Player,
     settings::Settings,
@@ -65,9 +65,8 @@ pub struct AlbumsPage {
     /// Fetching the tracks of the album picked at random.
     random: Option<JoinHandle<()>>,
     covers: VisibleCovers,
-    album_page: Controller<AlbumPage>,
-    /// Whether the album page is shown instead of the grid.
-    showing_album: bool,
+    /// The albums and artists opened, over the grid.
+    nav: Navigator,
 }
 
 #[derive(Debug)]
@@ -80,8 +79,7 @@ pub enum AlbumsMsg {
     Loaded(qobuz::Result<Vec<Album>>),
     /// Open the album at this position in the grid.
     Open(u32),
-    CloseAlbum,
-    SessionExpired,
+    Nav(NavigatorMsg),
     Search(String),
     FocusSearch,
     /// The positions of the genres picked, none meaning all of them.
@@ -115,10 +113,10 @@ impl Component for AlbumsPage {
     type CommandOutput = ();
 
     view! {
-        gtk::Stack {
-            set_transition_type: gtk::StackTransitionType::SlideLeftRight,
-
-            add_named[Some("albums")] = &gtk::Box {
+        gtk::Box {
+            #[local_ref]
+            nav_stack -> gtk::Stack {
+            add_named[Some("home")] = &gtk::Box {
             #[transition = "Crossfade"]
             match model.state {
                 State::Loading => gtk::Box {
@@ -279,10 +277,7 @@ impl Component for AlbumsPage {
             }
             },
 
-            add_named: (model.album_page.widget(), Some("album")),
-
-            #[watch]
-            set_visible_child_name: if model.showing_album { "album" } else { "albums" },
+            },
         }
     }
 
@@ -323,12 +318,10 @@ impl Component for AlbumsPage {
             decade_picker: Checklist::new("Decades"),
             sort_menu,
             client: None,
-            album_page: AlbumPage::builder()
-                .launch((player.clone(), favorites.clone()))
-                .forward(sender.input_sender(), |output| match output {
-                    AlbumPageOutput::Back => AlbumsMsg::CloseAlbum,
-                    AlbumPageOutput::SessionExpired => AlbumsMsg::SessionExpired,
-                }),
+            nav: Navigator::new(player.clone(), actions.clone(), {
+                let input = sender.input_sender().clone();
+                move |msg| input.emit(AlbumsMsg::Nav(msg))
+            }),
             player,
             favorites,
             actions,
@@ -336,8 +329,8 @@ impl Component for AlbumsPage {
             task: None,
             random: None,
             covers: VisibleCovers::default(),
-            showing_album: false,
         };
+        let nav_stack = model.nav.widget();
         let grid_view = &model.grid.view;
         let search = &model.search;
         let genre_button = model.genre_picker.widget();
@@ -381,6 +374,7 @@ impl Component for AlbumsPage {
     fn update(&mut self, msg: AlbumsMsg, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
             AlbumsMsg::Show(client) => {
+                self.nav.set_client(Some(client.clone()));
                 self.client = Some(client);
                 self.load(&sender);
             }
@@ -392,21 +386,19 @@ impl Component for AlbumsPage {
                 self.grid.clear();
                 self.shown = 0;
                 self.state = State::Loading;
-                self.showing_album = false;
+                self.nav.set_client(None);
             }
             AlbumsMsg::Open(position) => {
-                let (Some(client), Some(item)) =
-                    (self.client.clone(), self.grid.get_visible(position))
-                else {
+                let Some(item) = self.grid.get_visible(position) else {
                     return;
                 };
                 let album = Album::clone(&item.borrow().album);
-                self.album_page.emit(AlbumPageMsg::Show { client, album });
-                self.showing_album = true;
+                self.nav.open(Destination::Album(Box::new(album)));
             }
-            AlbumsMsg::CloseAlbum => self.showing_album = false,
-            AlbumsMsg::SessionExpired => {
-                let _ = sender.output(AlbumsOutput::SessionExpired);
+            AlbumsMsg::Nav(msg) => {
+                if self.nav.update(msg) {
+                    let _ = sender.output(AlbumsOutput::SessionExpired);
+                }
             }
             // Albums of a user who signed out meanwhile.
             AlbumsMsg::Loaded(_) if self.client.is_none() => {}
@@ -497,7 +489,8 @@ impl AlbumsPage {
                 }
             }
             AlbumsMsg::FocusSearch => {
-                if self.state == State::Loaded && !self.showing_album {
+                // Only while the grid shows, not an album over it.
+                if self.state == State::Loaded && self.search.is_mapped() {
                     self.search.grab_focus();
                 }
             }
@@ -698,7 +691,7 @@ impl AlbumsPage {
 }
 
 /// Ctrl+F searches the albums.
-fn add_search_shortcut(root: &gtk::Stack, sender: &ComponentSender<AlbumsPage>) {
+fn add_search_shortcut(root: &gtk::Box, sender: &ComponentSender<AlbumsPage>) {
     let sender = sender.clone();
     let shortcuts = gtk::ShortcutController::new();
     shortcuts.set_scope(gtk::ShortcutScope::Managed);

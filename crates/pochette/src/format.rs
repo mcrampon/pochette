@@ -65,10 +65,10 @@ pub fn html_to_text(html: &str) -> String {
             rest = &rest[end + 1..];
         } else {
             let entity_end = rest.find(';').filter(|&end| end <= 10);
-            let decoded = entity_end.and_then(|end| Some((decode_entity(&rest[1..end])?, end)));
-            if let Some((c, end)) = decoded {
+            let decoded = entity_end.and_then(|end| Some((decode_entity(&rest[1..end])?, end + 1)));
+            if let Some((c, length)) = decoded.or_else(|| legacy_entity(rest)) {
                 text.push(c);
-                rest = &rest[end + 1..];
+                rest = &rest[length..];
             } else {
                 // A bare ampersand.
                 text.push('&');
@@ -92,9 +92,25 @@ pub fn html_to_text(html: &str) -> String {
     result
 }
 
+/// An entity browsers also read without its semicolon, as Qobuz sometimes writes them:
+/// `&copy TiVo`. `rest` starts with the ampersand; returns the character and the length read.
+fn legacy_entity(rest: &str) -> Option<(char, usize)> {
+    let name_length = rest[1..]
+        .find(|c: char| !c.is_ascii_alphabetic())
+        .unwrap_or(rest.len() - 1);
+    let name = &rest[1..=name_length];
+    let legacy = ["amp", "lt", "gt", "quot", "nbsp", "copy", "reg"];
+    legacy
+        .contains(&name)
+        .then(|| Some((decode_entity(name)?, 1 + name_length)))
+        .flatten()
+}
+
 fn decode_entity(entity: &str) -> Option<char> {
     Some(match entity {
         "amp" => '&',
+        "copy" => '\u{a9}',
+        "reg" => '\u{ae}',
         "lt" => '<',
         "gt" => '>',
         "quot" => '"',
@@ -174,6 +190,14 @@ mod tests {
             "Rock & roll\nfrom the heart.\n\nSecond\u{a0}one \u{2014} \u{2019}"
         );
         assert_eq!(html_to_text("AT&T < 3"), "AT&T < 3");
+        assert_eq!(
+            html_to_text("attendu.\n<br />&copy TiVo"),
+            "attendu.\n\n\u{a9} TiVo"
+        );
+        assert_eq!(
+            html_to_text("&copy; 2026 &amp so on"),
+            "\u{a9} 2026 & so on"
+        );
         assert_eq!(html_to_text(""), "");
     }
 }

@@ -1,5 +1,5 @@
 //! An album as a tile: its cover, with play and heart buttons on hover, then its title and
-//! artist, and maybe a caption. In grids, and in the rows of the Discover tab.
+//! artist, and maybe a caption. In grids, and in rows like those of the Discover tab.
 
 use std::rc::Rc;
 
@@ -14,9 +14,10 @@ use crate::{
     favorites::{Heart, with_heart},
     format,
     playback::{CoverActions, PlayButton},
+    tile_strip::TileStrip,
 };
 
-use frame::CoverFrame;
+pub use frame::CoverFrame;
 
 /// The side of a cover, in logical pixels.
 pub const COVER_SIZE: i32 = 180;
@@ -50,7 +51,7 @@ pub fn tile() -> (gtk::Box, AlbumWidgets) {
         .overflow(gtk::Overflow::Hidden)
         .css_classes(["pochette-cover"])
         .build();
-    let (shaded, genre, date) = with_shade(&CoverFrame::new(&cover));
+    let (shaded, genre, date) = with_shade(&CoverFrame::new(&cover, COVER_SIZE));
     let heart = Heart::new();
     let cover_box = with_heart(&shaded, &heart);
     let play = PlayButton::new();
@@ -195,6 +196,116 @@ fn with_shade(cover: &impl IsA<gtk::Widget>) -> (gtk::Overlay, gtk::Label, gtk::
     (overlay, genre, date)
 }
 
+/// A row of albums under `title`: as many as fit side by side. Given `see_all`, "See All"
+/// next to the title calls it, shown when some albums don't fit or Qobuz has more
+/// (`more_beyond`). Clicking an album, or pressing Enter on it, calls `open`
+/// with its index.
+///
+/// Returns the row, and the tiles to let go of their covers when the row goes.
+pub fn album_row(
+    title: &str,
+    albums: &[Rc<Album>],
+    caption: impl Fn(&Album) -> Option<String>,
+    (covers, actions): (&VisibleCovers, &CoverActions),
+    open: impl Fn(usize) + 'static,
+    see_all: Option<(Box<dyn Fn()>, bool)>,
+) -> (gtk::Box, Vec<AlbumWidgets>) {
+    let open = Rc::new(open);
+    let strip = TileStrip::default();
+    strip.set_margin_start(24);
+    strip.set_margin_end(24);
+    let mut tiles = Vec::new();
+    for (index, album) in albums.iter().enumerate() {
+        let (item, widgets) = tile();
+        widgets.show(album, caption(album).as_deref(), covers, actions);
+        let open = open.clone();
+        strip.append(&row_tile(&item, move || open(index)));
+        tiles.push(widgets);
+    }
+
+    let header = row_header(title);
+    if let Some((see_all, more_beyond)) = see_all {
+        let button = gtk::Button::builder()
+            .label("See All")
+            .css_classes(["flat"])
+            .margin_start(6)
+            .visible(more_beyond)
+            .build();
+        button.connect_clicked(move |_| see_all());
+        header.append(&button);
+        let button = button.downgrade();
+        strip.connect_overflow(move |hidden| {
+            if let Some(button) = button.upgrade() {
+                button.set_visible(more_beyond || hidden);
+            }
+        });
+    }
+
+    let row = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    row.append(&header);
+    row.append(&strip);
+    (row, tiles)
+}
+
+/// The header of a row, lined up with its tiles' covers: its title, then maybe buttons.
+pub fn row_header(title: &str) -> gtk::Box {
+    let header = gtk::Box::builder()
+        .spacing(6)
+        .margin_start(36)
+        .margin_end(36)
+        .build();
+    header.append(
+        &gtk::Label::builder()
+            .label(title)
+            .xalign(0.0)
+            .css_classes(["pochette-heading"])
+            .build(),
+    );
+    header
+}
+
+/// `child` as an item of a row, calling `open` on a click or Enter.
+///
+/// Not a button: a button would take the clicks meant for the heart over a cover.
+pub fn row_tile(child: &impl IsA<gtk::Widget>, open: impl Fn() + 'static) -> gtk::Box {
+    let item = gtk::Box::builder()
+        .css_classes(["pochette-row-tile"])
+        .focusable(true)
+        .build();
+    item.append(child);
+    let open = Rc::new(open);
+
+    // The heart claims its clicks, so this one only sees those elsewhere on the tile.
+    let click = gtk::GestureClick::new();
+    click.set_button(gtk::gdk::BUTTON_PRIMARY);
+    let click_open = open.clone();
+    click.connect_released(move |gesture, _, x, y| {
+        // A click on the heart, or any other button on the tile, isn't one to open.
+        let on_button = gesture
+            .widget()
+            .and_then(|item| item.pick(x, y, gtk::PickFlags::DEFAULT))
+            .is_some_and(|target| {
+                target.is::<gtk::Button>() || target.ancestor(gtk::Button::static_type()).is_some()
+            });
+        if !on_button {
+            click_open();
+        }
+    });
+    item.add_controller(click);
+
+    let keys = gtk::EventControllerKey::new();
+    keys.connect_key_pressed(move |_, key, _, _| {
+        if matches!(key, gtk::gdk::Key::Return | gtk::gdk::Key::KP_Enter) {
+            open();
+            glib::Propagation::Stop
+        } else {
+            glib::Propagation::Proceed
+        }
+    });
+    item.add_controller(keys);
+    item
+}
+
 /// The smallest cover that stays sharp at the screen's scale.
 fn cover_url(album: &Album, scale_factor: i32) -> Option<String> {
     let image = &album.image;
@@ -250,13 +361,14 @@ pub fn fit_columns(grid: &gtk::GridView) {
     });
 }
 
-/// Holds a cover at [`COVER_SIZE`], square, whatever the size of its image.
+/// Holds a picture at a given size, square, whatever the size of its image: a cover, or
+/// an artist's portrait.
 ///
 /// A picture asks for its image's size, often larger than a tile: in a grid it then
 /// widened to the column while its row kept it [`COVER_SIZE`] tall, and the cover
 /// stretched into a rectangle as the window resized.
 mod frame {
-    use relm4::gtk::{self, glib, prelude::*};
+    use relm4::gtk::{self, glib, prelude::*, subclass::prelude::*};
 
     glib::wrapper! {
         pub struct CoverFrame(ObjectSubclass<imp::CoverFrame>)
@@ -265,8 +377,10 @@ mod frame {
     }
 
     impl CoverFrame {
-        pub fn new(picture: &gtk::Picture) -> Self {
+        /// `picture` at `size` by `size`.
+        pub fn new(picture: &gtk::Picture, size: i32) -> Self {
             let frame: Self = glib::Object::new();
+            frame.imp().size.set(size);
             picture.set_parent(&frame);
             frame
         }
@@ -275,10 +389,12 @@ mod frame {
     mod imp {
         use relm4::gtk::{self, glib, prelude::*, subclass::prelude::*};
 
-        use super::super::COVER_SIZE;
+        use std::cell::Cell;
 
         #[derive(Default)]
-        pub struct CoverFrame;
+        pub struct CoverFrame {
+            pub size: Cell<i32>,
+        }
 
         #[glib::object_subclass]
         impl ObjectSubclass for CoverFrame {
@@ -297,7 +413,8 @@ mod frame {
 
         impl WidgetImpl for CoverFrame {
             fn measure(&self, _: gtk::Orientation, _: i32) -> (i32, i32, i32, i32) {
-                (COVER_SIZE, COVER_SIZE, -1, -1)
+                let size = self.size.get();
+                (size, size, -1, -1)
             }
 
             fn size_allocate(&self, width: i32, height: i32, _baseline: i32) {

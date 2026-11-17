@@ -80,3 +80,46 @@ async fn reads_the_discover_sections() {
         assert_ne!(page.albums[0].id, next.albums[0].id);
     }
 }
+
+#[tokio::test]
+#[ignore = "needs a Qobuz session"]
+async fn reads_an_artist_page_and_their_releases() {
+    use qobuz::artist::ReleaseKind;
+
+    /// Radiohead.
+    const ARTIST_ID: u64 = 43840;
+
+    let client = client();
+    let artist = client.artist(ARTIST_ID).await.unwrap();
+    println!(
+        "{}: portrait {}, biography {} chars, {} similar",
+        artist.name,
+        artist.portrait.is_some(),
+        artist.biography.as_deref().map_or(0, str::len),
+        artist.similar.len()
+    );
+    for (kind, albums) in &artist.releases {
+        println!(
+            "  {kind:?}: {} albums, more: {}",
+            albums.albums.len(),
+            albums.has_more
+        );
+    }
+    assert_eq!(artist.releases[0].0, ReleaseKind::Album);
+
+    let first = client
+        .artist_releases(ARTIST_ID, ReleaseKind::EpSingle, 0, 10)
+        .await
+        .unwrap();
+    let next = client
+        .artist_releases(ARTIST_ID, ReleaseKind::EpSingle, 10, 10)
+        .await
+        .unwrap();
+    println!(
+        "  EPs and singles: {}, then {}",
+        first.albums.len(),
+        next.albums.len()
+    );
+    assert!(first.has_more);
+    assert_ne!(first.albums[0].id, next.albums[0].id);
+}

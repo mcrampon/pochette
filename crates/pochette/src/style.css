@@ -67,6 +67,32 @@
   font-weight: 600;
 }
 
+/* The artist's name links to their page: in the text's color, underlined on hover. */
+.pochette-album-page-artist link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.pochette-album-page-artist link:hover {
+  text-decoration: underline;
+}
+
+/* An artist's portrait, round, on a placeholder while it loads or when there's none. */
+.pochette-portrait {
+  border-radius: 9999px;
+  background-color: alpha(currentColor, 0.08);
+}
+
+.pochette-artist-initial {
+  font-size: 4em;
+  font-weight: 700;
+}
+
+.pochette-similar-initial {
+  font-size: 2.6em;
+  font-weight: 700;
+}
+
 .pochette-badge {
   font-size: 0.85em;
   font-weight: 600;

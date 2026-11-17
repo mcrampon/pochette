@@ -10,21 +10,20 @@ use qobuz::{
     models::{Album, Genre},
 };
 use relm4::{
-    Component, ComponentController, ComponentParts, ComponentSender, Controller,
+    Component, ComponentParts, ComponentSender,
     gtk::{self, glib, prelude::*},
     typed_view::grid::TypedGridView,
 };
 use tokio::task::JoinHandle;
 
 use crate::{
-    album_page::{AlbumPage, AlbumPageMsg, AlbumPageOutput},
     album_tile::{self, AlbumItem, AlbumWidgets},
     checklist::Checklist,
     covers::VisibleCovers,
+    navigation::{Destination, Navigator, NavigatorMsg},
     playback::CoverActions,
     player::Player,
     settings::Settings,
-    tile_strip::TileStrip,
 };
 
 /// The sections, in the order they're shown.
@@ -51,7 +50,6 @@ enum Home {
 enum Page {
     Home,
     Section,
-    Album,
 }
 
 pub struct DiscoverPage {
@@ -79,7 +77,8 @@ pub struct DiscoverPage {
     section_error: Option<String>,
     home_task: Option<JoinHandle<()>>,
     section_task: Option<JoinHandle<()>>,
-    album_page: Controller<AlbumPage>,
+    /// The albums and artists opened, over the home and section pages.
+    nav: Navigator,
     /// What the buttons over the covers do.
     actions: CoverActions,
 }
@@ -111,8 +110,7 @@ pub enum DiscoverMsg {
     },
     /// Open the album at this position in the section's grid.
     OpenGridAlbum(u32),
-    CloseAlbum,
-    SessionExpired,
+    Nav(NavigatorMsg),
 }
 
 #[derive(Debug)]
@@ -129,7 +127,10 @@ impl Component for DiscoverPage {
     type CommandOutput = ();
 
     view! {
-        gtk::Stack {
+        gtk::Box {
+          #[local_ref]
+          nav_stack -> gtk::Stack {
+          add_named[Some("home")] = &gtk::Stack {
             set_transition_type: gtk::StackTransitionType::SlideLeftRight,
 
             add_named[Some("home")] = &gtk::Box {
@@ -313,14 +314,13 @@ impl Component for DiscoverPage {
                 },
             },
 
-            add_named: (model.album_page.widget(), Some("album")),
-
             #[watch]
             set_visible_child_name: match model.page {
                 Page::Home => "home",
                 Page::Section => "section",
-                Page::Album => "album",
             },
+          },
+          },
         }
     }
 
@@ -350,14 +350,13 @@ impl Component for DiscoverPage {
             section_error: None,
             home_task: None,
             section_task: None,
-            album_page: AlbumPage::builder()
-                .launch((player, actions.favorites.clone()))
-                .forward(sender.input_sender(), |output| match output {
-                    AlbumPageOutput::Back => DiscoverMsg::CloseAlbum,
-                    AlbumPageOutput::SessionExpired => DiscoverMsg::SessionExpired,
-                }),
+            nav: Navigator::new(player, actions.clone(), {
+                let input = sender.input_sender().clone();
+                move |msg| input.emit(DiscoverMsg::Nav(msg))
+            }),
             actions,
         };
+        let nav_stack = model.nav.widget();
         let genre_button = model.genre_picker.widget();
         let rows = &model.rows;
         let grid_view = &model.grid.view;
@@ -387,6 +386,7 @@ impl Component for DiscoverPage {
         match msg {
             DiscoverMsg::Show(client) => {
                 self.client = Some(client.clone());
+                self.nav.set_client(Some(client.clone()));
                 let genres_sender = sender.clone();
                 relm4::spawn(async move {
                     genres_sender.input(DiscoverMsg::GenresLoaded(client.genres().await));
@@ -401,6 +401,7 @@ impl Component for DiscoverPage {
                     task.abort();
                 }
                 self.client = None;
+                self.nav.set_client(None);
                 self.fill_rows(&sender, &Discover::default());
                 self.home = Home::Loading;
                 self.close_section();
@@ -463,17 +464,10 @@ impl Component for DiscoverPage {
                     self.open_album(&album);
                 }
             }
-            DiscoverMsg::CloseAlbum => {
-                if self.page == Page::Album {
-                    self.page = if self.section.is_some() {
-                        Page::Section
-                    } else {
-                        Page::Home
-                    };
+            DiscoverMsg::Nav(msg) => {
+                if self.nav.update(msg) {
+                    let _ = sender.output(DiscoverOutput::SessionExpired);
                 }
-            }
-            DiscoverMsg::SessionExpired => {
-                let _ = sender.output(DiscoverOutput::SessionExpired);
             }
         }
     }
@@ -613,7 +607,18 @@ impl DiscoverPage {
             if albums.is_empty() {
                 continue;
             }
-            let (row, tiles) = row(section, &albums, (&self.row_covers, &self.actions), sender);
+            let (open, see_all) = (sender.clone(), sender.clone());
+            let (row, tiles) = album_tile::album_row(
+                title(section),
+                &albums,
+                |album| caption(section, album),
+                (&self.row_covers, &self.actions),
+                move |index| open.input(DiscoverMsg::OpenRowAlbum(section, index)),
+                Some((
+                    Box::new(move || see_all.input(DiscoverMsg::SeeAll(section))),
+                    discover.section(section).has_more,
+                )),
+            );
             self.rows.append(&row);
             self.row_tiles.extend(tiles);
             self.row_albums.push((section, albums));
@@ -681,14 +686,7 @@ impl DiscoverPage {
     }
 
     fn open_album(&mut self, album: &Album) {
-        let Some(client) = self.client.clone() else {
-            return;
-        };
-        self.album_page.emit(AlbumPageMsg::Show {
-            client,
-            album: album.clone(),
-        });
-        self.page = Page::Album;
+        self.nav.open(Destination::Album(Box::new(album.clone())));
     }
 }
 
@@ -705,96 +703,4 @@ fn caption(section: Section, album: &Album) -> Option<String> {
     (section == Section::PressAwards)
         .then(|| album_tile::awards(album))
         .flatten()
-}
-
-/// A section's row: its title and "See All", then as many of its albums as fit side by side.
-fn row(
-    section: Section,
-    albums: &[Rc<Album>],
-    (covers, actions): (&VisibleCovers, &CoverActions),
-    sender: &ComponentSender<DiscoverPage>,
-) -> (gtk::Box, Vec<AlbumWidgets>) {
-    let strip = TileStrip::default();
-    strip.set_margin_start(24);
-    strip.set_margin_end(24);
-    let mut tiles = Vec::new();
-    for (index, album) in albums.iter().enumerate() {
-        let (tile, widgets) = album_tile::tile();
-        widgets.show(album, caption(section, album).as_deref(), covers, actions);
-        strip.append(&row_tile(&tile, sender, section, index));
-        tiles.push(widgets);
-    }
-    let heading = gtk::Label::builder()
-        .label(title(section))
-        .xalign(0.0)
-        .css_classes(["pochette-heading"])
-        .build();
-    let see_all = gtk::Button::builder()
-        .label("See All")
-        .css_classes(["flat"])
-        .margin_start(6)
-        .build();
-    let see_all_sender = sender.clone();
-    see_all.connect_clicked(move |_| see_all_sender.input(DiscoverMsg::SeeAll(section)));
-
-    let header = gtk::Box::builder()
-        .spacing(6)
-        .margin_start(36)
-        .margin_end(36)
-        .build();
-    header.append(&heading);
-    header.append(&see_all);
-
-    let row = gtk::Box::new(gtk::Orientation::Vertical, 6);
-    row.append(&header);
-    row.append(&strip);
-    (row, tiles)
-}
-
-/// `tile` in a row, opening the album at `index` in the row of `section` with a click or
-/// Enter.
-///
-/// Not a button: a button would take the clicks meant for the heart over the cover.
-fn row_tile(
-    tile: &gtk::Box,
-    sender: &ComponentSender<DiscoverPage>,
-    section: Section,
-    index: usize,
-) -> gtk::Box {
-    let item = gtk::Box::builder()
-        .css_classes(["pochette-row-tile"])
-        .focusable(true)
-        .build();
-    item.append(tile);
-
-    // The heart claims its clicks, so this one only sees those elsewhere on the tile.
-    let click = gtk::GestureClick::new();
-    click.set_button(gtk::gdk::BUTTON_PRIMARY);
-    let click_sender = sender.clone();
-    click.connect_released(move |gesture, _, x, y| {
-        // A click on the heart, or any other button on the tile, isn't one to open.
-        let on_button = gesture
-            .widget()
-            .and_then(|item| item.pick(x, y, gtk::PickFlags::DEFAULT))
-            .is_some_and(|target| {
-                target.is::<gtk::Button>() || target.ancestor(gtk::Button::static_type()).is_some()
-            });
-        if !on_button {
-            click_sender.input(DiscoverMsg::OpenRowAlbum(section, index));
-        }
-    });
-    item.add_controller(click);
-
-    let keys = gtk::EventControllerKey::new();
-    let sender = sender.clone();
-    keys.connect_key_pressed(move |_, key, _, _| {
-        if matches!(key, gtk::gdk::Key::Return | gtk::gdk::Key::KP_Enter) {
-            sender.input(DiscoverMsg::OpenRowAlbum(section, index));
-            glib::Propagation::Stop
-        } else {
-            glib::Propagation::Proceed
-        }
-    });
-    item.add_controller(keys);
-    item
 }

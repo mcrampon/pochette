@@ -17,6 +17,7 @@ use crate::{
     covers,
     favorites::{Favorites, Heart, with_heart},
     format,
+    navigation::{Destination, PageOutput},
     player::{Player, State, Status},
 };
 
@@ -60,6 +61,7 @@ pub enum AlbumPageMsg {
     },
     Retry,
     Back,
+    OpenArtist,
     Loaded {
         id: String,
         result: qobuz::Result<Album>,
@@ -75,17 +77,11 @@ pub enum AlbumPageMsg {
     PlaybackChanged(Status),
 }
 
-#[derive(Debug)]
-pub enum AlbumPageOutput {
-    Back,
-    SessionExpired,
-}
-
 #[relm4::component(pub)]
 impl Component for AlbumPage {
     type Init = (Player, Favorites);
     type Input = AlbumPageMsg;
-    type Output = AlbumPageOutput;
+    type Output = PageOutput;
     type CommandOutput = ();
 
     view! {
@@ -105,7 +101,7 @@ impl Component for AlbumPage {
                     set_action: Some(gtk::CallbackAction::new({
                         let sender = sender.clone();
                         move |page, _| {
-                            // Each tab has an album page, and the shortcut reaches both.
+                            // Every open page has the shortcut: only the one shown takes it.
                             if !page.is_mapped() {
                                 return gtk::glib::Propagation::Proceed;
                             }
@@ -129,7 +125,7 @@ impl Component for AlbumPage {
 
                     gtk::Button {
                         set_icon_name: "go-previous-symbolic",
-                        set_tooltip_text: Some("Back to Albums"),
+                        set_tooltip_text: Some("Back"),
                         set_halign: gtk::Align::Start,
                         add_css_class: "flat",
                         add_css_class: "circular",
@@ -201,12 +197,17 @@ impl Component for AlbumPage {
                                 set_selectable: true,
                                 add_css_class: "pochette-album-page-title",
                             },
+                            // A link to the artist's page.
                             gtk::Label {
                                 #[watch]
-                                set_label: &model.text(|album| album.artist.name.clone()),
+                                set_markup: &model.artist_link(),
                                 set_xalign: 0.0,
                                 set_wrap: true,
                                 add_css_class: "pochette-album-page-artist",
+                                connect_activate_link[sender] => move |_, _| {
+                                    sender.input(AlbumPageMsg::OpenArtist);
+                                    gtk::glib::Propagation::Stop
+                                },
                             },
                             gtk::Label {
                                 #[watch]
@@ -363,7 +364,15 @@ impl Component for AlbumPage {
             }
             AlbumPageMsg::Retry => self.load(&sender),
             AlbumPageMsg::Back => {
-                let _ = sender.output(AlbumPageOutput::Back);
+                let _ = sender.output(PageOutput::Back);
+            }
+            AlbumPageMsg::OpenArtist => {
+                if let Some(album) = &self.album {
+                    let _ = sender.output(PageOutput::Open(Destination::Artist {
+                        id: album.artist.id,
+                        name: album.artist.name.clone(),
+                    }));
+                }
             }
             AlbumPageMsg::Loaded { id, result } => {
                 // Another album was opened meanwhile.
@@ -379,7 +388,7 @@ impl Component for AlbumPage {
                         self.tracks = Tracks::Loaded;
                     }
                     Err(qobuz::Error::Unauthorized { .. }) => {
-                        let _ = sender.output(AlbumPageOutput::SessionExpired);
+                        let _ = sender.output(PageOutput::SessionExpired);
                     }
                     Err(err) => {
                         tracing::warn!("cannot load album {id}: {err}");
@@ -480,7 +489,10 @@ impl AlbumPage {
         let sender = sender.clone();
         self.task = Some(relm4::spawn(async move {
             let result = client.album(&id).await;
-            sender.input(AlbumPageMsg::Loaded { id, result });
+            // Unless the page was closed meanwhile.
+            let _ = sender
+                .input_sender()
+                .send(AlbumPageMsg::Loaded { id, result });
         }));
     }
 
@@ -497,13 +509,27 @@ impl AlbumPage {
             let sender = sender.clone();
             relm4::spawn_local(async move {
                 let texture = covers::load(url.clone()).await;
-                sender.input(AlbumPageMsg::CoverLoaded { url, texture });
+                let _ = sender
+                    .input_sender()
+                    .send(AlbumPageMsg::CoverLoaded { url, texture });
             });
         }
     }
 
     fn text(&self, f: impl Fn(&Album) -> String) -> String {
         self.album.as_ref().map(f).unwrap_or_default()
+    }
+
+    /// The artist's name, as a link to their page when Qobuz knows them.
+    fn artist_link(&self) -> String {
+        self.text(|album| {
+            let name = gtk::glib::markup_escape_text(&album.artist.name);
+            if album.artist.id == 0 {
+                name.to_string()
+            } else {
+                format!("<a href=\"artist\">{name}</a>")
+            }
+        })
     }
 
     /// "ALBUM · 2026"
@@ -729,7 +755,14 @@ fn follow_playback(player: &Player, sender: &ComponentSender<AlbumPage>) {
     relm4::spawn(async move {
         while status.changed().await.is_ok() {
             let current = status.borrow_and_update().clone();
-            sender.input(AlbumPageMsg::PlaybackChanged(current));
+            // The page was closed.
+            if sender
+                .input_sender()
+                .send(AlbumPageMsg::PlaybackChanged(current))
+                .is_err()
+            {
+                break;
+            }
         }
     });
 }

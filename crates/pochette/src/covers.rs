@@ -166,14 +166,19 @@ pub fn cached_file(url: &str) -> Option<PathBuf> {
 }
 
 /// The cache file for a cover URL such as
-/// `https://static.qobuz.com/images/covers/a3/t2/dpqdxzmrwt2a3_230.jpg`: `a3-t2-dpqdxzmrwt2a3_230.jpg`.
+/// `https://static.qobuz.com/images/covers/a3/t2/dpqdxzmrwt2a3_230.jpg`: `a3-t2-dpqdxzmrwt2a3_230.jpg`,
+/// or for an artist's portrait such as
+/// `https://static.qobuz.com/images/artists/covers/medium/ae36.jpg`: `artist-medium-ae36.jpg`.
 ///
 /// Qobuz never changes the image behind a URL, so the URL is enough to name it.
 fn file_name(url: &str) -> Option<String> {
-    let path = url.split_once("/images/covers/")?.1;
+    let (prefix, path) = match url.split_once("/images/artists/covers/") {
+        Some((_, path)) => ("artist-", path),
+        None => ("", url.split_once("/images/covers/")?.1),
+    };
     let safe = |c: char| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '/' | '-');
     (!path.is_empty() && path.chars().all(safe) && !path.contains(".."))
-        .then(|| path.replace('/', "-"))
+        .then(|| format!("{prefix}{}", path.replace('/', "-")))
 }
 
 /// Shows covers in a scrolled list or grid, loading only those on or near the screen.
@@ -348,6 +353,10 @@ mod tests {
         assert_eq!(
             file_name("https://static.qobuz.com/images/covers/../x.jpg"),
             None
+        );
+        assert_eq!(
+            file_name("https://static.qobuz.com/images/artists/covers/medium/ae36.jpg").as_deref(),
+            Some("artist-medium-ae36.jpg")
         );
         assert_eq!(file_name("https://example.com/cover.jpg"), None);
     }

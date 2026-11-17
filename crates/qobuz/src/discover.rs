@@ -131,8 +131,9 @@ fn with_genres(request: reqwest::RequestBuilder, genre_ids: &[u64]) -> reqwest::
     request.query(&[("genre_ids", ids.join(","))])
 }
 
+/// A list of albums in the shape of the newer endpoints, which the artist pages share.
 #[derive(Deserialize)]
-struct Items {
+pub(crate) struct Items {
     #[serde(default)]
     items: Vec<DiscoverAlbum>,
     #[serde(default)]

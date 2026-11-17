@@ -3,6 +3,7 @@
 //! This crate knows nothing about any UI: it finds the web player's app id,
 //! runs the browser login and calls the API.
 
+pub mod artist;
 pub mod auth;
 mod client;
 pub mod discover;

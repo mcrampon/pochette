@@ -1,7 +1,7 @@
 //! A row of tiles side by side that shows as many as fit, whole, and hides the others,
-//! for the rows of the Discover tab: what doesn't fit is in the section's "See All".
+//! for rows of albums like those of the Discover tab: what doesn't fit is in "See All".
 
-use relm4::gtk::{self, glib, prelude::*};
+use relm4::gtk::{self, glib, prelude::*, subclass::prelude::*};
 
 glib::wrapper! {
     pub struct TileStrip(ObjectSubclass<imp::TileStrip>)
@@ -19,13 +19,26 @@ impl TileStrip {
     pub fn append(&self, tile: &impl IsA<gtk::Widget>) {
         tile.set_parent(self);
     }
+
+    /// Call `f` with whether some tiles are hidden, each time that changes.
+    pub fn connect_overflow(&self, f: impl Fn(bool) + 'static) {
+        self.imp().on_overflow.replace(Some(Box::new(f)));
+    }
 }
 
 mod imp {
+    use std::cell::{Cell, RefCell};
+
     use relm4::gtk::{self, glib, prelude::*, subclass::prelude::*};
 
+    type OverflowHandler = Box<dyn Fn(bool)>;
+
     #[derive(Default)]
-    pub struct TileStrip;
+    pub struct TileStrip {
+        pub on_overflow: RefCell<Option<OverflowHandler>>,
+        /// Whether some tiles were hidden at the last allocation.
+        overflowing: Cell<Option<bool>>,
+    }
 
     #[glib::object_subclass]
     impl ObjectSubclass for TileStrip {
@@ -80,6 +93,25 @@ mod imp {
                     x += child_width;
                 }
             }
+            self.report_overflow(!fits);
+        }
+    }
+
+    impl TileStrip {
+        /// Tell [`super::TileStrip::connect_overflow`] whether some tiles are hidden, if that
+        /// changed: once the layout is done, as what it does may change sizes.
+        fn report_overflow(&self, overflowing: bool) {
+            if self.overflowing.replace(Some(overflowing)) == Some(overflowing) {
+                return;
+            }
+            let strip = self.obj().downgrade();
+            glib::idle_add_local_once(move || {
+                if let Some(strip) = strip.upgrade()
+                    && let Some(f) = strip.imp().on_overflow.borrow().as_ref()
+                {
+                    f(overflowing);
+                }
+            });
         }
     }
 
