@@ -5,6 +5,8 @@ use std::{io, path::PathBuf};
 use relm4::gtk::glib;
 use serde::{Deserialize, Serialize};
 
+use crate::library::Sort;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -14,6 +16,11 @@ pub struct Settings {
     pub pane_width: i32,
     /// The genres picked in the Albums tab, by name: they come from the albums.
     pub album_genres: Vec<String>,
+    /// The decade picked in the Albums tab.
+    pub album_decade: Option<u16>,
+    /// How the Albums tab sorts, and whether the other way round.
+    pub album_sort: Sort,
+    pub album_sort_reversed: bool,
     /// The genres picked in the Discover tab, by Qobuz id.
     pub discover_genres: Vec<u64>,
 }
@@ -24,6 +31,9 @@ impl Default for Settings {
             volume: 1.0,
             pane_width: 360,
             album_genres: Vec::new(),
+            album_decade: None,
+            album_sort: Sort::default(),
+            album_sort_reversed: false,
             discover_genres: Vec::new(),
         }
     }

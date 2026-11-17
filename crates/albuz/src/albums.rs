@@ -284,11 +284,24 @@ impl Component for AlbumsPage {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let sort_labels: Vec<&str> = Sort::ALL.iter().map(|sort| sort.label()).collect();
+        let settings = Settings::load();
+        let sort_menu = dropdown(&sort_labels);
+        let sort_position = Sort::ALL
+            .iter()
+            .position(|sort| *sort == settings.album_sort);
+        sort_menu.set_selected(
+            sort_position
+                .and_then(|p| u32::try_from(p).ok())
+                .unwrap_or(0),
+        );
         let mut model = Self {
             state: State::Loading,
             entries: Vec::new(),
             view: View {
-                genres: Settings::load().album_genres,
+                genres: settings.album_genres,
+                decade: settings.album_decade,
+                sort: settings.album_sort,
+                reversed: settings.album_sort_reversed,
                 ..View::default()
             },
             genres: Vec::new(),
@@ -299,7 +312,7 @@ impl Component for AlbumsPage {
             search: gtk::SearchEntry::new(),
             genre_picker: GenrePicker::new(),
             decade_filter: dropdown(&["All Decades"]),
-            sort_menu: dropdown(&sort_labels),
+            sort_menu,
             scroller: None,
             client: None,
             album_page: AlbumPage::builder().launch(player.clone()).forward(
@@ -466,6 +479,7 @@ impl AlbumsPage {
                 let decade = pick(&self.decades, position);
                 if decade != self.view.decade {
                     self.view.decade = decade;
+                    self.save_view();
                     self.show_albums();
                 }
             }
@@ -478,12 +492,14 @@ impl AlbumsPage {
                     self.view.sort = sort;
                     // Each sort starts in its natural order.
                     self.view.reversed = false;
+                    self.save_view();
                     self.sort_grid();
                     self.show_albums();
                 }
             }
             AlbumsMsg::Reverse => {
                 self.view.reversed = !self.view.reversed;
+                self.save_view();
                 self.sort_grid();
                 self.show_albums();
             }
@@ -538,6 +554,16 @@ impl AlbumsPage {
         // The selection change above comes back as a message after this one, and finds
         // the view already up to date.
         self.view.decade = pick(&self.decades, decade);
+    }
+
+    /// Remember the decade and order picked, for the next run.
+    fn save_view(&self) {
+        let (decade, sort, reversed) = (self.view.decade, self.view.sort, self.view.reversed);
+        Settings::update(|settings| {
+            settings.album_decade = decade;
+            settings.album_sort = sort;
+            settings.album_sort_reversed = reversed;
+        });
     }
 
     /// Put every album in the grid, in order. The search and filters then only hide some,

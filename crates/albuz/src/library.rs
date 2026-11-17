@@ -3,6 +3,7 @@
 use std::{cmp::Ordering, rc::Rc};
 
 use qobuz::models::Album;
+use serde::{Deserialize, Serialize};
 use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
 
 /// `text` in lower case and without accents, so "Beyoncé" matches "beyonce".
@@ -55,7 +56,8 @@ fn decade(album: &Album) -> Option<u16> {
     Some(year / 10 * 10)
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Sort {
     #[default]
     DateAdded,
