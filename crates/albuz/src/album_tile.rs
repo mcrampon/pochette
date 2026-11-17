@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use qobuz::models::Album;
 use relm4::{
-    gtk::{self, pango, prelude::*},
+    gtk::{self, glib, pango, prelude::*},
     typed_view::grid::RelmGridItem,
 };
 
@@ -149,4 +149,38 @@ pub fn awards(album: &Album) -> Option<String> {
         .map(|award| award.name.as_str())
         .collect();
     (!names.is_empty()).then(|| names.join(" · "))
+}
+
+/// The most columns a grid of tiles ever needs.
+const MAX_COLUMNS: u32 = 16;
+
+/// How wide a tile is in a grid, with the padding around it, and how much padding the
+/// grid adds on its sides: see `.albuz-album-grid` in the style sheet.
+const GRID_TILE_WIDTH: i32 = COVER_SIZE + 2 * 12;
+const GRID_SIDE_PADDING: i32 = 2 * 24;
+
+/// Keep `grid`'s column count to what fits its width, as the window resizes.
+///
+/// A grid view keeps tiles for 30 rows of its maximum column count, ready to scroll to,
+/// and fills them all whenever its albums change: with a maximum of 16 columns where 5
+/// fit, that's three times the tiles to fill, which made searching sluggish.
+pub fn fit_columns(grid: &gtk::GridView) {
+    let Some(adjustment) = grid.hadjustment() else {
+        return;
+    };
+    let grid = grid.downgrade();
+    adjustment.connect_page_size_notify(move |adjustment| {
+        #[expect(clippy::cast_possible_truncation, reason = "widths are small")]
+        let width = adjustment.page_size() as i32;
+        let fit = (width - GRID_SIDE_PADDING) / GRID_TILE_WIDTH;
+        // One more, in case the tiles end up narrower than reckoned.
+        let columns = u32::try_from(fit + 1).unwrap_or(0).clamp(2, MAX_COLUMNS);
+        let Some(grid) = grid.upgrade() else {
+            return;
+        };
+        if grid.max_columns() != columns {
+            // Not while the grid is being laid out, which is when the width changes.
+            glib::idle_add_local_once(move || grid.set_max_columns(columns));
+        }
+    });
 }

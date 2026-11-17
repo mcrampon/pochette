@@ -364,6 +364,7 @@ impl Component for DiscoverPage {
 
         model.row_covers.attach(&widgets.home_scroller);
         model.grid_covers.attach(&widgets.grid_scroller);
+        album_tile::fit_columns(&model.grid.view);
         // Load more as the end of the grid comes near, or while the grid doesn't fill the
         // screen.
         let adjustment = widgets.grid_scroller.vadjustment();

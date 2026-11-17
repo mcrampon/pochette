@@ -1,7 +1,12 @@
 //! The Albums tab: the albums the user saved to their Qobuz favorites, to search, filter,
 //! sort, and play at random.
 
-use std::hash::{BuildHasher, RandomState};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    hash::{BuildHasher, RandomState},
+    rc::Rc,
+};
 
 use qobuz::{Client, models::Album};
 use relm4::{
@@ -13,7 +18,7 @@ use tokio::task::JoinHandle;
 
 use crate::{
     album_page::{AlbumPage, AlbumPageMsg, AlbumPageOutput},
-    album_tile::AlbumItem,
+    album_tile::{self, AlbumItem},
     covers::VisibleCovers,
     dropdown::{dropdown, replace_choices},
     genre_picker::GenrePicker,
@@ -39,7 +44,10 @@ pub struct AlbumsPage {
     decades: Vec<u16>,
     /// How many albums the grid shows.
     shown: usize,
+    /// Every album, in order; the filter hides those not in `visible`.
     grid: TypedGridView<AlbumItem, gtk::NoSelection>,
+    /// The albums the search and filters let through, by id.
+    visible: Rc<RefCell<HashSet<String>>>,
     search: gtk::SearchEntry,
     genre_picker: GenrePicker,
     decade_filter: gtk::DropDown,
@@ -173,6 +181,8 @@ impl Component for AlbumsPage {
                         search -> gtk::SearchEntry {
                             set_hexpand: true,
                             set_width_request: 120,
+                            // Searching is quick, so it needn't wait long for the typing to pause.
+                            set_search_delay: 60,
                             set_placeholder_text: Some("Search albums, artists, labels"),
                             connect_search_changed[sender] => move |entry| {
                                 sender.input(AlbumsMsg::Search(entry.text().into()));
@@ -281,6 +291,7 @@ impl Component for AlbumsPage {
             decades: Vec::new(),
             shown: 0,
             grid: TypedGridView::new(),
+            visible: Rc::default(),
             search: gtk::SearchEntry::new(),
             genre_picker: GenrePicker::new(),
             decade_filter: dropdown(&["All Decades"]),
@@ -308,6 +319,11 @@ impl Component for AlbumsPage {
         let sort_menu = &model.sort_menu;
         let widgets = view_output!();
 
+        let visible = model.visible.clone();
+        model
+            .grid
+            .add_filter(move |item: &AlbumItem| visible.borrow().contains(&item.album.id));
+
         let input = sender.input_sender().clone();
         model
             .genre_picker
@@ -327,6 +343,7 @@ impl Component for AlbumsPage {
         model.search.set_key_capture_widget(Some(&widgets.scroller));
         add_search_shortcut(&root, &sender);
 
+        album_tile::fit_columns(&model.grid.view);
         model.covers.attach(&widgets.scroller);
         model.scroller = Some(widgets.scroller.clone());
         ComponentParts { model, widgets }
@@ -349,7 +366,8 @@ impl Component for AlbumsPage {
                 self.showing_album = false;
             }
             AlbumsMsg::Open(position) => {
-                let (Some(client), Some(item)) = (self.client.clone(), self.grid.get(position))
+                let (Some(client), Some(item)) =
+                    (self.client.clone(), self.grid.get_visible(position))
                 else {
                     return;
                 };
@@ -372,6 +390,7 @@ impl Component for AlbumsPage {
                     State::Loaded
                 };
                 self.fill_filters();
+                self.fill_grid();
                 self.show_albums();
             }
             AlbumsMsg::Loaded(Err(qobuz::Error::Unauthorized { .. })) => {
@@ -454,11 +473,13 @@ impl AlbumsPage {
                     self.view.sort = sort;
                     // Each sort starts in its natural order.
                     self.view.reversed = false;
+                    self.sort_grid();
                     self.show_albums();
                 }
             }
             AlbumsMsg::Reverse => {
                 self.view.reversed = !self.view.reversed;
+                self.sort_grid();
                 self.show_albums();
             }
             AlbumsMsg::ClearFilters => {
@@ -514,17 +535,42 @@ impl AlbumsPage {
         self.view.decade = pick(&self.decades, decade);
     }
 
-    /// Fill the grid with the albums the search and filters let through, in order.
-    fn show_albums(&mut self) {
-        let shown = self.view.apply(&self.entries);
-        self.shown = shown.len();
+    /// Put every album in the grid, in order. The search and filters then only hide some,
+    /// which lets the grid keep the tiles of the albums that stay: refilling it instead
+    /// would redraw hundreds of tiles at every key typed.
+    fn fill_grid(&mut self) {
+        let all = self.view.sorted(&self.entries);
         self.grid.clear();
         self.grid
-            .extend_from_iter(shown.into_iter().map(|entry| AlbumItem {
+            .extend_from_iter(all.into_iter().map(|entry| AlbumItem {
                 album: entry.album.clone(),
                 caption: None,
                 covers: self.covers.clone(),
             }));
+    }
+
+    /// Put the albums of the grid in the order picked.
+    fn sort_grid(&self) {
+        let ranks: HashMap<&str, usize> = self
+            .view
+            .sorted(&self.entries)
+            .into_iter()
+            .enumerate()
+            .map(|(rank, entry)| (entry.album.id.as_str(), rank))
+            .collect();
+        let rank = |item: &AlbumItem| ranks.get(item.album.id.as_str()).copied();
+        self.grid.sort(|a, b| rank(a).cmp(&rank(b)));
+    }
+
+    /// Show the albums the search and filters let through.
+    fn show_albums(&mut self) {
+        let shown = self.view.apply(&self.entries);
+        self.shown = shown.len();
+        *self.visible.borrow_mut() = shown
+            .into_iter()
+            .map(|entry| entry.album.id.clone())
+            .collect();
+        self.grid.notify_filter_changed(0);
         if let Some(scroller) = &self.scroller {
             scroller.vadjustment().set_value(0.0);
         }

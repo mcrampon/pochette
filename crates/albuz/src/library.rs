@@ -133,12 +133,23 @@ impl View {
             })
             .filter(|entry| self.decade.is_none() || entry.decade == self.decade)
             .collect();
-        // Stable, so ties keep the order Qobuz gave.
-        shown.sort_by(|a, b| self.sort.compare(a, b));
-        if self.reversed {
-            shown.reverse();
-        }
+        self.sort(&mut shown);
         shown
+    }
+
+    /// All of `entries`, whatever the search and filters, in order.
+    pub fn sorted<'a>(&self, entries: &'a [Entry]) -> Vec<&'a Entry> {
+        let mut all: Vec<&Entry> = entries.iter().collect();
+        self.sort(&mut all);
+        all
+    }
+
+    fn sort(&self, entries: &mut [&Entry]) {
+        // Stable, so ties keep the order Qobuz gave.
+        entries.sort_by(|a, b| self.sort.compare(a, b));
+        if self.reversed {
+            entries.reverse();
+        }
     }
 
     /// Whether anything hides some of the albums.
@@ -287,6 +298,21 @@ mod tests {
         );
     }
 
+    #[test]
+    fn sorts_everything_whatever_the_filters() {
+        let library = library();
+        let view = View {
+            query: "miles".into(),
+            sort: Sort::Title,
+            ..View::default()
+        };
+        let all: Vec<&str> = view
+            .sorted(&library)
+            .iter()
+            .map(|entry| entry.album.title.as_str())
+            .collect();
+        assert_eq!(all, ["Bitches Brew", "Écoute", "Kind of Blue", "Lemonade"]);
+    }
     #[test]
     fn lists_genres_and_decades() {
         let library = library();
