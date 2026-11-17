@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Pochette
+GenericName=Music Player
+Comment=Listen to Qobuz, album by album
+Exec=pochette
+Icon=io.github.mcrampon.Pochette
+Terminal=false
+Categories=Audio;AudioVideo;Player;GTK;
+Keywords=Qobuz;Music;Album;Streaming;Hi-Res;
+StartupNotify=true
+StartupWMClass=io.github.mcrampon.Pochette
+SingleMainWindow=true
