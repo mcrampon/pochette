@@ -15,6 +15,8 @@ use crate::{
     playback::{CoverActions, PlayButton},
 };
 
+use frame::CoverFrame;
+
 /// The side of a cover, in logical pixels.
 pub const COVER_SIZE: i32 = 180;
 
@@ -46,7 +48,7 @@ pub fn tile() -> (gtk::Box, AlbumWidgets) {
         .css_classes(["pochette-cover"])
         .build();
     let heart = Heart::new();
-    let cover_box = with_heart(&cover, &heart);
+    let cover_box = with_heart(&CoverFrame::new(&cover), &heart);
     let play = PlayButton::new();
     cover_box.add_overlay(play.widget());
 
@@ -211,4 +213,71 @@ pub fn fit_columns(grid: &gtk::GridView) {
             glib::idle_add_local_once(move || grid.set_max_columns(columns));
         }
     });
+}
+
+/// Holds a cover at [`COVER_SIZE`], square, whatever the size of its image.
+///
+/// A picture asks for its image's size, often larger than a tile: in a grid it then
+/// widened to the column while its row kept it [`COVER_SIZE`] tall, and the cover
+/// stretched into a rectangle as the window resized.
+mod frame {
+    use relm4::gtk::{self, glib, prelude::*};
+
+    glib::wrapper! {
+        pub struct CoverFrame(ObjectSubclass<imp::CoverFrame>)
+            @extends gtk::Widget,
+            @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
+    }
+
+    impl CoverFrame {
+        pub fn new(picture: &gtk::Picture) -> Self {
+            let frame: Self = glib::Object::new();
+            picture.set_parent(&frame);
+            frame
+        }
+    }
+
+    mod imp {
+        use relm4::gtk::{self, glib, prelude::*, subclass::prelude::*};
+
+        use super::super::COVER_SIZE;
+
+        #[derive(Default)]
+        pub struct CoverFrame;
+
+        #[glib::object_subclass]
+        impl ObjectSubclass for CoverFrame {
+            const NAME: &'static str = "PochetteCoverFrame";
+            type Type = super::CoverFrame;
+            type ParentType = gtk::Widget;
+        }
+
+        impl ObjectImpl for CoverFrame {
+            fn dispose(&self) {
+                while let Some(child) = self.obj().first_child() {
+                    child.unparent();
+                }
+            }
+        }
+
+        impl WidgetImpl for CoverFrame {
+            fn measure(&self, _: gtk::Orientation, _: i32) -> (i32, i32, i32, i32) {
+                (COVER_SIZE, COVER_SIZE, -1, -1)
+            }
+
+            fn size_allocate(&self, width: i32, height: i32, _baseline: i32) {
+                let Some(picture) = self.obj().first_child() else {
+                    return;
+                };
+                // Square, centered, even if given more room one way.
+                let side = width.min(height);
+                // GTK wants a widget measured before it's allocated.
+                picture.measure(gtk::Orientation::Horizontal, -1);
+                picture.size_allocate(
+                    &gtk::Allocation::new((width - side) / 2, (height - side) / 2, side, side),
+                    -1,
+                );
+            }
+        }
+    }
 }
