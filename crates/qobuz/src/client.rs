@@ -100,6 +100,26 @@ impl Client {
         }
     }
 
+    /// Add an album to the user's favorites, which is their library.
+    pub async fn add_favorite_album(&self, id: &str) -> Result<()> {
+        let response = self
+            .post("favorite/create")
+            .form(&[("album_ids", id)])
+            .send()
+            .await?;
+        read_json::<serde_json::Value>(response).await.map(drop)
+    }
+
+    /// Remove an album from the user's favorites.
+    pub async fn remove_favorite_album(&self, id: &str) -> Result<()> {
+        let response = self
+            .post("favorite/delete")
+            .form(&[("album_ids", id)])
+            .send()
+            .await?;
+        read_json::<serde_json::Value>(response).await.map(drop)
+    }
+
     /// An album, with its tracks and review.
     pub async fn album(&self, id: &str) -> Result<Album> {
         let response = self

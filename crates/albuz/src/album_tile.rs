@@ -1,5 +1,5 @@
-//! An album as a tile: its cover, title and artist, and maybe a caption. In grids, and in
-//! the rows of the Discover tab.
+//! An album as a tile: its cover, with a heart on hover, then its title and artist, and
+//! maybe a caption. In grids, and in the rows of the Discover tab.
 
 use std::rc::Rc;
 
@@ -9,7 +9,10 @@ use relm4::{
     typed_view::grid::RelmGridItem,
 };
 
-use crate::covers::VisibleCovers;
+use crate::{
+    covers::VisibleCovers,
+    favorites::{Favorites, Heart, with_heart},
+};
 
 /// The side of a cover, in logical pixels.
 pub const COVER_SIZE: i32 = 180;
@@ -20,10 +23,12 @@ pub struct AlbumItem {
     /// A line under the artist, such as the album's awards.
     pub caption: Option<String>,
     pub covers: VisibleCovers,
+    pub favorites: Favorites,
 }
 
 pub struct AlbumWidgets {
     cover: gtk::Picture,
+    heart: Heart,
     title: gtk::Label,
     artist: gtk::Label,
     caption: gtk::Label,
@@ -31,6 +36,16 @@ pub struct AlbumWidgets {
 
 /// A tile, empty until [`AlbumWidgets::show`] fills it.
 pub fn tile() -> (gtk::Box, AlbumWidgets) {
+    let cover = gtk::Picture::builder()
+        .width_request(COVER_SIZE)
+        .height_request(COVER_SIZE)
+        .content_fit(gtk::ContentFit::Cover)
+        .overflow(gtk::Overflow::Hidden)
+        .css_classes(["albuz-cover"])
+        .build();
+    let heart = Heart::new();
+    let cover_box = with_heart(&cover, &heart);
+
     relm4::view! {
         root = gtk::Box {
             set_orientation: gtk::Orientation::Vertical,
@@ -39,14 +54,10 @@ pub fn tile() -> (gtk::Box, AlbumWidgets) {
             set_halign: gtk::Align::Center,
             set_valign: gtk::Align::Start,
             set_cursor_from_name: Some("pointer"),
+            // The heart shows when the pointer is anywhere on the tile.
+            add_css_class: "albuz-hearted",
 
-            #[name = "cover"]
-            gtk::Picture {
-                set_size_request: (COVER_SIZE, COVER_SIZE),
-                set_content_fit: gtk::ContentFit::Cover,
-                set_overflow: gtk::Overflow::Hidden,
-                add_css_class: "albuz-cover",
-            },
+            append: &cover_box,
             #[name = "title"]
             gtk::Label {
                 set_xalign: 0.0,
@@ -75,6 +86,7 @@ pub fn tile() -> (gtk::Box, AlbumWidgets) {
 
     let widgets = AlbumWidgets {
         cover,
+        heart,
         title,
         artist,
         caption,
@@ -86,9 +98,10 @@ impl AlbumWidgets {
     pub fn show(
         &self,
         root: &gtk::Box,
-        album: &Album,
+        album: &Rc<Album>,
         caption: Option<&str>,
         covers: &VisibleCovers,
+        favorites: &Favorites,
     ) {
         let title = album.full_title();
         self.title.set_label(&title);
@@ -101,6 +114,7 @@ impl AlbumWidgets {
             .collect::<Vec<_>>()
             .join("\n");
         root.set_tooltip_text(Some(&tooltip));
+        self.heart.show(Some(album.clone()), favorites);
 
         match cover_url(album, self.cover.scale_factor()) {
             Some(url) => covers.show(&self.cover, url),
@@ -110,6 +124,7 @@ impl AlbumWidgets {
 
     pub fn hide(&self, covers: &VisibleCovers) {
         covers.hide(&self.cover);
+        self.heart.clear();
     }
 }
 
@@ -122,7 +137,13 @@ impl RelmGridItem for AlbumItem {
     }
 
     fn bind(&mut self, widgets: &mut AlbumWidgets, root: &mut gtk::Box) {
-        widgets.show(root, &self.album, self.caption.as_deref(), &self.covers);
+        widgets.show(
+            root,
+            &self.album,
+            self.caption.as_deref(),
+            &self.covers,
+            &self.favorites,
+        );
     }
 
     fn unbind(&mut self, widgets: &mut AlbumWidgets, _root: &mut gtk::Box) {

@@ -13,6 +13,7 @@ use crate::{
     account::{self, Account},
     albums::{AlbumsMsg, AlbumsOutput, AlbumsPage},
     discover::{DiscoverMsg, DiscoverOutput, DiscoverPage},
+    favorites::Favorites,
     now_playing::NowPlaying,
     player::{Player, State},
     session_store::SessionStore,
@@ -48,6 +49,8 @@ pub struct App {
     discover: Controller<DiscoverPage>,
     now_playing: Controller<NowPlaying>,
     player: Player,
+    /// The albums in the user's library, which hearts add and remove.
+    favorites: Favorites,
     /// Whether something is playing or paused.
     playing: bool,
     /// Whether the user wants the now playing pane, while something plays.
@@ -282,6 +285,7 @@ impl Component for App {
 
     fn init((): (), root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let player = Player::new().expect("GStreamer and its playbin are installed");
+        let favorites = Favorites::default();
         let settings = Settings::load();
         player.set_volume(settings.volume);
         finish_playback_before_closing(&root, &player);
@@ -294,20 +298,21 @@ impl Component for App {
             error: None,
             sign_in_url: None,
             task: None,
-            albums: AlbumsPage::builder().launch(player.clone()).forward(
-                sender.input_sender(),
-                |output| match output {
+            albums: AlbumsPage::builder()
+                .launch((player.clone(), favorites.clone()))
+                .forward(sender.input_sender(), |output| match output {
                     AlbumsOutput::SessionExpired => Msg::SessionExpired,
-                },
-            ),
-            discover: DiscoverPage::builder().launch(player.clone()).forward(
-                sender.input_sender(),
-                |output| match output {
+                }),
+            discover: DiscoverPage::builder()
+                .launch((player.clone(), favorites.clone()))
+                .forward(sender.input_sender(), |output| match output {
                     DiscoverOutput::SessionExpired => Msg::SessionExpired,
-                },
-            ),
-            now_playing: NowPlaying::builder().launch(player.clone()).detach(),
+                }),
+            now_playing: NowPlaying::builder()
+                .launch((player.clone(), favorites.clone()))
+                .detach(),
             player,
+            favorites,
             playing: false,
             pane_open: false,
             collapsed: false,
@@ -471,6 +476,7 @@ impl App {
 
     fn signed_in(&mut self, account: Account) {
         tracing::info!("signed in as user {}", account.user.id);
+        self.favorites.reset(Some(account.client.clone()), []);
         self.albums.emit(AlbumsMsg::Show(account.client.clone()));
         self.discover
             .emit(DiscoverMsg::Show(account.client.clone()));
@@ -483,6 +489,7 @@ impl App {
         self.stop_task();
         self.account = None;
         self.player.stop();
+        self.favorites.reset(None, []);
         self.albums.emit(AlbumsMsg::Clear);
         self.discover.emit(DiscoverMsg::Clear);
         self.screen = Screen::SignedOut;

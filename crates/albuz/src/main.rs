@@ -9,6 +9,7 @@ mod clamp;
 mod covers;
 mod discover;
 mod dropdown;
+mod favorites;
 mod format;
 mod genre_picker;
 mod library;

@@ -158,3 +158,28 @@ label {
   padding: 12px;
   border-radius: 12px;
 }
+
+/* The heart over a cover, which adds the album to the favorites or removes it. It shows
+   when the pointer is over the tile or cover, or when it has the keyboard focus. */
+.albuz-heart {
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+  color: white;
+  background-color: alpha(black, 0.55);
+  opacity: 0;
+  transition: opacity 120ms ease-out, background-color 120ms ease-out;
+}
+
+.albuz-heart:hover {
+  background-color: alpha(black, 0.75);
+}
+
+.albuz-heart.albuz-favorite {
+  color: #ff5f78;
+}
+
+.albuz-hearted:hover .albuz-heart,
+.albuz-heart:focus-visible {
+  opacity: 1;
+}

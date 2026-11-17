@@ -20,6 +20,7 @@ use crate::{
     album_page::{AlbumPage, AlbumPageMsg, AlbumPageOutput},
     album_tile::{self, AlbumItem, AlbumWidgets},
     covers::VisibleCovers,
+    favorites::Favorites,
     genre_picker::GenrePicker,
     player::Player,
     settings::Settings,
@@ -78,6 +79,7 @@ pub struct DiscoverPage {
     home_task: Option<JoinHandle<()>>,
     section_task: Option<JoinHandle<()>>,
     album_page: Controller<AlbumPage>,
+    favorites: Favorites,
 }
 
 #[derive(Debug)]
@@ -119,7 +121,7 @@ pub enum DiscoverOutput {
 
 #[relm4::component(pub)]
 impl Component for DiscoverPage {
-    type Init = Player;
+    type Init = (Player, Favorites);
     type Input = DiscoverMsg;
     type Output = DiscoverOutput;
     type CommandOutput = ();
@@ -320,7 +322,7 @@ impl Component for DiscoverPage {
     }
 
     fn init(
-        player: Player,
+        (player, favorites): (Player, Favorites),
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
@@ -345,13 +347,13 @@ impl Component for DiscoverPage {
             section_error: None,
             home_task: None,
             section_task: None,
-            album_page: AlbumPage::builder().launch(player).forward(
-                sender.input_sender(),
-                |output| match output {
+            album_page: AlbumPage::builder()
+                .launch((player, favorites.clone()))
+                .forward(sender.input_sender(), |output| match output {
                     AlbumPageOutput::Back => DiscoverMsg::CloseAlbum,
                     AlbumPageOutput::SessionExpired => DiscoverMsg::SessionExpired,
-                },
-            ),
+                }),
+            favorites,
         };
         let genre_button = model.genre_picker.widget();
         let rows = &model.rows;
@@ -517,6 +519,7 @@ impl DiscoverPage {
                                 caption: caption(section, &album),
                                 album: Rc::new(album),
                                 covers: self.grid_covers.clone(),
+                                favorites: self.favorites.clone(),
                             }));
                     }
                     Err(err) => {
@@ -607,7 +610,12 @@ impl DiscoverPage {
             if albums.is_empty() {
                 continue;
             }
-            let (row, tiles) = row(section, &albums, &self.row_covers, sender);
+            let (row, tiles) = row(
+                section,
+                &albums,
+                (&self.row_covers, &self.favorites),
+                sender,
+            );
             self.rows.append(&row);
             self.row_tiles.extend(tiles);
             self.row_albums.push((section, albums));
@@ -705,7 +713,7 @@ fn caption(section: Section, album: &Album) -> Option<String> {
 fn row(
     section: Section,
     albums: &[Rc<Album>],
-    covers: &VisibleCovers,
+    (covers, favorites): (&VisibleCovers, &Favorites),
     sender: &ComponentSender<DiscoverPage>,
 ) -> (gtk::Box, Vec<AlbumWidgets>) {
     let strip = gtk::Box::new(gtk::Orientation::Horizontal, 0);
@@ -714,7 +722,13 @@ fn row(
     let mut tiles = Vec::new();
     for (index, album) in albums.iter().enumerate() {
         let (tile, widgets) = album_tile::tile();
-        widgets.show(&tile, album, caption(section, album).as_deref(), covers);
+        widgets.show(
+            &tile,
+            album,
+            caption(section, album).as_deref(),
+            covers,
+            favorites,
+        );
         let button = gtk::Button::builder()
             .child(&tile)
             .css_classes(["flat", "albuz-row-tile"])

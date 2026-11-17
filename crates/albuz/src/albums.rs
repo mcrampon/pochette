@@ -21,6 +21,7 @@ use crate::{
     album_tile::{self, AlbumItem},
     covers::VisibleCovers,
     dropdown::{dropdown, replace_choices},
+    favorites::Favorites,
     genre_picker::GenrePicker,
     library::{self, Entry, Sort, View},
     player::Player,
@@ -56,6 +57,7 @@ pub struct AlbumsPage {
     scroller: Option<gtk::ScrolledWindow>,
     client: Option<Client>,
     player: Player,
+    favorites: Favorites,
     error: String,
     task: Option<JoinHandle<()>>,
     /// Fetching the tracks of the album picked at random.
@@ -90,6 +92,11 @@ pub enum AlbumsMsg {
     /// Play one of the albums shown, at random.
     PlayRandom,
     RandomLoaded(Box<qobuz::Result<Album>>),
+    /// An album was added to the favorites, or removed, from anywhere.
+    FavoriteChanged {
+        album: Box<Album>,
+        added: bool,
+    },
 }
 
 #[derive(Debug)]
@@ -100,7 +107,7 @@ pub enum AlbumsOutput {
 
 #[relm4::component(pub)]
 impl Component for AlbumsPage {
-    type Init = Player;
+    type Init = (Player, Favorites);
     type Input = AlbumsMsg;
     type Output = AlbumsOutput;
     type CommandOutput = ();
@@ -279,7 +286,7 @@ impl Component for AlbumsPage {
     }
 
     fn init(
-        player: Player,
+        (player, favorites): (Player, Favorites),
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
@@ -315,14 +322,14 @@ impl Component for AlbumsPage {
             sort_menu,
             scroller: None,
             client: None,
-            album_page: AlbumPage::builder().launch(player.clone()).forward(
-                sender.input_sender(),
-                |output| match output {
+            album_page: AlbumPage::builder()
+                .launch((player.clone(), favorites.clone()))
+                .forward(sender.input_sender(), |output| match output {
                     AlbumPageOutput::Back => AlbumsMsg::CloseAlbum,
                     AlbumPageOutput::SessionExpired => AlbumsMsg::SessionExpired,
-                },
-            ),
+                }),
             player,
+            favorites,
             error: String::new(),
             task: None,
             random: None,
@@ -361,6 +368,13 @@ impl Component for AlbumsPage {
         add_search_shortcut(&root, &sender);
 
         album_tile::fit_columns(&model.grid.view);
+        let input = sender.input_sender().clone();
+        model.favorites.connect_changed(move |album, added| {
+            input.emit(AlbumsMsg::FavoriteChanged {
+                album: Box::new(album.clone()),
+                added,
+            });
+        });
         model.covers.attach(&widgets.scroller);
         model.scroller = Some(widgets.scroller.clone());
         ComponentParts { model, widgets }
@@ -401,6 +415,10 @@ impl Component for AlbumsPage {
             AlbumsMsg::Loaded(Ok(albums)) => {
                 self.task = None;
                 self.entries = albums.into_iter().map(Entry::new).collect();
+                self.favorites.reset(
+                    self.client.clone(),
+                    self.entries.iter().map(|entry| entry.album.id.clone()),
+                );
                 self.state = if self.entries.is_empty() {
                     State::Empty
                 } else {
@@ -429,6 +447,18 @@ impl Component for AlbumsPage {
             | AlbumsMsg::Reverse
             | AlbumsMsg::ClearFilters) => self.change_view(msg),
 
+            AlbumsMsg::FavoriteChanged { album, added } => {
+                if added && !self.entries.iter().any(|entry| entry.album.id == album.id) {
+                    let mut album = *album;
+                    album.favorited_at = Some(unix_time());
+                    self.entries.push(Entry::new(album));
+                    self.fill_filters();
+                    self.fill_grid();
+                    self.show_albums();
+                }
+                // An album removed stays until the albums load again, its heart empty, so
+                // that a click by mistake is one click to undo.
+            }
             AlbumsMsg::PlayRandom => self.play_random(&sender),
             AlbumsMsg::RandomLoaded(result) => {
                 let result = *result;
@@ -577,6 +607,7 @@ impl AlbumsPage {
                 album: entry.album.clone(),
                 caption: None,
                 covers: self.covers.clone(),
+                favorites: self.favorites.clone(),
             }));
     }
 
@@ -663,4 +694,13 @@ fn add_search_shortcut(root: &gtk::Stack, sender: &ComponentSender<AlbumsPage>) 
         })),
     ));
     root.add_controller(shortcuts);
+}
+
+/// Now, in Unix time.
+fn unix_time() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()
+        .and_then(|elapsed| i64::try_from(elapsed.as_secs()).ok())
+        .unwrap_or_default()
 }

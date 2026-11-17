@@ -14,7 +14,9 @@ use tokio::task::JoinHandle;
 
 use crate::{
     clamp::Clamp,
-    covers, format,
+    covers,
+    favorites::{Favorites, Heart, with_heart},
+    format,
     player::{Player, State, Status},
 };
 
@@ -39,6 +41,9 @@ pub struct AlbumPage {
     error: String,
     task: Option<JoinHandle<()>>,
     cover: gtk::Picture,
+    /// Over the cover, to add the album to the favorites or remove it.
+    heart: Heart,
+    favorites: Favorites,
     track_list: gtk::Box,
     /// The track rows, with the id of their track.
     rows: Vec<(u64, gtk::ListBoxRow)>,
@@ -78,7 +83,7 @@ pub enum AlbumPageOutput {
 
 #[relm4::component(pub)]
 impl Component for AlbumPage {
-    type Init = Player;
+    type Init = (Player, Favorites);
     type Input = AlbumPageMsg;
     type Output = AlbumPageOutput;
     type CommandOutput = ();
@@ -136,13 +141,8 @@ impl Component for AlbumPage {
                         set_spacing: 32,
 
                         #[local_ref]
-                        cover -> gtk::Picture {
-                            set_size_request: (COVER_SIZE, COVER_SIZE),
-                            set_content_fit: gtk::ContentFit::Cover,
-                            set_overflow: gtk::Overflow::Hidden,
+                        cover_box -> gtk::Overlay {
                             set_valign: gtk::Align::Start,
-                            add_css_class: "albuz-cover",
-                            add_css_class: "albuz-cover-large",
                         },
 
                         gtk::Box {
@@ -319,7 +319,7 @@ impl Component for AlbumPage {
     }
 
     fn init(
-        player: Player,
+        (player, favorites): (Player, Favorites),
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
@@ -330,13 +330,21 @@ impl Component for AlbumPage {
             tracks: Tracks::Loading,
             error: String::new(),
             task: None,
-            cover: gtk::Picture::new(),
+            cover: gtk::Picture::builder()
+                .width_request(COVER_SIZE)
+                .height_request(COVER_SIZE)
+                .content_fit(gtk::ContentFit::Cover)
+                .overflow(gtk::Overflow::Hidden)
+                .css_classes(["albuz-cover", "albuz-cover-large"])
+                .build(),
+            heart: Heart::new(),
+            favorites,
             track_list: gtk::Box::default(),
             rows: Vec::new(),
             playback: player.status().borrow().clone(),
             player,
         };
-        let cover = &model.cover;
+        let cover_box = &with_heart(&model.cover, &model.heart);
         let track_list = &model.track_list;
         let widgets = view_output!();
         ComponentParts { model, widgets }
@@ -347,6 +355,8 @@ impl Component for AlbumPage {
             AlbumPageMsg::Show { client, album } => {
                 root.vadjustment().set_value(0.0);
                 self.show_cover(&album, &sender);
+                self.heart
+                    .show(Some(Rc::new(album.clone())), &self.favorites);
                 self.client = Some(client);
                 self.album = Some(album);
                 self.load(&sender);

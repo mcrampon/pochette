@@ -1,6 +1,7 @@
 //! The now playing pane: the controls first, then the album's tracks.
 
 use std::{
+    rc::Rc,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -13,7 +14,9 @@ use relm4::{
 
 use crate::{
     clamp::Clamp,
-    covers, format,
+    covers,
+    favorites::{Favorites, Heart, with_heart},
+    format,
     player::{Player, State, Status},
     settings::Settings,
 };
@@ -42,6 +45,9 @@ pub struct NowPlaying {
     player: Player,
     status: Status,
     cover: gtk::Picture,
+    /// Over the cover, to add the album to the favorites or remove it.
+    heart: Heart,
+    favorites: Favorites,
     cover_url: Option<String>,
     progress: gtk::Scale,
     elapsed: gtk::Label,
@@ -81,7 +87,7 @@ pub enum NowPlayingMsg {
 
 #[relm4::component(pub)]
 impl Component for NowPlaying {
-    type Init = Player;
+    type Init = (Player, Favorites);
     type Input = NowPlayingMsg;
     type Output = ();
     type CommandOutput = ();
@@ -105,13 +111,8 @@ impl Component for NowPlaying {
                         set_spacing: 6,
 
                         #[local_ref]
-                        cover -> gtk::Picture {
-                            set_size_request: (COVER_SIZE, COVER_SIZE),
+                        cover_box -> gtk::Overlay {
                             set_halign: gtk::Align::Center,
-                            set_content_fit: gtk::ContentFit::Cover,
-                            set_overflow: gtk::Overflow::Hidden,
-                            add_css_class: "albuz-cover",
-                            add_css_class: "albuz-cover-large",
                             set_margin_bottom: 12,
                         },
 
@@ -283,7 +284,7 @@ impl Component for NowPlaying {
     }
 
     fn init(
-        player: Player,
+        (player, favorites): (Player, Favorites),
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
@@ -292,7 +293,15 @@ impl Component for NowPlaying {
         let model = Self {
             status: player.status().borrow().clone(),
             player,
-            cover: gtk::Picture::new(),
+            cover: gtk::Picture::builder()
+                .width_request(COVER_SIZE)
+                .height_request(COVER_SIZE)
+                .content_fit(gtk::ContentFit::Cover)
+                .overflow(gtk::Overflow::Hidden)
+                .css_classes(["albuz-cover", "albuz-cover-large"])
+                .build(),
+            heart: Heart::new(),
+            favorites,
             cover_url: None,
             progress: gtk::Scale::with_range(gtk::Orientation::Horizontal, 0.0, 1.0, 1.0),
             elapsed: gtk::Label::new(None),
@@ -304,7 +313,7 @@ impl Component for NowPlaying {
             volume_changes: 0,
             seeked_at: None,
         };
-        let cover = &model.cover;
+        let cover_box = &with_heart(&model.cover, &model.heart);
         let progress = &model.progress;
         let elapsed = &model.elapsed;
         let remaining = &model.remaining;
@@ -403,6 +412,8 @@ impl NowPlaying {
             return;
         }
         self.cover_url.clone_from(&url);
+        let album = self.status.album.as_deref().cloned().map(Rc::new);
+        self.heart.show(album, &self.favorites);
         let Some(url) = url else {
             self.cover.set_paintable(None::<&gdk::Paintable>);
             return;
