@@ -108,7 +108,8 @@ impl Sort {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct View {
     pub query: String,
-    pub genre: Option<String>,
+    /// The genres to show, or all of them when empty.
+    pub genres: Vec<String>,
     pub decade: Option<u16>,
     pub sort: Sort,
     /// The other way round from the sort's natural order.
@@ -124,7 +125,12 @@ impl View {
         let mut shown: Vec<&Entry> = entries
             .iter()
             .filter(|entry| words.iter().all(|word| entry.search.contains(word)))
-            .filter(|entry| self.genre.is_none() || entry.genre() == self.genre.as_deref())
+            .filter(|entry| {
+                self.genres.is_empty()
+                    || entry
+                        .genre()
+                        .is_some_and(|genre| self.genres.iter().any(|picked| picked == genre))
+            })
             .filter(|entry| self.decade.is_none() || entry.decade == self.decade)
             .collect();
         // Stable, so ties keep the order Qobuz gave.
@@ -137,7 +143,7 @@ impl View {
 
     /// Whether anything hides some of the albums.
     pub fn is_filtered(&self) -> bool {
-        !self.query.trim().is_empty() || self.genre.is_some() || self.decade.is_some()
+        !self.query.trim().is_empty() || !self.genres.is_empty() || self.decade.is_some()
     }
 
     /// How the order reads: "Newest First", "A to Z"…
@@ -233,11 +239,21 @@ mod tests {
     fn filters_by_genre_and_decade() {
         let library = library();
         let view = View {
-            genre: Some("Jazz".into()),
+            genres: vec!["Jazz".into()],
             decade: Some(1950),
             ..View::default()
         };
         assert_eq!(titles(&view.apply(&library)), ["Kind of Blue"]);
+    }
+
+    #[test]
+    fn filters_by_several_genres() {
+        let library = library();
+        let view = View {
+            genres: vec!["Pop".into(), "Chanson française".into()],
+            ..View::default()
+        };
+        assert_eq!(titles(&view.apply(&library)), ["Écoute", "Lemonade"]);
     }
 
     #[test]

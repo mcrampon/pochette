@@ -10,6 +10,7 @@ mod covers;
 mod discover;
 mod dropdown;
 mod format;
+mod genre_picker;
 mod library;
 mod now_playing;
 mod player;

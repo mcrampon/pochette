@@ -41,13 +41,16 @@ async fn reads_the_discover_sections() {
 
     let client = client();
     let genres = client.genres().await.unwrap();
-    let jazz = genres
+    // Jazz and classical.
+    let picked: Vec<u64> = genres
         .iter()
-        .find(|genre| genre.id == 80)
-        .map(|genre| genre.id);
+        .map(|genre| genre.id)
+        .filter(|id| [80, 10].contains(id))
+        .collect();
+    assert_eq!(picked.len(), 2);
     println!("{} genres", genres.len());
 
-    let discover = client.discover(jazz).await.unwrap();
+    let discover = client.discover(&picked).await.unwrap();
     for section in [
         Section::NewReleases,
         Section::PressAwards,
@@ -61,9 +64,12 @@ async fn reads_the_discover_sections() {
         );
         assert!(!albums.albums.is_empty());
 
-        let page = client.discover_section(section, jazz, 0, 50).await.unwrap();
+        let page = client
+            .discover_section(section, &picked, 0, 50)
+            .await
+            .unwrap();
         let next = client
-            .discover_section(section, jazz, 50, 50)
+            .discover_section(section, &picked, 50, 50)
             .await
             .unwrap();
         println!(

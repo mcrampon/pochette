@@ -55,8 +55,9 @@ impl Discover {
 }
 
 impl Client {
-    /// The first albums of each section, of genre `genre_id` or of all genres.
-    pub async fn discover(&self, genre_id: Option<u64>) -> Result<Discover> {
+    /// The first albums of each section, of the genres `genre_ids`, or of all genres when
+    /// there are none.
+    pub async fn discover(&self, genre_ids: &[u64]) -> Result<Discover> {
         #[derive(Deserialize)]
         struct Index {
             containers: Containers,
@@ -73,9 +74,7 @@ impl Client {
         }
 
         let mut request = self.get("discover/index");
-        if let Some(genre_id) = genre_id {
-            request = request.query(&[("genre_ids", genre_id)]);
-        }
+        request = with_genres(request, genre_ids);
         let index: Index = read_json(request.send().await?).await?;
         let albums = |container: Option<Container>| {
             container
@@ -90,20 +89,19 @@ impl Client {
         })
     }
 
-    /// `limit` albums of `section` from `offset`, of genre `genre_id` or of all genres.
+    /// `limit` albums of `section` from `offset`, of the genres `genre_ids`, or of all
+    /// genres when there are none.
     pub async fn discover_section(
         &self,
         section: Section,
-        genre_id: Option<u64>,
+        genre_ids: &[u64],
         offset: usize,
         limit: usize,
     ) -> Result<Albums> {
         let mut request = self
             .get(section.endpoint())
             .query(&[("offset", offset), ("limit", limit)]);
-        if let Some(genre_id) = genre_id {
-            request = request.query(&[("genre_ids", genre_id)]);
-        }
+        request = with_genres(request, genre_ids);
         let items: Items = read_json(request.send().await?).await?;
         Ok(items.into())
     }
@@ -122,6 +120,15 @@ impl Client {
         let response = self.get("genre/list").send().await?;
         Ok(read_json::<Response>(response).await?.genres.items)
     }
+}
+
+/// Ask for albums of `genre_ids` only, when there are some.
+fn with_genres(request: reqwest::RequestBuilder, genre_ids: &[u64]) -> reqwest::RequestBuilder {
+    if genre_ids.is_empty() {
+        return request;
+    }
+    let ids: Vec<String> = genre_ids.iter().map(u64::to_string).collect();
+    request.query(&[("genre_ids", ids.join(","))])
 }
 
 #[derive(Deserialize)]

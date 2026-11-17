@@ -16,6 +16,7 @@ use crate::{
     album_tile::AlbumItem,
     covers::VisibleCovers,
     dropdown::{dropdown, replace_choices},
+    genre_picker::GenrePicker,
     library::{self, Entry, Sort, View},
     player::Player,
 };
@@ -33,14 +34,14 @@ pub struct AlbumsPage {
     /// Every saved album.
     entries: Vec<Entry>,
     view: View,
-    /// The genres and decades the filters offer, after "All".
+    /// The genres and decades the filters offer; the decades after "All".
     genres: Vec<String>,
     decades: Vec<u16>,
     /// How many albums the grid shows.
     shown: usize,
     grid: TypedGridView<AlbumItem, gtk::NoSelection>,
     search: gtk::SearchEntry,
-    genre_filter: gtk::DropDown,
+    genre_picker: GenrePicker,
     decade_filter: gtk::DropDown,
     sort_menu: gtk::DropDown,
     scroller: Option<gtk::ScrolledWindow>,
@@ -70,8 +71,8 @@ pub enum AlbumsMsg {
     SessionExpired,
     Search(String),
     FocusSearch,
-    /// The position picked in the genre filter, 0 being all of them.
-    Genre(u32),
+    /// The positions of the genres picked, none meaning all of them.
+    Genres(Vec<usize>),
     /// The position picked in the decade filter, 0 being all of them.
     Decade(u32),
     Sort(u32),
@@ -179,9 +180,7 @@ impl Component for AlbumsPage {
                             connect_stop_search => |entry| entry.set_text(""),
                         },
                         #[local_ref]
-                        genre_filter -> gtk::DropDown {
-                            set_tooltip_text: Some("Genre"),
-                        },
+                        genre_button -> gtk::MenuButton {},
                         #[local_ref]
                         decade_filter -> gtk::DropDown {
                             set_tooltip_text: Some("Decade"),
@@ -283,7 +282,7 @@ impl Component for AlbumsPage {
             shown: 0,
             grid: TypedGridView::new(),
             search: gtk::SearchEntry::new(),
-            genre_filter: dropdown(&["All Genres"]),
+            genre_picker: GenrePicker::new(),
             decade_filter: dropdown(&["All Decades"]),
             sort_menu: dropdown(&sort_labels),
             scroller: None,
@@ -304,17 +303,20 @@ impl Component for AlbumsPage {
         };
         let grid_view = &model.grid.view;
         let search = &model.search;
-        let genre_filter = &model.genre_filter;
+        let genre_button = model.genre_picker.widget();
         let decade_filter = &model.decade_filter;
         let sort_menu = &model.sort_menu;
         let widgets = view_output!();
 
+        let input = sender.input_sender().clone();
+        model
+            .genre_picker
+            .connect_changed(move |picked| input.emit(AlbumsMsg::Genres(picked)));
         for (dropdown, msg) in [
             (
-                &model.genre_filter,
-                AlbumsMsg::Genre as fn(u32) -> AlbumsMsg,
+                &model.decade_filter,
+                AlbumsMsg::Decade as fn(u32) -> AlbumsMsg,
             ),
-            (&model.decade_filter, AlbumsMsg::Decade),
             (&model.sort_menu, AlbumsMsg::Sort),
         ] {
             let sender = sender.clone();
@@ -385,7 +387,7 @@ impl Component for AlbumsPage {
 
             msg @ (AlbumsMsg::Search(_)
             | AlbumsMsg::FocusSearch
-            | AlbumsMsg::Genre(_)
+            | AlbumsMsg::Genres(_)
             | AlbumsMsg::Decade(_)
             | AlbumsMsg::Sort(_)
             | AlbumsMsg::Reverse
@@ -426,10 +428,13 @@ impl AlbumsPage {
                     self.search.grab_focus();
                 }
             }
-            AlbumsMsg::Genre(position) => {
-                let genre = pick(&self.genres, position);
-                if genre != self.view.genre {
-                    self.view.genre = genre;
+            AlbumsMsg::Genres(picked) => {
+                let genres: Vec<String> = picked
+                    .into_iter()
+                    .filter_map(|index| self.genres.get(index).cloned())
+                    .collect();
+                if genres != self.view.genres {
+                    self.view.genres = genres;
                     self.show_albums();
                 }
             }
@@ -459,7 +464,7 @@ impl AlbumsPage {
             AlbumsMsg::ClearFilters => {
                 // Each change comes back as a message, which shows the albums.
                 self.search.set_text("");
-                self.genre_filter.set_selected(0);
+                self.genre_picker.clear();
                 self.decade_filter.set_selected(0);
             }
             // Not about the view.
@@ -490,19 +495,22 @@ impl AlbumsPage {
     fn fill_filters(&mut self) {
         self.genres = library::genres(&self.entries);
         self.decades = library::decades(&self.entries);
-        let genre_labels: Vec<String> = std::iter::once("All Genres".to_owned())
-            .chain(self.genres.iter().cloned())
+        self.view.genres.retain(|genre| self.genres.contains(genre));
+        let picked: Vec<usize> = self
+            .view
+            .genres
+            .iter()
+            .filter_map(|genre| self.genres.iter().position(|g| g == genre))
             .collect();
+        self.genre_picker.set_choices(&self.genres, &picked);
+
         let decade_labels: Vec<String> = std::iter::once("All Decades".to_owned())
             .chain(self.decades.iter().map(|decade| format!("{decade}s")))
             .collect();
-        let genre = position(&self.genres, self.view.genre.as_ref());
         let decade = position(&self.decades, self.view.decade.as_ref());
-        replace_choices(&self.genre_filter, &genre_labels, genre);
         replace_choices(&self.decade_filter, &decade_labels, decade);
-        // The selection changes above come back as messages after this one, and find
+        // The selection change above comes back as a message after this one, and finds
         // the view already up to date.
-        self.view.genre = pick(&self.genres, genre);
         self.view.decade = pick(&self.decades, decade);
     }
 

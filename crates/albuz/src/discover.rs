@@ -20,7 +20,7 @@ use crate::{
     album_page::{AlbumPage, AlbumPageMsg, AlbumPageOutput},
     album_tile::{self, AlbumItem, AlbumWidgets},
     covers::VisibleCovers,
-    dropdown::{dropdown, replace_choices},
+    genre_picker::GenrePicker,
     player::Player,
 };
 
@@ -57,8 +57,8 @@ pub struct DiscoverPage {
     page: Page,
     error: String,
     genres: Vec<Genre>,
-    genre_id: Option<u64>,
-    genre_filter: gtk::DropDown,
+    genre_ids: Vec<u64>,
+    genre_picker: GenrePicker,
     /// The rows, refilled when the genre changes.
     rows: gtk::Box,
     /// The albums of each row, in order.
@@ -88,11 +88,11 @@ pub enum DiscoverMsg {
     Reload,
     GenresLoaded(qobuz::Result<Vec<Genre>>),
     Loaded {
-        genre_id: Option<u64>,
+        genre_ids: Vec<u64>,
         result: Box<qobuz::Result<Discover>>,
     },
-    /// The position picked in the genre filter, 0 being all of them.
-    Genre(u32),
+    /// The positions of the genres picked, none meaning all of them.
+    Genres(Vec<usize>),
     /// Open the album at this index in a row.
     OpenRowAlbum(Section, usize),
     SeeAll(Section),
@@ -100,7 +100,7 @@ pub enum DiscoverMsg {
     LoadMore,
     SectionLoaded {
         section: Section,
-        genre_id: Option<u64>,
+        genre_ids: Vec<u64>,
         offset: usize,
         result: qobuz::Result<Albums>,
     },
@@ -136,9 +136,7 @@ impl Component for DiscoverPage {
                     set_margin_end: 36,
 
                     #[local_ref]
-                    genre_filter -> gtk::DropDown {
-                        set_tooltip_text: Some("Genre"),
-                    },
+                    genre_button -> gtk::MenuButton {},
                 },
 
                 #[transition = "Crossfade"]
@@ -245,7 +243,7 @@ impl Component for DiscoverPage {
                     },
                     gtk::Label {
                         #[watch]
-                        set_label: model.genre_name().unwrap_or_default(),
+                        set_label: &model.genre_names(),
                         add_css_class: "dim-label",
                     },
                 },
@@ -331,8 +329,8 @@ impl Component for DiscoverPage {
             page: Page::Home,
             error: String::new(),
             genres: Vec::new(),
-            genre_id: None,
-            genre_filter: dropdown(&["All Genres"]),
+            genre_ids: Vec::new(),
+            genre_picker: GenrePicker::new(),
             rows: gtk::Box::default(),
             row_albums: Vec::new(),
             row_tiles: Vec::new(),
@@ -354,15 +352,15 @@ impl Component for DiscoverPage {
                 },
             ),
         };
-        let genre_filter = &model.genre_filter;
+        let genre_button = model.genre_picker.widget();
         let rows = &model.rows;
         let grid_view = &model.grid.view;
         let widgets = view_output!();
 
         let input = sender.input_sender().clone();
-        model.genre_filter.connect_selected_notify(move |filter| {
-            input.emit(DiscoverMsg::Genre(filter.selected()));
-        });
+        model
+            .genre_picker
+            .connect_changed(move |picked| input.emit(DiscoverMsg::Genres(picked)));
 
         model.row_covers.attach(&widgets.home_scroller);
         model.grid_covers.attach(&widgets.grid_scroller);
@@ -396,7 +394,7 @@ impl Component for DiscoverPage {
                     task.abort();
                 }
                 self.client = None;
-                self.genre_id = None;
+                self.genre_ids.clear();
                 self.fill_rows(&sender, &Discover::default());
                 self.home = Home::Loading;
                 self.close_section();
@@ -405,15 +403,14 @@ impl Component for DiscoverPage {
             DiscoverMsg::Reload => self.load_home(&sender),
             DiscoverMsg::GenresLoaded(Ok(genres)) => {
                 self.genres = genres;
-                let labels: Vec<String> = std::iter::once("All Genres".to_owned())
-                    .chain(self.genres.iter().map(|genre| genre.name.clone()))
-                    .collect();
-                replace_choices(&self.genre_filter, &labels, 0);
+                let names: Vec<String> =
+                    self.genres.iter().map(|genre| genre.name.clone()).collect();
+                self.genre_picker.set_choices(&names, &[]);
             }
             DiscoverMsg::GenresLoaded(Err(err)) => Self::failed(&sender, "the genres", &err),
             // Sections of another genre, or of a user who signed out meanwhile.
-            DiscoverMsg::Loaded { genre_id, .. }
-                if genre_id != self.genre_id || self.client.is_none() => {}
+            DiscoverMsg::Loaded { genre_ids, .. }
+                if genre_ids != self.genre_ids || self.client.is_none() => {}
             DiscoverMsg::Loaded { result, .. } => {
                 self.home_task = None;
                 match *result {
@@ -428,14 +425,14 @@ impl Component for DiscoverPage {
                     }
                 }
             }
-            DiscoverMsg::Genre(position) => {
-                let genre_id = usize::try_from(position)
-                    .ok()
-                    .and_then(|position| position.checked_sub(1))
-                    .and_then(|index| self.genres.get(index))
-                    .map(|genre| genre.id);
-                if genre_id != self.genre_id {
-                    self.genre_id = genre_id;
+            DiscoverMsg::Genres(picked) => {
+                let genre_ids: Vec<u64> = picked
+                    .into_iter()
+                    .filter_map(|index| self.genres.get(index))
+                    .map(|genre| genre.id)
+                    .collect();
+                if genre_ids != self.genre_ids {
+                    self.genre_ids = genre_ids;
                     self.load_home(&sender);
                     if let Some(section) = self.section {
                         self.open_section(section);
@@ -502,13 +499,13 @@ impl DiscoverPage {
             }
             DiscoverMsg::SectionLoaded {
                 section,
-                genre_id,
+                genre_ids,
                 offset,
                 result,
             } => {
                 // A page of another section, genre or scroll than the one shown.
                 if Some(section) != self.section
-                    || genre_id != self.genre_id
+                    || genre_ids != self.genre_ids
                     || offset != self.grid.len() as usize
                 {
                     return;
@@ -538,10 +535,14 @@ impl DiscoverPage {
         }
     }
 
-    fn genre_name(&self) -> Option<&str> {
-        let genre_id = self.genre_id?;
-        let genre = self.genres.iter().find(|genre| genre.id == genre_id)?;
-        Some(genre.name.as_str())
+    /// The genres picked: "Jazz · Classique".
+    fn genre_names(&self) -> String {
+        self.genres
+            .iter()
+            .filter(|genre| self.genre_ids.contains(&genre.id))
+            .map(|genre| genre.name.as_str())
+            .collect::<Vec<_>>()
+            .join(" · ")
     }
 
     fn load_home(&mut self, sender: &ComponentSender<Self>) {
@@ -552,10 +553,10 @@ impl DiscoverPage {
             task.abort();
         }
         self.home = Home::Loading;
-        let (genre_id, sender) = (self.genre_id, sender.clone());
+        let (genre_ids, sender) = (self.genre_ids.clone(), sender.clone());
         self.home_task = Some(relm4::spawn(async move {
-            let result = Box::new(client.discover(genre_id).await);
-            sender.input(DiscoverMsg::Loaded { genre_id, result });
+            let result = Box::new(client.discover(&genre_ids).await);
+            sender.input(DiscoverMsg::Loaded { genre_ids, result });
         }));
     }
 
@@ -638,14 +639,18 @@ impl DiscoverPage {
             return;
         }
         self.loading_more = true;
-        let (genre_id, offset, sender) = (self.genre_id, self.grid.len() as usize, sender.clone());
+        let (genre_ids, offset, sender) = (
+            self.genre_ids.clone(),
+            self.grid.len() as usize,
+            sender.clone(),
+        );
         self.section_task = Some(relm4::spawn(async move {
             let result = client
-                .discover_section(section, genre_id, offset, PAGE_SIZE)
+                .discover_section(section, &genre_ids, offset, PAGE_SIZE)
                 .await;
             sender.input(DiscoverMsg::SectionLoaded {
                 section,
-                genre_id,
+                genre_ids,
                 offset,
                 result,
             });
