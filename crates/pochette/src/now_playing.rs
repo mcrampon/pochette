@@ -129,8 +129,6 @@ impl Component for NowPlaying {
                           gtk::Stack {
                             set_transition_type: gtk::StackTransitionType::Crossfade,
                             set_vhomogeneous: true,
-                            #[watch]
-                            set_visible_child_name: if model.showing_lyrics { "lyrics" } else { "album" },
 
                             add_named[Some("album")] = &gtk::Box {
                                 set_orientation: gtk::Orientation::Vertical,
@@ -172,6 +170,10 @@ impl Component for NowPlaying {
                             },
 
                             add_named: (lyrics_view, Some("lyrics")),
+
+                            // After the pages, which must be there to be shown.
+                            #[watch]
+                            set_visible_child_name: if model.showing_lyrics { "lyrics" } else { "album" },
                           },
 
                           add_overlay = &gtk::Button {
