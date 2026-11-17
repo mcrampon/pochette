@@ -136,6 +136,7 @@ impl Component for DiscoverPage {
 
                 gtk::Box {
                     set_margin_top: 12,
+                    set_margin_bottom: 12,
                     set_margin_start: 36,
                     set_margin_end: 36,
 
