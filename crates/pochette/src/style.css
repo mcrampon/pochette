@@ -322,3 +322,24 @@ selection {
 entry:focus-within {
   outline-color: alpha(@pochette_accent, 0.6);
 }
+
+/* Lyrics, in Now Playing: the line sung lit, the others dim, each a click away. */
+.pochette-lyric {
+  font-size: 1.25em;
+  font-weight: 700;
+  opacity: 0.35;
+  transition: opacity 200ms ease-out;
+}
+
+.pochette-lyric:hover {
+  opacity: 0.6;
+}
+
+.pochette-lyric.pochette-lyric-current {
+  opacity: 1;
+}
+
+.pochette-lyrics-plain {
+  font-size: 1.05em;
+  line-height: 1.6;
+}

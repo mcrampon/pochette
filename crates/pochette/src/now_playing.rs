@@ -8,7 +8,7 @@ use std::{
 
 use qobuz::models::{Album, Track};
 use relm4::{
-    Component, ComponentParts, ComponentSender, RelmWidgetExt,
+    Component, ComponentController, ComponentParts, ComponentSender, Controller, RelmWidgetExt,
     gtk::{self, gdk, glib, pango, prelude::*},
 };
 
@@ -17,6 +17,8 @@ use crate::{
     covers,
     favorites::{Favorites, Heart, with_heart},
     format,
+    lyrics_view::{LyricsView, LyricsViewMsg},
+    path_icon::{self, PathIcon},
     player::{Player, State, Status},
     settings::Settings,
 };
@@ -44,6 +46,9 @@ pub struct NowPlaying {
     cover: gtk::Picture,
     /// Over the cover, to add the album to the favorites or remove it.
     heart: Heart,
+    /// In place of the cover and the album's details, when shown.
+    lyrics: Controller<LyricsView>,
+    showing_lyrics: bool,
     favorites: Favorites,
     cover_url: Option<String>,
     progress: gtk::Scale,
@@ -82,6 +87,8 @@ pub enum NowPlayingMsg {
     SaveVolume(u64),
     /// Open the page of the album playing.
     OpenAlbum,
+    /// Show the lyrics in place of the cover, or the cover again.
+    ToggleLyrics,
 }
 
 #[derive(Debug)]
@@ -115,38 +122,73 @@ impl Component for NowPlaying {
                         set_orientation: gtk::Orientation::Vertical,
                         set_spacing: 6,
 
-                        #[local_ref]
-                        cover_box -> gtk::Overlay {
-                            set_halign: gtk::Align::Center,
-                            set_margin_bottom: 12,
-                        },
+                        // The album, or the lyrics in its place, as tall as each other, and
+                        // the button that swaps them, in the corner of either: a button of the
+                        // theme, always shown.
+                        gtk::Overlay {
+                          gtk::Stack {
+                            set_transition_type: gtk::StackTransitionType::Crossfade,
+                            set_vhomogeneous: true,
+                            #[watch]
+                            set_visible_child_name: if model.showing_lyrics { "lyrics" } else { "album" },
 
-                        // The album, a link to its page; its tracks are in the list below.
-                        gtk::Label {
-                            #[watch]
-                            set_markup: &model.album_link(),
-                            add_css_class: "pochette-now-playing-title",
-                            set_wrap: true,
-                            set_justify: gtk::Justification::Center,
-                            connect_activate_link[sender] => move |_, _| {
-                                sender.input(NowPlayingMsg::OpenAlbum);
-                                glib::Propagation::Stop
+                            add_named[Some("album")] = &gtk::Box {
+                                set_orientation: gtk::Orientation::Vertical,
+                                set_spacing: 6,
+
+                                #[local_ref]
+                                cover_box -> gtk::Overlay {
+                                    set_halign: gtk::Align::Center,
+                                    set_margin_bottom: 12,
+                                },
+
+                                // The album, a link to its page; its tracks are in the list below.
+                                gtk::Label {
+                                    #[watch]
+                                    set_markup: &model.album_link(),
+                                    add_css_class: "pochette-now-playing-title",
+                                    set_wrap: true,
+                                    set_justify: gtk::Justification::Center,
+                                    connect_activate_link[sender] => move |_, _| {
+                                        sender.input(NowPlayingMsg::OpenAlbum);
+                                        glib::Propagation::Stop
+                                    },
+                                },
+                                gtk::Label {
+                                    #[watch]
+                                    set_label: &model.artist(),
+                                    set_wrap: true,
+                                    set_justify: gtk::Justification::Center,
+                                },
+                                gtk::Label {
+                                    #[watch]
+                                    set_visible: model.status.quality.is_some(),
+                                    #[watch]
+                                    set_label: model.status.quality.as_deref().unwrap_or_default(),
+                                    add_css_class: "pochette-badge",
+                                    set_halign: gtk::Align::Center,
+                                    set_margin_top: 6,
+                                },
                             },
-                        },
-                        gtk::Label {
-                            #[watch]
-                            set_label: &model.artist(),
-                            set_wrap: true,
-                            set_justify: gtk::Justification::Center,
-                        },
-                        gtk::Label {
-                            #[watch]
-                            set_visible: model.status.quality.is_some(),
-                            #[watch]
-                            set_label: model.status.quality.as_deref().unwrap_or_default(),
-                            add_css_class: "pochette-badge",
-                            set_halign: gtk::Align::Center,
-                            set_margin_top: 6,
+
+                            add_named: (lyrics_view, Some("lyrics")),
+                          },
+
+                          add_overlay = &gtk::Button {
+                              set_child: Some(&PathIcon::new(path_icon::SWAP)),
+                              set_halign: gtk::Align::End,
+                              set_valign: gtk::Align::End,
+                              set_margin_end: 8,
+                              set_margin_bottom: 8,
+                              add_css_class: "circular",
+                              #[watch]
+                              update_property: &[gtk::accessible::Property::Label(
+                                  if model.showing_lyrics { "Show the Cover" } else { "Show the Lyrics" },
+                              )],
+                              connect_clicked[sender] => move |_| {
+                                  sender.input(NowPlayingMsg::ToggleLyrics);
+                              },
+                          },
                         },
 
                         gtk::Box {
@@ -284,6 +326,7 @@ impl Component for NowPlaying {
     ) -> ComponentParts<Self> {
         follow_playback(&player, &sender);
         tick(&sender);
+        let lyrics = LyricsView::builder().launch(player.clone()).detach();
         let model = Self {
             status: player.status().borrow().clone(),
             player,
@@ -295,6 +338,8 @@ impl Component for NowPlaying {
                 .css_classes(["pochette-cover", "pochette-cover-large"])
                 .build(),
             heart: Heart::new(),
+            lyrics,
+            showing_lyrics: false,
             favorites,
             cover_url: None,
             progress: gtk::Scale::with_range(gtk::Orientation::Horizontal, 0.0, 1.0, 1.0),
@@ -308,6 +353,7 @@ impl Component for NowPlaying {
             seeked_at: None,
         };
         let cover_box = &with_heart(&model.cover, &model.heart);
+        let lyrics_view = model.lyrics.widget();
         let progress = &model.progress;
         let elapsed = &model.elapsed;
         let remaining = &model.remaining;
@@ -342,6 +388,11 @@ impl Component for NowPlaying {
                 if self.cover_url.as_deref() == Some(&url) && texture.is_some() {
                     self.cover.set_paintable(texture.as_ref());
                 }
+            }
+            NowPlayingMsg::ToggleLyrics => {
+                self.showing_lyrics = !self.showing_lyrics;
+                self.lyrics
+                    .emit(LyricsViewMsg::SetVisible(self.showing_lyrics));
             }
             NowPlayingMsg::TogglePause => self.player.toggle_pause(),
             NowPlayingMsg::Previous => self.player.previous(),
