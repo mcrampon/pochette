@@ -80,6 +80,8 @@ pub enum AlbumsMsg {
     /// Open the album at this position in the grid.
     Open(u32),
     Nav(NavigatorMsg),
+    /// Open a page over the albums, as from Now Playing.
+    OpenPage(Destination),
     Search(String),
     FocusSearch,
     /// The positions of the genres picked, none meaning all of them.
@@ -395,6 +397,7 @@ impl Component for AlbumsPage {
                 let album = Album::clone(&item.borrow().album);
                 self.nav.open(Destination::Album(Box::new(album)));
             }
+            AlbumsMsg::OpenPage(destination) => self.nav.open(destination),
             AlbumsMsg::Nav(msg) => {
                 if self.nav.update(msg) {
                     let _ = sender.output(AlbumsOutput::SessionExpired);

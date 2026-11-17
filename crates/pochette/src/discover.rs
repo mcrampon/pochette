@@ -111,6 +111,8 @@ pub enum DiscoverMsg {
     /// Open the album at this position in the section's grid.
     OpenGridAlbum(u32),
     Nav(NavigatorMsg),
+    /// Open a page over Discover, as from Now Playing.
+    OpenPage(Destination),
 }
 
 #[derive(Debug)]
@@ -464,6 +466,7 @@ impl Component for DiscoverPage {
                     self.open_album(&album);
                 }
             }
+            DiscoverMsg::OpenPage(destination) => self.nav.open(destination),
             DiscoverMsg::Nav(msg) => {
                 if self.nav.update(msg) {
                     let _ = sender.output(DiscoverOutput::SessionExpired);

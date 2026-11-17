@@ -162,6 +162,16 @@
   font-weight: 700;
 }
 
+/* The album's title links to its page, in the text's color like the artist on an album's page. */
+.pochette-now-playing-title link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.pochette-now-playing-title link:hover {
+  text-decoration: underline;
+}
+
 .pochette-play-pause {
   min-width: 56px;
   min-height: 56px;

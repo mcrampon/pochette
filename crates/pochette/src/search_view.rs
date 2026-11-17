@@ -8,7 +8,7 @@ use relm4::{
 };
 
 use crate::{
-    navigation::{Navigator, NavigatorMsg, PageOutput},
+    navigation::{Destination, Navigator, NavigatorMsg, PageOutput},
     playback::CoverActions,
     player::Player,
 };
@@ -24,6 +24,8 @@ pub enum SearchViewMsg {
     /// Search as the user `client` signs in as, or close the results as they signed out.
     SetClient(Option<Client>),
     Nav(NavigatorMsg),
+    /// Open a page over the results, as from Now Playing.
+    OpenPage(Destination),
 }
 
 #[derive(Debug)]
@@ -76,6 +78,7 @@ impl Component for SearchView {
             }
             SearchViewMsg::Search(query) => self.nav.search(query),
             SearchViewMsg::SetClient(client) => self.nav.set_client(client),
+            SearchViewMsg::OpenPage(destination) => self.nav.open(destination),
             SearchViewMsg::Nav(msg) => {
                 let back = matches!(msg, NavigatorMsg::Page(PageOutput::Back));
                 if self.nav.update(msg) {

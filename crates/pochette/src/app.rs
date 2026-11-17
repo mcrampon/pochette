@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use qobuz::models::Album;
 use relm4::{
     Component, ComponentController, ComponentParts, ComponentSender, Controller, RelmWidgetExt,
     actions::{RelmAction, RelmActionGroup},
@@ -15,7 +16,8 @@ use crate::{
     discover::{DiscoverMsg, DiscoverOutput, DiscoverPage},
     favorites::Favorites,
     mpris,
-    now_playing::NowPlaying,
+    navigation::Destination,
+    now_playing::{NowPlaying, NowPlayingOutput},
     playback::{CoverActions, Playback},
     player::{Player, State},
     search_view::{SearchView, SearchViewMsg, SearchViewOutput},
@@ -89,6 +91,8 @@ pub enum Msg {
     Search(String),
     /// The search results were closed.
     SearchClosed,
+    /// Open the page of an album in the library, as from Now Playing.
+    OpenAlbum(Box<Album>),
     /// Bring the window to the front, as the desktop's media controls ask.
     Raise,
     // Results of background tasks.
@@ -354,7 +358,9 @@ impl Component for App {
                 }),
             now_playing: NowPlaying::builder()
                 .launch((player.clone(), favorites.clone()))
-                .detach(),
+                .forward(sender.input_sender(), |output| match output {
+                    NowPlayingOutput::OpenAlbum(album) => Msg::OpenAlbum(Box::new(album)),
+                }),
             search_view: SearchView::builder()
                 .launch((player.clone(), actions.clone()))
                 .forward(sender.input_sender(), |output| match output {
@@ -498,6 +504,7 @@ impl Component for App {
                 }
             }
             Msg::LibraryShown => self.library_shown(),
+            Msg::OpenAlbum(album) => self.open_album(*album),
         }
     }
 }
@@ -519,6 +526,24 @@ fn follow_playback(player: &Player, sender: &ComponentSender<App>) {
 
 impl App {
     /// Search the catalog in the tab shown.
+    /// Open the page of `album` in what the library shows: a tab, or the search results.
+    fn open_album(&mut self, album: Album) {
+        let destination = Destination::Album(Box::new(album));
+        let shown = self
+            .library
+            .as_ref()
+            .and_then(gtk::Stack::visible_child_name);
+        match shown.as_deref() {
+            Some("search") => self.search_view.emit(SearchViewMsg::OpenPage(destination)),
+            Some("discover") => self.discover.emit(DiscoverMsg::OpenPage(destination)),
+            _ => self.albums.emit(AlbumsMsg::OpenPage(destination)),
+        }
+        // Over the library, the pane would hide the page.
+        if self.collapsed {
+            self.pane_open = false;
+        }
+    }
+
     /// A tab, or the search results, was shown.
     fn library_shown(&mut self) {
         let shown = self

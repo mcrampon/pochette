@@ -6,7 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use qobuz::models::Track;
+use qobuz::models::{Album, Track};
 use relm4::{
     Component, ComponentParts, ComponentSender, RelmWidgetExt,
     gtk::{self, gdk, glib, pango, prelude::*},
@@ -80,13 +80,21 @@ pub enum NowPlayingMsg {
     Volume(f64),
     /// Save the volume, unless it changed again since.
     SaveVolume(u64),
+    /// Open the page of the album playing.
+    OpenAlbum,
+}
+
+#[derive(Debug)]
+pub enum NowPlayingOutput {
+    /// Open the page of this album, in the library.
+    OpenAlbum(Album),
 }
 
 #[relm4::component(pub)]
 impl Component for NowPlaying {
     type Init = (Player, Favorites);
     type Input = NowPlayingMsg;
-    type Output = ();
+    type Output = NowPlayingOutput;
     type CommandOutput = ();
 
     view! {
@@ -113,23 +121,21 @@ impl Component for NowPlaying {
                             set_margin_bottom: 12,
                         },
 
+                        // The album, a link to its page; its tracks are in the list below.
                         gtk::Label {
                             #[watch]
-                            set_label: &model.status.track().map(Track::full_title).unwrap_or_default(),
+                            set_markup: &model.album_link(),
                             add_css_class: "pochette-now-playing-title",
                             set_wrap: true,
                             set_justify: gtk::Justification::Center,
+                            connect_activate_link[sender] => move |_, _| {
+                                sender.input(NowPlayingMsg::OpenAlbum);
+                                glib::Propagation::Stop
+                            },
                         },
                         gtk::Label {
                             #[watch]
                             set_label: &model.artist(),
-                            set_wrap: true,
-                            set_justify: gtk::Justification::Center,
-                        },
-                        gtk::Label {
-                            #[watch]
-                            set_label: &model.status.album.as_ref().map(|album| album.full_title()).unwrap_or_default(),
-                            add_css_class: "dim-label",
                             set_wrap: true,
                             set_justify: gtk::Justification::Center,
                         },
@@ -306,6 +312,12 @@ impl Component for NowPlaying {
         let elapsed = &model.elapsed;
         let remaining = &model.remaining;
         let queue_list = &model.queue_list;
+        // The cover opens the album's page too.
+        let click = gtk::GestureClick::new();
+        let input = sender.input_sender().clone();
+        click.connect_released(move |_, _, _, _| input.emit(NowPlayingMsg::OpenAlbum));
+        model.cover.add_controller(click);
+        model.cover.set_cursor_from_name(Some("pointer"));
         let widgets = view_output!();
         // The pane scrolls over its sliders, rather than the wheel seeking or changing the volume.
         scroll_past(&model.progress);
@@ -372,6 +384,11 @@ impl Component for NowPlaying {
                     Settings::update(|settings| settings.volume = volume);
                 }
             }
+            NowPlayingMsg::OpenAlbum => {
+                if let Some(album) = &self.status.album {
+                    let _ = sender.output(NowPlayingOutput::OpenAlbum(Album::clone(album)));
+                }
+            }
         }
     }
 }
@@ -382,14 +399,23 @@ impl NowPlaying {
     }
 
     /// The track's performer, or the album's artist.
+    /// The album's artist: the tracks' own performers are in the list.
     fn artist(&self) -> String {
         self.status
-            .track()
-            .and_then(|track| track.performer.as_ref())
-            .map(|performer| performer.name.clone())
-            .or_else(|| {
-                let album = self.status.album.as_ref()?;
-                Some(album.artist.name.clone())
+            .album
+            .as_ref()
+            .map(|album| album.artist.name.clone())
+            .unwrap_or_default()
+    }
+
+    /// The album's title, as a link to its page.
+    fn album_link(&self) -> String {
+        self.status
+            .album
+            .as_ref()
+            .map(|album| {
+                let title = glib::markup_escape_text(&album.full_title());
+                format!("<a href=\"album\">{title}</a>")
             })
             .unwrap_or_default()
     }

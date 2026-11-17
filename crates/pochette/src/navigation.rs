@@ -59,6 +59,28 @@ enum Page {
     Search(Controller<SearchPage>),
 }
 
+/// What a page shows, to tell when what's opened is already shown.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Shows {
+    Album(String),
+    Artist(u64),
+    Releases(u64, ReleaseKind),
+    Search,
+}
+
+impl Destination {
+    fn shows(&self) -> Shows {
+        match self {
+            Self::Album(album) => Shows::Album(album.id.clone()),
+            Self::Artist { id, .. } => Shows::Artist(*id),
+            Self::Releases {
+                artist_id, kind, ..
+            } => Shows::Releases(*artist_id, *kind),
+            Self::Search(_) => Shows::Search,
+        }
+    }
+}
+
 impl Page {
     fn widget(&self) -> gtk::Widget {
         match self {
@@ -73,7 +95,7 @@ impl Page {
 pub struct Navigator {
     /// The tab's own page, named "home", then the pages opened.
     stack: gtk::Stack,
-    pages: Vec<Page>,
+    pages: Vec<(Shows, Page)>,
     /// Pages gone back from, still in the stack until the slide away from them ends.
     leaving: Vec<Page>,
     client: Option<Client>,
@@ -134,7 +156,8 @@ impl Navigator {
 
     /// Back to the tab's own page, closing all the others.
     pub fn home(&mut self) {
-        self.leaving.append(&mut self.pages);
+        self.leaving
+            .extend(self.pages.drain(..).map(|(_, page)| page));
         self.stack.set_visible_child_name("home");
         self.settle_unless_sliding();
     }
@@ -155,6 +178,11 @@ impl Navigator {
         let Some(client) = self.client.clone() else {
             return;
         };
+        // Clicked again, or twice: it's shown already.
+        let shows = destination.shows();
+        if self.pages.last().is_some_and(|(shown, _)| *shown == shows) {
+            return;
+        }
         let page = match destination {
             Destination::Album(album) => {
                 let page = AlbumPage::builder()
@@ -200,22 +228,23 @@ impl Navigator {
         let widget = page.widget();
         self.stack.add_child(&widget);
         self.stack.set_visible_child(&widget);
-        self.pages.push(page);
+        self.pages.push((shows, page));
     }
 
     /// Search the catalog for `query`, in results at the bottom of the pages: back to them
     /// if they're there, from whatever was opened from them, or opened.
     pub fn search(&mut self, query: String) {
         let results = match self.pages.first() {
-            Some(Page::Search(page)) => Some(page.sender().clone()),
+            Some((_, Page::Search(page))) => Some(page.sender().clone()),
             _ => None,
         };
         match (results, self.client.clone()) {
             (Some(results), Some(client)) => {
                 results.emit(SearchPageMsg::Show { client, query });
                 if self.pages.len() > 1 {
-                    self.leaving.extend(self.pages.drain(1..));
-                    self.stack.set_visible_child(&self.pages[0].widget());
+                    self.leaving
+                        .extend(self.pages.drain(1..).map(|(_, page)| page));
+                    self.stack.set_visible_child(&self.pages[0].1.widget());
                     self.settle_unless_sliding();
                 }
             }
@@ -231,12 +260,12 @@ impl Navigator {
 
     /// Back to the page under the one shown.
     fn back(&mut self) {
-        let Some(page) = self.pages.pop() else {
+        let Some((_, page)) = self.pages.pop() else {
             return;
         };
         self.leaving.push(page);
         match self.pages.last() {
-            Some(under) => self.stack.set_visible_child(&under.widget()),
+            Some((_, under)) => self.stack.set_visible_child(&under.widget()),
             None => self.stack.set_visible_child_name("home"),
         }
         self.settle_unless_sliding();
