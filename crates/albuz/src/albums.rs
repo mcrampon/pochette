@@ -55,7 +55,6 @@ pub struct AlbumsPage {
     genre_picker: Checklist,
     decade_picker: Checklist,
     sort_menu: gtk::DropDown,
-    scroller: Option<gtk::ScrolledWindow>,
     client: Option<Client>,
     player: Player,
     favorites: Favorites,
@@ -322,7 +321,6 @@ impl Component for AlbumsPage {
             genre_picker: Checklist::new("Genres"),
             decade_picker: Checklist::new("Decades"),
             sort_menu,
-            scroller: None,
             client: None,
             album_page: AlbumPage::builder()
                 .launch((player.clone(), favorites.clone()))
@@ -376,7 +374,6 @@ impl Component for AlbumsPage {
             });
         });
         model.covers.attach(&widgets.scroller);
-        model.scroller = Some(widgets.scroller.clone());
         ComponentParts { model, widgets }
     }
 
@@ -650,8 +647,12 @@ impl AlbumsPage {
     /// Show the albums the search and filters let through, from the top.
     fn show_albums(&mut self) {
         self.refilter();
-        if let Some(scroller) = &self.scroller {
-            scroller.vadjustment().set_value(0.0);
+        // Through the grid, not its scrollbar: the grid keeps an album in view across
+        // changes, and would scroll back to it, further down at each change.
+        if self.shown > 0 {
+            self.grid
+                .view
+                .scroll_to(0, gtk::ListScrollFlags::NONE, None);
         }
     }
 
