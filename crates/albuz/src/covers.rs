@@ -205,6 +205,10 @@ impl VisibleCovers {
         // Resizing, or the content changing.
         let this = self.clone();
         adjustment.connect_changed(move |_| this.schedule_check());
+        // Coming back on screen, as when switching tabs: the grid may have changed while
+        // hidden, and nothing else would check it again before the next scroll.
+        let this = self.clone();
+        viewport.connect_map(move |_| this.schedule_check());
     }
 
     /// Show the cover at `url` in `picture` once it's near the screen.
@@ -242,8 +246,9 @@ impl VisibleCovers {
         };
         #[expect(clippy::cast_precision_loss, reason = "screen sizes are small")]
         let screen = viewport.height() as f32;
-        if screen <= 0.0 {
-            // Not shown yet; resizing will check again.
+        // Not shown yet, or hidden, as in another tab: its tiles aren't laid out, so they'd
+        // all look far away and lose their covers. Showing it checks again.
+        if screen <= 0.0 || !viewport.is_mapped() {
             return;
         }
 
