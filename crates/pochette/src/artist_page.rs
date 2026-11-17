@@ -165,7 +165,6 @@ impl Component for ArtistPage {
                             set_xalign: 0.0,
                             set_wrap: true,
                             set_wrap_mode: pango::WrapMode::WordChar,
-                            set_selectable: true,
                             add_css_class: "pochette-album-page-title",
                         },
                         gtk::Label {
@@ -185,7 +184,6 @@ impl Component for ArtistPage {
                             set_wrap: true,
                             set_max_width_chars: 90,
                             set_margin_top: 6,
-                            set_selectable: true,
                             add_css_class: "pochette-review",
                         },
                         gtk::Button {

@@ -265,7 +265,6 @@ impl LyricsView {
                     .label(text)
                     .wrap(true)
                     .justify(gtk::Justification::Center)
-                    .selectable(true)
                     .margin_top(12)
                     .margin_bottom(12)
                     .css_classes(["pochette-lyrics-plain"])

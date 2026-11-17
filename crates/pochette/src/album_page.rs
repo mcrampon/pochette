@@ -194,7 +194,6 @@ impl Component for AlbumPage {
                                 set_xalign: 0.0,
                                 set_wrap: true,
                                 set_wrap_mode: pango::WrapMode::WordChar,
-                                set_selectable: true,
                                 add_css_class: "pochette-album-page-title",
                             },
                             // A link to the artist's page.
@@ -299,7 +298,6 @@ impl Component for AlbumPage {
                             set_label: &model.review(),
                             set_xalign: 0.0,
                             set_wrap: true,
-                            set_selectable: true,
                             add_css_class: "pochette-review",
                         },
                     },
