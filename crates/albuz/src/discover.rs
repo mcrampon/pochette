@@ -729,13 +729,7 @@ fn row(
             covers,
             favorites,
         );
-        let button = gtk::Button::builder()
-            .child(&tile)
-            .css_classes(["flat", "albuz-row-tile"])
-            .build();
-        let sender = sender.clone();
-        button.connect_clicked(move |_| sender.input(DiscoverMsg::OpenRowAlbum(section, index)));
-        strip.append(&button);
+        strip.append(&row_tile(&tile, sender, section, index));
         tiles.push(widgets);
     }
     let scroller = gtk::ScrolledWindow::builder()
@@ -785,4 +779,52 @@ fn row(
     row.append(&header);
     row.append(&scroller);
     (row, tiles)
+}
+
+/// `tile` in a row, opening the album at `index` in the row of `section` with a click or
+/// Enter.
+///
+/// Not a button: a button would take the clicks meant for the heart over the cover.
+fn row_tile(
+    tile: &gtk::Box,
+    sender: &ComponentSender<DiscoverPage>,
+    section: Section,
+    index: usize,
+) -> gtk::Box {
+    let item = gtk::Box::builder()
+        .css_classes(["albuz-row-tile"])
+        .focusable(true)
+        .build();
+    item.append(tile);
+
+    // The heart claims its clicks, so this one only sees those elsewhere on the tile.
+    let click = gtk::GestureClick::new();
+    click.set_button(gtk::gdk::BUTTON_PRIMARY);
+    let click_sender = sender.clone();
+    click.connect_released(move |gesture, _, x, y| {
+        // A click on the heart, or any other button on the tile, isn't one to open.
+        let on_button = gesture
+            .widget()
+            .and_then(|item| item.pick(x, y, gtk::PickFlags::DEFAULT))
+            .is_some_and(|target| {
+                target.is::<gtk::Button>() || target.ancestor(gtk::Button::static_type()).is_some()
+            });
+        if !on_button {
+            click_sender.input(DiscoverMsg::OpenRowAlbum(section, index));
+        }
+    });
+    item.add_controller(click);
+
+    let keys = gtk::EventControllerKey::new();
+    let sender = sender.clone();
+    keys.connect_key_pressed(move |_, key, _, _| {
+        if matches!(key, gtk::gdk::Key::Return | gtk::gdk::Key::KP_Enter) {
+            sender.input(DiscoverMsg::OpenRowAlbum(section, index));
+            glib::Propagation::Stop
+        } else {
+            glib::Propagation::Proceed
+        }
+    });
+    item.add_controller(keys);
+    item
 }

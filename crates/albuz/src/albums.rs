@@ -448,16 +448,25 @@ impl Component for AlbumsPage {
             | AlbumsMsg::ClearFilters) => self.change_view(msg),
 
             AlbumsMsg::FavoriteChanged { album, added } => {
-                if added && !self.entries.iter().any(|entry| entry.album.id == album.id) {
+                let known = self.entries.iter().any(|entry| entry.album.id == album.id);
+                if added && !known {
                     let mut album = *album;
-                    album.favorited_at = Some(unix_time());
+                    // Back where it was if Qobuz refused to remove it, at the top if new.
+                    album.favorited_at.get_or_insert_with(unix_time);
                     self.entries.push(Entry::new(album));
+                    self.state = State::Loaded;
                     self.fill_filters();
                     self.fill_grid();
-                    self.show_albums();
+                    self.refilter();
+                } else if !added && known {
+                    // Out of the library, so out of sight, wherever it was removed from.
+                    self.entries.retain(|entry| entry.album.id != album.id);
+                    if self.entries.is_empty() {
+                        self.state = State::Empty;
+                    }
+                    self.fill_filters();
+                    self.refilter();
                 }
-                // An album removed stays until the albums load again, its heart empty, so
-                // that a click by mistake is one click to undo.
             }
             AlbumsMsg::PlayRandom => self.play_random(&sender),
             AlbumsMsg::RandomLoaded(result) => {
@@ -624,8 +633,16 @@ impl AlbumsPage {
         self.grid.sort(|a, b| rank(a).cmp(&rank(b)));
     }
 
-    /// Show the albums the search and filters let through.
+    /// Show the albums the search and filters let through, from the top.
     fn show_albums(&mut self) {
+        self.refilter();
+        if let Some(scroller) = &self.scroller {
+            scroller.vadjustment().set_value(0.0);
+        }
+    }
+
+    /// Show the albums the search and filters let through, staying where the grid was.
+    fn refilter(&mut self) {
         let shown = self.view.apply(&self.entries);
         self.shown = shown.len();
         *self.visible.borrow_mut() = shown
@@ -633,9 +650,6 @@ impl AlbumsPage {
             .map(|entry| entry.album.id.clone())
             .collect();
         self.grid.notify_filter_changed(0);
-        if let Some(scroller) = &self.scroller {
-            scroller.vadjustment().set_value(0.0);
-        }
     }
 
     fn play_random(&mut self, sender: &ComponentSender<Self>) {

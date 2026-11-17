@@ -159,6 +159,16 @@ label {
   border-radius: 12px;
 }
 
+/* Row tiles aren't buttons, so they get the hover and focus looks of one here. */
+.albuz-row-tile:hover {
+  background-color: alpha(currentColor, 0.07);
+}
+
+.albuz-row-tile:focus-visible {
+  outline: 2px solid alpha(@accent_color, 0.6);
+  outline-offset: -2px;
+}
+
 /* The heart over a cover, which adds the album to the favorites or removes it. It shows
    when the pointer is over the tile or cover, or when it has the keyboard focus. */
 .albuz-heart {
