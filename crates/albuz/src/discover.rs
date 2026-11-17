@@ -22,6 +22,7 @@ use crate::{
     covers::VisibleCovers,
     genre_picker::GenrePicker,
     player::Player,
+    settings::Settings,
 };
 
 /// The sections, in the order they're shown.
@@ -329,7 +330,7 @@ impl Component for DiscoverPage {
             page: Page::Home,
             error: String::new(),
             genres: Vec::new(),
-            genre_ids: Vec::new(),
+            genre_ids: Settings::load().discover_genres,
             genre_picker: GenrePicker::new(),
             rows: gtk::Box::default(),
             row_albums: Vec::new(),
@@ -395,19 +396,13 @@ impl Component for DiscoverPage {
                     task.abort();
                 }
                 self.client = None;
-                self.genre_ids.clear();
                 self.fill_rows(&sender, &Discover::default());
                 self.home = Home::Loading;
                 self.close_section();
                 self.page = Page::Home;
             }
             DiscoverMsg::Reload => self.load_home(&sender),
-            DiscoverMsg::GenresLoaded(Ok(genres)) => {
-                self.genres = genres;
-                let names: Vec<String> =
-                    self.genres.iter().map(|genre| genre.name.clone()).collect();
-                self.genre_picker.set_choices(&names, &[]);
-            }
+            DiscoverMsg::GenresLoaded(Ok(genres)) => self.offer_genres(genres, &sender),
             DiscoverMsg::GenresLoaded(Err(err)) => Self::failed(&sender, "the genres", &err),
             // Sections of another genre, or of a user who signed out meanwhile.
             DiscoverMsg::Loaded { genre_ids, .. }
@@ -433,7 +428,8 @@ impl Component for DiscoverPage {
                     .map(|genre| genre.id)
                     .collect();
                 if genre_ids != self.genre_ids {
-                    self.genre_ids = genre_ids;
+                    self.genre_ids.clone_from(&genre_ids);
+                    Settings::update(|settings| settings.discover_genres = genre_ids);
                     self.load_home(&sender);
                     if let Some(section) = self.section {
                         self.open_section(section);
@@ -533,6 +529,26 @@ impl DiscoverPage {
             }
             // Not about the section.
             _ => {}
+        }
+    }
+
+    /// Offer `genres` to pick from, with the saved ones checked.
+    fn offer_genres(&mut self, genres: Vec<Genre>, sender: &ComponentSender<Self>) {
+        self.genres = genres;
+        let names: Vec<String> = self.genres.iter().map(|genre| genre.name.clone()).collect();
+        let picked: Vec<usize> = self
+            .genres
+            .iter()
+            .enumerate()
+            .filter(|(_, genre)| self.genre_ids.contains(&genre.id))
+            .map(|(index, _)| index)
+            .collect();
+        self.genre_picker.set_choices(&names, &picked);
+        // Saved genres Qobuz no longer has.
+        if picked.len() != self.genre_ids.len() {
+            let known: Vec<u64> = picked.iter().map(|&index| self.genres[index].id).collect();
+            self.genre_ids = known;
+            self.load_home(sender);
         }
     }
 

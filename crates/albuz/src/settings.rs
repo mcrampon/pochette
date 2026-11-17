@@ -12,6 +12,10 @@ pub struct Settings {
     pub volume: f64,
     /// The now playing pane's width next to the library, in logical pixels.
     pub pane_width: i32,
+    /// The genres picked in the Albums tab, by name: they come from the albums.
+    pub album_genres: Vec<String>,
+    /// The genres picked in the Discover tab, by Qobuz id.
+    pub discover_genres: Vec<u64>,
 }
 
 impl Default for Settings {
@@ -19,6 +23,8 @@ impl Default for Settings {
         Self {
             volume: 1.0,
             pane_width: 360,
+            album_genres: Vec::new(),
+            discover_genres: Vec::new(),
         }
     }
 }

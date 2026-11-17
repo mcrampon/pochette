@@ -24,6 +24,7 @@ use crate::{
     genre_picker::GenrePicker,
     library::{self, Entry, Sort, View},
     player::Player,
+    settings::Settings,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -286,7 +287,10 @@ impl Component for AlbumsPage {
         let mut model = Self {
             state: State::Loading,
             entries: Vec::new(),
-            view: View::default(),
+            view: View {
+                genres: Settings::load().album_genres,
+                ..View::default()
+            },
             genres: Vec::new(),
             decades: Vec::new(),
             shown: 0,
@@ -453,7 +457,8 @@ impl AlbumsPage {
                     .filter_map(|index| self.genres.get(index).cloned())
                     .collect();
                 if genres != self.view.genres {
-                    self.view.genres = genres;
+                    self.view.genres.clone_from(&genres);
+                    Settings::update(|settings| settings.album_genres = genres);
                     self.show_albums();
                 }
             }
