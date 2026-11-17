@@ -24,6 +24,7 @@ use crate::{
     playback::CoverActions,
     player::Player,
     settings::Settings,
+    tile_strip::TileStrip,
 };
 
 /// The sections, in the order they're shown.
@@ -706,14 +707,14 @@ fn caption(section: Section, album: &Album) -> Option<String> {
         .flatten()
 }
 
-/// A section's row: its title and buttons, then its albums side by side.
+/// A section's row: its title and "See All", then as many of its albums as fit side by side.
 fn row(
     section: Section,
     albums: &[Rc<Album>],
     (covers, actions): (&VisibleCovers, &CoverActions),
     sender: &ComponentSender<DiscoverPage>,
 ) -> (gtk::Box, Vec<AlbumWidgets>) {
-    let strip = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    let strip = TileStrip::default();
     strip.set_margin_start(24);
     strip.set_margin_end(24);
     let mut tiles = Vec::new();
@@ -723,31 +724,11 @@ fn row(
         strip.append(&row_tile(&tile, sender, section, index));
         tiles.push(widgets);
     }
-    let scroller = gtk::ScrolledWindow::builder()
-        .hscrollbar_policy(gtk::PolicyType::Automatic)
-        .vscrollbar_policy(gtk::PolicyType::Never)
-        .child(&strip)
-        .build();
-
     let heading = gtk::Label::builder()
         .label(title(section))
         .xalign(0.0)
-        .hexpand(true)
         .css_classes(["pochette-heading"])
         .build();
-    let scroll_button = |icon: &str, tooltip: &str, direction: f64| {
-        let button = gtk::Button::builder()
-            .icon_name(icon)
-            .tooltip_text(tooltip)
-            .css_classes(["flat", "circular"])
-            .build();
-        let adjustment = scroller.hadjustment();
-        button.connect_clicked(move |_| {
-            let step = adjustment.page_size() * 0.8;
-            adjustment.set_value(adjustment.value() + direction * step);
-        });
-        button
-    };
     let see_all = gtk::Button::builder()
         .label("See All")
         .css_classes(["flat"])
@@ -762,13 +743,11 @@ fn row(
         .margin_end(36)
         .build();
     header.append(&heading);
-    header.append(&scroll_button("go-previous-symbolic", "Scroll Back", -1.0));
-    header.append(&scroll_button("go-next-symbolic", "Scroll On", 1.0));
     header.append(&see_all);
 
     let row = gtk::Box::new(gtk::Orientation::Vertical, 6);
     row.append(&header);
-    row.append(&scroller);
+    row.append(&strip);
     (row, tiles)
 }
 

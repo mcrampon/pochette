@@ -34,9 +34,6 @@ const SCRUB_DELAY: Duration = Duration::from_millis(200);
 /// a moment to land.
 const SEEK_SETTLE: Duration = Duration::from_millis(800);
 
-/// How much one notch of the mouse wheel changes the volume.
-const VOLUME_STEP: f64 = 0.05;
-
 /// How long the volume must stay put before it is saved, so dragging the slider doesn't
 /// write the settings at every step.
 const VOLUME_SAVE_DELAY: Duration = Duration::from_millis(500);
@@ -231,6 +228,7 @@ impl Component for NowPlaying {
                                 set_icon_name: Some("audio-volume-low-symbolic"),
                                 add_css_class: "dim-label",
                             },
+                            #[name = "volume"]
                             gtk::Scale::with_range(gtk::Orientation::Horizontal, 0.0, 1.0, 0.05) {
                                 set_hexpand: true,
                                 set_draw_value: false,
@@ -238,16 +236,6 @@ impl Component for NowPlaying {
                                 set_value: model.player.volume(),
                                 connect_value_changed[sender] => move |scale| {
                                     sender.input(NowPlayingMsg::Volume(scale.value()));
-                                },
-                                // GTK's own step is far too big on so short a range.
-                                add_controller = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL) {
-                                    set_propagation_phase: gtk::PropagationPhase::Capture,
-                                    connect_scroll => move |controller, _, dy| {
-                                        if let Some(scale) = controller.widget().and_downcast::<gtk::Scale>() {
-                                            scale.set_value((scale.value() - dy * VOLUME_STEP).clamp(0.0, 1.0));
-                                        }
-                                        glib::Propagation::Stop
-                                    },
                                 },
                             },
                             gtk::Image {
@@ -319,6 +307,9 @@ impl Component for NowPlaying {
         let remaining = &model.remaining;
         let queue_list = &model.queue_list;
         let widgets = view_output!();
+        // The pane scrolls over its sliders, rather than the wheel seeking or changing the volume.
+        scroll_past(&model.progress);
+        scroll_past(&widgets.volume);
         ComponentParts { model, widgets }
     }
 
@@ -531,4 +522,19 @@ fn tick(sender: &ComponentSender<NowPlaying>) {
             glib::ControlFlow::Break
         }
     });
+}
+
+/// Let the mouse wheel over `scale` scroll what's around it instead of moving the scale.
+///
+/// GTK gives every range a scroll controller that takes the wheel for itself; without it,
+/// the scroll goes on to the scrolled window above.
+fn scroll_past(scale: &gtk::Scale) {
+    let controllers = scale.observe_controllers();
+    // Collected first, as removing them changes the list.
+    let scrolls: Vec<gtk::EventControllerScroll> = (0..controllers.n_items())
+        .filter_map(|index| controllers.item(index).and_downcast())
+        .collect();
+    for scroll in &scrolls {
+        scale.remove_controller(scroll);
+    }
 }

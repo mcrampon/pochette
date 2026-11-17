@@ -20,6 +20,7 @@ mod player;
 mod session_store;
 mod settings;
 mod split_view;
+mod tile_strip;
 
 use tracing_subscriber::EnvFilter;
 
