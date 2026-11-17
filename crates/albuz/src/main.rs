@@ -14,6 +14,7 @@ mod format;
 mod genre_picker;
 mod library;
 mod now_playing;
+mod playback;
 mod player;
 mod session_store;
 mod settings;

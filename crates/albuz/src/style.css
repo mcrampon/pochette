@@ -189,7 +189,18 @@ label {
   color: #ff5f78;
 }
 
-.albuz-hearted:hover .albuz-heart,
+.albuz-cover-hover:hover .albuz-heart,
+.albuz-cover-hover:hover .albuz-cover-play,
+.albuz-cover-play:focus-visible,
 .albuz-heart:focus-visible {
   opacity: 1;
+}
+
+/* The play button over a cover, which shows with the heart. */
+.albuz-cover-play {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 120ms ease-out;
 }

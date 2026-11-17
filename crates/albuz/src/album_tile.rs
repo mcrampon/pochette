@@ -1,5 +1,5 @@
-//! An album as a tile: its cover, with a heart on hover, then its title and artist, and
-//! maybe a caption. In grids, and in the rows of the Discover tab.
+//! An album as a tile: its cover, with play and heart buttons on hover, then its title and
+//! artist, and maybe a caption. In grids, and in the rows of the Discover tab.
 
 use std::rc::Rc;
 
@@ -11,7 +11,8 @@ use relm4::{
 
 use crate::{
     covers::VisibleCovers,
-    favorites::{Favorites, Heart, with_heart},
+    favorites::{Heart, with_heart},
+    playback::{CoverActions, PlayButton},
 };
 
 /// The side of a cover, in logical pixels.
@@ -23,12 +24,13 @@ pub struct AlbumItem {
     /// A line under the artist, such as the album's awards.
     pub caption: Option<String>,
     pub covers: VisibleCovers,
-    pub favorites: Favorites,
+    pub actions: CoverActions,
 }
 
 pub struct AlbumWidgets {
     cover: gtk::Picture,
     heart: Heart,
+    play: PlayButton,
     title: gtk::Label,
     artist: gtk::Label,
     caption: gtk::Label,
@@ -45,6 +47,8 @@ pub fn tile() -> (gtk::Box, AlbumWidgets) {
         .build();
     let heart = Heart::new();
     let cover_box = with_heart(&cover, &heart);
+    let play = PlayButton::new();
+    cover_box.add_overlay(play.widget());
 
     relm4::view! {
         root = gtk::Box {
@@ -54,8 +58,8 @@ pub fn tile() -> (gtk::Box, AlbumWidgets) {
             set_halign: gtk::Align::Center,
             set_valign: gtk::Align::Start,
             set_cursor_from_name: Some("pointer"),
-            // The heart shows when the pointer is anywhere on the tile.
-            add_css_class: "albuz-hearted",
+            // The buttons over the cover show when the pointer is anywhere on the tile.
+            add_css_class: "albuz-cover-hover",
 
             append: &cover_box,
             #[name = "title"]
@@ -87,6 +91,7 @@ pub fn tile() -> (gtk::Box, AlbumWidgets) {
     let widgets = AlbumWidgets {
         cover,
         heart,
+        play,
         title,
         artist,
         caption,
@@ -101,7 +106,7 @@ impl AlbumWidgets {
         album: &Rc<Album>,
         caption: Option<&str>,
         covers: &VisibleCovers,
-        favorites: &Favorites,
+        actions: &CoverActions,
     ) {
         let title = album.full_title();
         self.title.set_label(&title);
@@ -114,7 +119,8 @@ impl AlbumWidgets {
             .collect::<Vec<_>>()
             .join("\n");
         root.set_tooltip_text(Some(&tooltip));
-        self.heart.show(Some(album.clone()), favorites);
+        self.heart.show(Some(album.clone()), &actions.favorites);
+        self.play.show(Some(album.clone()), &actions.playback);
 
         match cover_url(album, self.cover.scale_factor()) {
             Some(url) => covers.show(&self.cover, url),
@@ -125,6 +131,7 @@ impl AlbumWidgets {
     pub fn hide(&self, covers: &VisibleCovers) {
         covers.hide(&self.cover);
         self.heart.clear();
+        self.play.clear();
     }
 }
 
@@ -142,7 +149,7 @@ impl RelmGridItem for AlbumItem {
             &self.album,
             self.caption.as_deref(),
             &self.covers,
-            &self.favorites,
+            &self.actions,
         );
     }
 

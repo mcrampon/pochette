@@ -24,6 +24,7 @@ use crate::{
     favorites::Favorites,
     genre_picker::GenrePicker,
     library::{self, Entry, Sort, View},
+    playback::CoverActions,
     player::Player,
     settings::Settings,
 };
@@ -58,6 +59,8 @@ pub struct AlbumsPage {
     client: Option<Client>,
     player: Player,
     favorites: Favorites,
+    /// What the buttons over the covers do.
+    actions: CoverActions,
     error: String,
     task: Option<JoinHandle<()>>,
     /// Fetching the tracks of the album picked at random.
@@ -107,7 +110,7 @@ pub enum AlbumsOutput {
 
 #[relm4::component(pub)]
 impl Component for AlbumsPage {
-    type Init = (Player, Favorites);
+    type Init = (Player, CoverActions);
     type Input = AlbumsMsg;
     type Output = AlbumsOutput;
     type CommandOutput = ();
@@ -286,10 +289,11 @@ impl Component for AlbumsPage {
     }
 
     fn init(
-        (player, favorites): (Player, Favorites),
+        (player, actions): (Player, CoverActions),
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
+        let favorites = actions.favorites.clone();
         let sort_labels: Vec<&str> = Sort::ALL.iter().map(|sort| sort.label()).collect();
         let settings = Settings::load();
         let sort_menu = dropdown(&sort_labels);
@@ -330,6 +334,7 @@ impl Component for AlbumsPage {
                 }),
             player,
             favorites,
+            actions,
             error: String::new(),
             task: None,
             random: None,
@@ -616,7 +621,7 @@ impl AlbumsPage {
                 album: entry.album.clone(),
                 caption: None,
                 covers: self.covers.clone(),
-                favorites: self.favorites.clone(),
+                actions: self.actions.clone(),
             }));
     }
 

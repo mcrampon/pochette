@@ -203,7 +203,7 @@ impl Heart {
 pub fn with_heart(child: &impl IsA<gtk::Widget>, heart: &Heart) -> gtk::Overlay {
     let overlay = gtk::Overlay::builder()
         .child(child)
-        .css_classes(["albuz-hearted"])
+        .css_classes(["albuz-cover-hover"])
         .build();
     overlay.add_overlay(heart.widget());
     overlay

@@ -15,6 +15,7 @@ use crate::{
     discover::{DiscoverMsg, DiscoverOutput, DiscoverPage},
     favorites::Favorites,
     now_playing::NowPlaying,
+    playback::{CoverActions, Playback},
     player::{Player, State},
     session_store::SessionStore,
     settings::Settings,
@@ -51,6 +52,8 @@ pub struct App {
     player: Player,
     /// The albums in the user's library, which hearts add and remove.
     favorites: Favorites,
+    /// Plays albums from the buttons over their covers.
+    playback: Playback,
     /// Whether something is playing or paused.
     playing: bool,
     /// Whether the user wants the now playing pane, while something plays.
@@ -286,6 +289,11 @@ impl Component for App {
     fn init((): (), root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let player = Player::new().expect("GStreamer and its playbin are installed");
         let favorites = Favorites::default();
+        let playback = Playback::new(player.clone());
+        let actions = CoverActions {
+            favorites: favorites.clone(),
+            playback: playback.clone(),
+        };
         let settings = Settings::load();
         player.set_volume(settings.volume);
         finish_playback_before_closing(&root, &player);
@@ -299,12 +307,12 @@ impl Component for App {
             sign_in_url: None,
             task: None,
             albums: AlbumsPage::builder()
-                .launch((player.clone(), favorites.clone()))
+                .launch((player.clone(), actions.clone()))
                 .forward(sender.input_sender(), |output| match output {
                     AlbumsOutput::SessionExpired => Msg::SessionExpired,
                 }),
             discover: DiscoverPage::builder()
-                .launch((player.clone(), favorites.clone()))
+                .launch((player.clone(), actions.clone()))
                 .forward(sender.input_sender(), |output| match output {
                     DiscoverOutput::SessionExpired => Msg::SessionExpired,
                 }),
@@ -313,6 +321,7 @@ impl Component for App {
                 .detach(),
             player,
             favorites,
+            playback,
             playing: false,
             pane_open: false,
             collapsed: false,
@@ -477,6 +486,7 @@ impl App {
     fn signed_in(&mut self, account: Account) {
         tracing::info!("signed in as user {}", account.user.id);
         self.favorites.reset(Some(account.client.clone()), []);
+        self.playback.set_client(Some(account.client.clone()));
         self.albums.emit(AlbumsMsg::Show(account.client.clone()));
         self.discover
             .emit(DiscoverMsg::Show(account.client.clone()));
@@ -490,6 +500,7 @@ impl App {
         self.account = None;
         self.player.stop();
         self.favorites.reset(None, []);
+        self.playback.set_client(None);
         self.albums.emit(AlbumsMsg::Clear);
         self.discover.emit(DiscoverMsg::Clear);
         self.screen = Screen::SignedOut;
