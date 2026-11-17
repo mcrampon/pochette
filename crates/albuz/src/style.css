@@ -148,3 +148,13 @@
 label {
   caret-color: transparent;
 }
+
+.albuz-tile-caption {
+  font-size: 0.85em;
+  color: @accent_color;
+}
+
+.albuz-row-tile {
+  padding: 12px;
+  border-radius: 12px;
+}

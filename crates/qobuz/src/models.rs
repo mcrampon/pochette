@@ -102,6 +102,9 @@ pub struct Album {
     /// The Qobuz review, in HTML. Only from `album/get`, and often empty.
     pub description: Option<String>,
     pub copyright: Option<String>,
+    /// Prizes from Qobuz and the press: "Qobuzissime", "4F de Télérama"…
+    #[serde(default)]
+    pub awards: Vec<Award>,
     /// Only from `album/get`.
     pub tracks: Option<Page<Track>>,
 }
@@ -140,6 +143,11 @@ pub struct AlbumImage {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Genre {
     pub id: u64,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Award {
     pub name: String,
 }
 

@@ -12,6 +12,7 @@ use tokio::task::JoinHandle;
 use crate::{
     account::{self, Account},
     albums::{AlbumsMsg, AlbumsOutput, AlbumsPage},
+    discover::{DiscoverMsg, DiscoverOutput, DiscoverPage},
     now_playing::NowPlaying,
     player::{Player, State},
     session_store::SessionStore,
@@ -44,6 +45,7 @@ pub struct App {
     /// The start-up check or the sign-in in progress.
     task: Option<JoinHandle<()>>,
     albums: Controller<AlbumsPage>,
+    discover: Controller<DiscoverPage>,
     now_playing: Controller<NowPlaying>,
     player: Player,
     /// Whether something is playing or paused.
@@ -260,23 +262,9 @@ impl Component for App {
                         set_content = &gtk::Stack {
                         set_transition_type: gtk::StackTransitionType::Crossfade,
 
-                        add_titled[Some("discover"), "Discover"] = &gtk::Box {
-                            set_orientation: gtk::Orientation::Vertical,
-                            set_spacing: 12,
-                            set_halign: gtk::Align::Center,
-                            set_valign: gtk::Align::Center,
-
-                            gtk::Label {
-                                set_label: "Discover",
-                                add_css_class: "albuz-heading",
-                            },
-                            gtk::Label {
-                                set_label: "New releases and picks from Qobuz will show up here.",
-                                add_css_class: "dim-label",
-                            },
-                        },
+                        add_titled: (model.discover.widget(), Some("discover"), "Discover"),
                         add_titled: (model.albums.widget(), Some("albums"), "Albums"),
-                        // Discover is empty for now.
+                        // The library first: Discover is for when there's time to explore.
                         set_visible_child_name: "albums",
                         connect_visible_child_notify => Msg::LibraryShown,
                         },
@@ -310,6 +298,12 @@ impl Component for App {
                 sender.input_sender(),
                 |output| match output {
                     AlbumsOutput::SessionExpired => Msg::SessionExpired,
+                },
+            ),
+            discover: DiscoverPage::builder().launch(player.clone()).forward(
+                sender.input_sender(),
+                |output| match output {
+                    DiscoverOutput::SessionExpired => Msg::SessionExpired,
                 },
             ),
             now_playing: NowPlaying::builder().launch(player.clone()).detach(),
@@ -478,6 +472,8 @@ impl App {
     fn signed_in(&mut self, account: Account) {
         tracing::info!("signed in as user {}", account.user.id);
         self.albums.emit(AlbumsMsg::Show(account.client.clone()));
+        self.discover
+            .emit(DiscoverMsg::Show(account.client.clone()));
         self.account = Some(account);
         self.screen = Screen::SignedIn;
     }
@@ -488,6 +484,7 @@ impl App {
         self.account = None;
         self.player.stop();
         self.albums.emit(AlbumsMsg::Clear);
+        self.discover.emit(DiscoverMsg::Clear);
         self.screen = Screen::SignedOut;
         if let Some(store) = self.store.clone() {
             relm4::spawn(async move {

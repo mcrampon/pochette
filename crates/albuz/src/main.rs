@@ -2,10 +2,13 @@
 
 mod account;
 mod album_page;
+mod album_tile;
 mod albums;
 mod app;
 mod clamp;
 mod covers;
+mod discover;
+mod dropdown;
 mod format;
 mod library;
 mod now_playing;

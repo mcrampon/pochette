@@ -208,7 +208,7 @@ impl Client {
         read_json::<serde_json::Value>(response).await.map(drop)
     }
 
-    fn get(&self, endpoint: &str) -> RequestBuilder {
+    pub(crate) fn get(&self, endpoint: &str) -> RequestBuilder {
         self.http
             .get(format!("{API_URL}{endpoint}"))
             .header("X-App-Id", &self.session.app_id)

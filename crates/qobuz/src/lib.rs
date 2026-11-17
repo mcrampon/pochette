@@ -5,6 +5,7 @@
 
 pub mod auth;
 mod client;
+pub mod discover;
 mod error;
 pub mod models;
 mod web_player;

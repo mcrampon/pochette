@@ -1,28 +1,24 @@
 //! The Albums tab: the albums the user saved to their Qobuz favorites, to search, filter,
 //! sort, and play at random.
 
-use std::{
-    hash::{BuildHasher, RandomState},
-    rc::Rc,
-};
+use std::hash::{BuildHasher, RandomState};
 
 use qobuz::{Client, models::Album};
 use relm4::{
     Component, ComponentController, ComponentParts, ComponentSender, Controller,
-    gtk::{self, glib, pango, prelude::*},
-    typed_view::grid::{RelmGridItem, TypedGridView},
+    gtk::{self, glib, prelude::*},
+    typed_view::grid::TypedGridView,
 };
 use tokio::task::JoinHandle;
 
 use crate::{
     album_page::{AlbumPage, AlbumPageMsg, AlbumPageOutput},
+    album_tile::AlbumItem,
     covers::VisibleCovers,
+    dropdown::{dropdown, replace_choices},
     library::{self, Entry, Sort, View},
     player::Player,
 };
-
-/// The side of a cover in the grid, in logical pixels.
-const COVER_SIZE: i32 = 180;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum State {
@@ -518,6 +514,7 @@ impl AlbumsPage {
         self.grid
             .extend_from_iter(shown.into_iter().map(|entry| AlbumItem {
                 album: entry.album.clone(),
+                caption: None,
                 covers: self.covers.clone(),
             }));
         if let Some(scroller) = &self.scroller {
@@ -568,52 +565,6 @@ fn position<T: PartialEq>(choices: &[T], choice: Option<&T>) -> u32 {
         .unwrap_or(0)
 }
 
-/// A drop-down whose button shortens long choices, so it doesn't widen the toolbar.
-fn dropdown(choices: &[&str]) -> gtk::DropDown {
-    let dropdown = gtk::DropDown::new(Some(gtk::StringList::new(choices)), gtk::Expression::NONE);
-    dropdown.set_factory(Some(&label_factory(true)));
-    dropdown.set_list_factory(Some(&label_factory(false)));
-    dropdown
-}
-
-fn label_factory(shorten: bool) -> gtk::SignalListItemFactory {
-    let factory = gtk::SignalListItemFactory::new();
-    factory.connect_setup(move |_, item| {
-        let Some(item) = item.downcast_ref::<gtk::ListItem>() else {
-            return;
-        };
-        let label = gtk::Label::new(None);
-        label.set_xalign(0.0);
-        if shorten {
-            label.set_ellipsize(pango::EllipsizeMode::End);
-            label.set_max_width_chars(14);
-        }
-        item.set_child(Some(&label));
-    });
-    factory.connect_bind(|_, item| {
-        let Some(item) = item.downcast_ref::<gtk::ListItem>() else {
-            return;
-        };
-        let text = item
-            .item()
-            .and_downcast::<gtk::StringObject>()
-            .map(|choice| choice.string());
-        if let Some(label) = item.child().and_downcast::<gtk::Label>() {
-            label.set_label(text.as_deref().unwrap_or_default());
-        }
-    });
-    factory
-}
-
-fn replace_choices(dropdown: &gtk::DropDown, labels: &[String], selected: u32) {
-    let Some(list) = dropdown.model().and_downcast::<gtk::StringList>() else {
-        return;
-    };
-    let labels: Vec<&str> = labels.iter().map(String::as_str).collect();
-    list.splice(0, list.n_items(), &labels);
-    dropdown.set_selected(selected);
-}
-
 /// Ctrl+F searches the albums.
 fn add_search_shortcut(root: &gtk::Stack, sender: &ComponentSender<AlbumsPage>) {
     let sender = sender.clone();
@@ -627,91 +578,4 @@ fn add_search_shortcut(root: &gtk::Stack, sender: &ComponentSender<AlbumsPage>) 
         })),
     ));
     root.add_controller(shortcuts);
-}
-
-/// An album in the grid.
-struct AlbumItem {
-    album: Rc<Album>,
-    covers: VisibleCovers,
-}
-
-struct AlbumWidgets {
-    cover: gtk::Picture,
-    title: gtk::Label,
-    artist: gtk::Label,
-}
-
-impl RelmGridItem for AlbumItem {
-    type Root = gtk::Box;
-    type Widgets = AlbumWidgets;
-
-    fn setup(_item: &gtk::ListItem) -> (gtk::Box, AlbumWidgets) {
-        relm4::view! {
-            root = gtk::Box {
-                set_orientation: gtk::Orientation::Vertical,
-                set_spacing: 2,
-                set_width_request: COVER_SIZE,
-                set_halign: gtk::Align::Center,
-                set_cursor_from_name: Some("pointer"),
-
-                #[name = "cover"]
-                gtk::Picture {
-                    set_size_request: (COVER_SIZE, COVER_SIZE),
-                    set_content_fit: gtk::ContentFit::Cover,
-                    set_overflow: gtk::Overflow::Hidden,
-                    add_css_class: "albuz-cover",
-                },
-                #[name = "title"]
-                gtk::Label {
-                    set_xalign: 0.0,
-                    // Lets the label shrink to the tile instead of widening it.
-                    set_max_width_chars: 1,
-                    set_ellipsize: pango::EllipsizeMode::End,
-                    set_margin_top: 6,
-                    add_css_class: "albuz-album-title",
-                },
-                #[name = "artist"]
-                gtk::Label {
-                    set_xalign: 0.0,
-                    set_max_width_chars: 1,
-                    set_ellipsize: pango::EllipsizeMode::End,
-                    add_css_class: "dim-label",
-                },
-            }
-        }
-
-        let widgets = AlbumWidgets {
-            cover,
-            title,
-            artist,
-        };
-        (root, widgets)
-    }
-
-    fn bind(&mut self, widgets: &mut AlbumWidgets, root: &mut gtk::Box) {
-        let title = self.album.full_title();
-        widgets.title.set_label(&title);
-        widgets.artist.set_label(&self.album.artist.name);
-        root.set_tooltip_text(Some(&format!("{title}\n{}", self.album.artist.name)));
-
-        match cover_url(&self.album, widgets.cover.scale_factor()) {
-            Some(url) => self.covers.show(&widgets.cover, url),
-            None => self.covers.hide(&widgets.cover),
-        }
-    }
-
-    fn unbind(&mut self, widgets: &mut AlbumWidgets, _root: &mut gtk::Box) {
-        self.covers.hide(&widgets.cover);
-    }
-}
-
-/// The smallest cover that stays sharp at the screen's scale.
-fn cover_url(album: &Album, scale_factor: i32) -> Option<String> {
-    let image = &album.image;
-    let sizes = if scale_factor > 1 {
-        [&image.large, &image.small]
-    } else {
-        [&image.small, &image.large]
-    };
-    sizes.into_iter().flatten().next().cloned()
 }

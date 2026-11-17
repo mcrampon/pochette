@@ -33,3 +33,44 @@ async fn finds_where_to_stream_a_track() {
     // The secret found by the first call signs the next ones.
     client.file_url(TRACK_ID, Quality::Cd).await.unwrap();
 }
+
+#[tokio::test]
+#[ignore = "needs a Qobuz session"]
+async fn reads_the_discover_sections() {
+    use qobuz::discover::Section;
+
+    let client = client();
+    let genres = client.genres().await.unwrap();
+    let jazz = genres
+        .iter()
+        .find(|genre| genre.id == 80)
+        .map(|genre| genre.id);
+    println!("{} genres", genres.len());
+
+    let discover = client.discover(jazz).await.unwrap();
+    for section in [
+        Section::NewReleases,
+        Section::PressAwards,
+        Section::IdealDiscography,
+    ] {
+        let albums = discover.section(section);
+        println!(
+            "{section:?}: {} albums, more: {}",
+            albums.albums.len(),
+            albums.has_more
+        );
+        assert!(!albums.albums.is_empty());
+
+        let page = client.discover_section(section, jazz, 0, 50).await.unwrap();
+        let next = client
+            .discover_section(section, jazz, 50, 50)
+            .await
+            .unwrap();
+        println!(
+            "  page of {}, then {}",
+            page.albums.len(),
+            next.albums.len()
+        );
+        assert_ne!(page.albums[0].id, next.albums[0].id);
+    }
+}

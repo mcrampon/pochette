@@ -99,7 +99,11 @@ impl Component for AlbumPage {
                     set_trigger: gtk::ShortcutTrigger::parse_string("<Alt>Left"),
                     set_action: Some(gtk::CallbackAction::new({
                         let sender = sender.clone();
-                        move |_, _| {
+                        move |page, _| {
+                            // Each tab has an album page, and the shortcut reaches both.
+                            if !page.is_mapped() {
+                                return gtk::glib::Propagation::Proceed;
+                            }
                             sender.input(AlbumPageMsg::Back);
                             gtk::glib::Propagation::Stop
                         }
