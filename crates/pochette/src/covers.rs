@@ -216,6 +216,12 @@ impl VisibleCovers {
         // Resizing, or the content changing.
         let this = self.clone();
         adjustment.connect_changed(move |_| this.schedule_check());
+        // Getting wider or narrower, which shows or hides tiles in rows without changing the
+        // height, as when the Now Playing pane is resized.
+        let this = self.clone();
+        viewport
+            .hadjustment()
+            .connect_changed(move |_| this.schedule_check());
         // Coming back on screen, as when switching tabs: the grid may have changed while
         // hidden, and nothing else would check it again before the next scroll.
         let this = self.clone();
