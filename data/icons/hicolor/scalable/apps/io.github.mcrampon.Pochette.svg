@@ -12,7 +12,7 @@
   </defs>
 
   <!-- The record, sliding out of its sleeve. -->
-  <g transform="translate(82 62)">
+  <g transform="translate(82 66)">
     <circle r="42" fill="#1c1c1f"/>
     <circle r="42" fill="url(#shine)"/>
     <g fill="none" stroke="#38383d" stroke-width="1">

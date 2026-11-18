@@ -65,6 +65,11 @@ rustPlatform.buildRustPackage (finalAttrs: {
       -t $out/share/icons/hicolor/scalable/apps
     install -Dm644 data/icons/hicolor/symbolic/apps/io.github.mcrampon.Pochette-symbolic.svg \
       -t $out/share/icons/hicolor/symbolic/apps
+    # Drawn for the small sizes, where the scalable icon's record would be a smudge.
+    for size in 16x16 22x22 24x24; do
+      install -Dm644 data/icons/hicolor/$size/apps/io.github.mcrampon.Pochette.svg \
+        -t $out/share/icons/hicolor/$size/apps
+    done
   '';
 
   doInstallCheck = true;
