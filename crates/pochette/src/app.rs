@@ -333,6 +333,7 @@ impl Component for App {
         };
         let settings = Settings::load();
         player.set_volume(settings.volume);
+        player.set_quality(settings.quality);
         finish_playback_before_closing(&root, &player);
         play_pause_with_space(&root, &player);
         leave_search_bars_on_click(&root);

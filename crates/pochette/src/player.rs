@@ -20,9 +20,6 @@ use tokio::{
     task::JoinHandle,
 };
 
-/// The best quality to ask Qobuz for.
-const QUALITY: Quality = Quality::HiRes192;
-
 /// Within this much of a track's start, "previous" goes to the previous track rather than
 /// back to the start of this one.
 const RESTART_WITHIN: Duration = Duration::from_secs(3);
@@ -104,6 +101,8 @@ enum Command {
     /// Play the track at this index in the queue.
     PlayIndex(usize),
     Seek(Duration),
+    /// Stream in this quality at best, from now on: the track playing too.
+    SetQuality(Quality),
     /// Stop, and answer once the last listening is reported.
     Stop(Option<oneshot::Sender<()>>),
 }
@@ -153,6 +152,11 @@ impl Player {
 
     pub fn seek(&self, position: Duration) {
         self.send(Command::Seek(position));
+    }
+
+    /// Stream in `quality` at best, the track playing included.
+    pub fn set_quality(&self, quality: Quality) {
+        self.send(Command::SetQuality(quality));
     }
 
     /// Where playback is in the current track.
@@ -207,6 +211,11 @@ struct Actor {
     queue: Arc<[Track]>,
     /// The quality of the stream playing.
     quality: Option<String>,
+    /// The best quality to ask Qobuz for.
+    best_quality: Quality,
+    /// Where to go in the track starting, once it can seek: where it was before its
+    /// stream changed.
+    resume_at: Option<Duration>,
     /// The track playing, as an index in the queue.
     current: Option<usize>,
     /// The track asked to play, until its stream starts.
@@ -249,6 +258,8 @@ impl Actor {
             album: None,
             queue: Arc::default(),
             quality: None,
+            best_quality: Quality::default(),
+            resume_at: None,
             current: None,
             starting: None,
             upcoming,
@@ -317,6 +328,7 @@ impl Actor {
                 }
             }
             Command::Seek(position) => self.seek(position),
+            Command::SetQuality(quality) => self.set_quality(quality).await,
             Command::Stop(done) => {
                 self.stop().await;
                 self.album = None;
@@ -339,10 +351,11 @@ impl Actor {
         self.forget_next();
         self.current = Some(index);
         self.quality = None;
+        self.resume_at = None;
         self.wants_playing = true;
         self.publish(State::Loading, None);
 
-        match client.file_url(track_id, QUALITY).await {
+        match client.file_url(track_id, self.best_quality).await {
             Ok(file) => {
                 let _ = self.playbin.set_state(gst::State::Null);
                 self.playbin.set_property("uri", &file.url);
@@ -355,6 +368,27 @@ impl Actor {
                 let title = self.queue[index].title.clone();
                 self.fail(&format!("Can't stream \u{201c}{title}\u{201d}: {err}"));
             }
+        }
+    }
+
+    /// Stream in `quality` at best: the track playing starts again in it, where it was,
+    /// paused if it was.
+    async fn set_quality(&mut self, quality: Quality) {
+        if quality == self.best_quality {
+            return;
+        }
+        self.best_quality = quality;
+        let state = self.status.borrow().state;
+        let Some(index) = self.current.filter(|_| state != State::Stopped) else {
+            return;
+        };
+        let position = self.position();
+        self.retire_report(false);
+        self.play(index).await;
+        self.resume_at = Some(position);
+        if state == State::Paused {
+            self.wants_playing = false;
+            let _ = self.playbin.set_state(gst::State::Paused);
         }
     }
 
@@ -495,6 +529,12 @@ impl Actor {
                     self.publish(State::Playing, None);
                 }
             }
+            // The new stream can seek, back to where the track was.
+            MessageView::AsyncDone(_) => {
+                if let Some(position) = self.resume_at.take() {
+                    self.seek(position);
+                }
+            }
             MessageView::Error(err) => {
                 tracing::warn!("playback failed: {} ({:?})", err.error(), err.debug());
                 self.fail(&err.error().to_string());
@@ -519,12 +559,21 @@ impl Actor {
             }
         );
         self.current = Some(started.index);
-        self.quality =
-            crate::format::audio_quality(started.file.bit_depth, started.file.sampling_rate);
+        self.quality = if started.file.format_id == Quality::Mp3 as u32 {
+            Some("MP3 \u{b7} 320 kbps".to_owned())
+        } else {
+            crate::format::audio_quality(started.file.bit_depth, started.file.sampling_rate)
+        };
         if let Some(client) = &self.client {
             self.report = Report::start(client.clone(), track, &started.file);
         }
-        self.publish(State::Playing, None);
+        // Paused when its stream changed while paused.
+        let state = if self.wants_playing {
+            State::Playing
+        } else {
+            State::Paused
+        };
+        self.publish(state, None);
         self.prefetch_next(started.index + 1);
     }
 
@@ -536,9 +585,9 @@ impl Actor {
             return;
         };
         let track_id = track.id;
-        let upcoming = self.upcoming.clone();
+        let (upcoming, quality) = (self.upcoming.clone(), self.best_quality);
         self.prefetch = Some(relm4::spawn(async move {
-            match client.file_url(track_id, QUALITY).await {
+            match client.file_url(track_id, quality).await {
                 Ok(file) => {
                     if let Ok(mut upcoming) = upcoming.lock() {
                         *upcoming = Some(Upcoming { index, file });

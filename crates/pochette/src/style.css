@@ -101,6 +101,21 @@
   background-color: alpha(currentColor, 0.1);
 }
 
+/* The quality badge in Now Playing, a button showing as the badge alone. */
+.pochette-quality > button {
+  padding: 0;
+  min-height: 0;
+  min-width: 0;
+  border-radius: 9999px;
+  background: none;
+  box-shadow: none;
+}
+
+.pochette-quality > button:hover .pochette-badge,
+.pochette-quality > button:checked .pochette-badge {
+  background-color: alpha(currentColor, 0.18);
+}
+
 .pochette-numeric {
   font-feature-settings: "tnum";
 }

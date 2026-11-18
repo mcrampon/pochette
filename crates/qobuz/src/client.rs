@@ -280,7 +280,7 @@ fn unix_time() -> u64 {
 
 /// The best quality to ask for. Qobuz answers with the best that the track and the
 /// subscription allow, up to it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum Quality {
     Mp3 = 5,
@@ -289,7 +289,13 @@ pub enum Quality {
     /// FLAC, up to 24-bit / 96 kHz.
     HiRes96 = 7,
     /// FLAC, up to 24-bit / 192 kHz.
+    #[default]
     HiRes192 = 27,
+}
+
+impl Quality {
+    /// From the lowest to the highest.
+    pub const ALL: [Self; 4] = [Self::Mp3, Self::Cd, Self::HiRes96, Self::HiRes192];
 }
 
 /// Where a track streams from.

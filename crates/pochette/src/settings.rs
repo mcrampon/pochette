@@ -2,6 +2,7 @@
 
 use std::{io, path::PathBuf};
 
+use qobuz::Quality;
 use relm4::gtk::glib;
 use serde::{Deserialize, Serialize};
 
@@ -26,6 +27,8 @@ pub struct Settings {
     pub album_sort_reversed: bool,
     /// The genres picked in the Discover tab, by Qobuz id.
     pub discover_genres: Vec<u64>,
+    /// The best quality to stream in.
+    pub quality: Quality,
 }
 
 impl Default for Settings {
@@ -39,6 +42,7 @@ impl Default for Settings {
             album_sort: Sort::default(),
             album_sort_reversed: false,
             discover_genres: Vec::new(),
+            quality: Quality::default(),
         }
     }
 }

@@ -6,7 +6,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use qobuz::models::{Album, Track};
+use qobuz::{
+    Quality,
+    models::{Album, Track},
+};
 use relm4::{
     Component, ComponentController, ComponentParts, ComponentSender, Controller, RelmWidgetExt,
     gtk::{self, gdk, glib, pango, prelude::*},
@@ -90,6 +93,8 @@ pub enum NowPlayingMsg {
     OpenAlbum,
     /// Show the lyrics in place of the cover, or the cover again.
     ToggleLyrics,
+    /// Stream in this quality at best.
+    SetQuality(Quality),
 }
 
 #[derive(Debug)]
@@ -159,14 +164,22 @@ impl Component for NowPlaying {
                                     set_wrap: true,
                                     set_justify: gtk::Justification::Center,
                                 },
-                                gtk::Label {
+                                // The stream's quality, which picks the best to stream in.
+                                gtk::MenuButton {
                                     #[watch]
                                     set_visible: model.status.quality.is_some(),
-                                    #[watch]
-                                    set_label: model.status.quality.as_deref().unwrap_or_default(),
-                                    add_css_class: "pochette-badge",
+                                    set_popover: Some(&quality_popover),
+                                    set_tooltip_text: Some("Quality"),
+                                    add_css_class: "pochette-quality",
                                     set_halign: gtk::Align::Center,
                                     set_margin_top: 6,
+
+                                    #[wrap(Some)]
+                                    set_child = &gtk::Label {
+                                        #[watch]
+                                        set_label: model.status.quality.as_deref().unwrap_or_default(),
+                                        add_css_class: "pochette-badge",
+                                    },
                                 },
                             },
 
@@ -368,6 +381,7 @@ impl Component for NowPlaying {
         };
         let cover_box = &with_heart(&model.cover, &model.heart);
         let lyrics_view = model.lyrics.widget();
+        let quality_popover = quality_popover(&sender);
         let lyrics_background = &BlurredCover::default();
         let background = lyrics_background.clone();
         model.cover.connect_paintable_notify(move |cover| {
@@ -453,6 +467,10 @@ impl Component for NowPlaying {
                     let volume = self.player.volume();
                     Settings::update(|settings| settings.volume = volume);
                 }
+            }
+            NowPlayingMsg::SetQuality(quality) => {
+                self.player.set_quality(quality);
+                Settings::update(|settings| settings.quality = quality);
             }
             NowPlayingMsg::OpenAlbum => {
                 if let Some(album) = &self.status.album {
@@ -618,6 +636,63 @@ fn tick(sender: &ComponentSender<NowPlaying>) {
             glib::ControlFlow::Break
         }
     });
+}
+
+/// The qualities to pick the best to stream in from, the saved one picked.
+fn quality_popover(sender: &ComponentSender<NowPlaying>) -> gtk::Popover {
+    let content = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(6)
+        .margin_top(6)
+        .margin_bottom(6)
+        .margin_start(6)
+        .margin_end(6)
+        .build();
+    content.append(
+        &gtk::Label::builder()
+            .label("Best Quality")
+            .xalign(0.0)
+            .css_classes(["heading"])
+            .build(),
+    );
+    content.append(
+        &gtk::Label::builder()
+            .label(
+                "Each track streams in the best it has, up to this, as your subscription allows.",
+            )
+            .xalign(0.0)
+            .wrap(true)
+            .max_width_chars(30)
+            .css_classes(["dim-label"])
+            .build(),
+    );
+    let saved = Settings::load().quality;
+    let mut group: Option<gtk::CheckButton> = None;
+    for quality in Quality::ALL.into_iter().rev() {
+        let check = gtk::CheckButton::builder()
+            .label(quality_name(quality))
+            .active(quality == saved)
+            .build();
+        check.set_group(group.as_ref());
+        group.get_or_insert_with(|| check.clone());
+        let input = sender.input_sender().clone();
+        check.connect_toggled(move |check| {
+            if check.is_active() {
+                input.emit(NowPlayingMsg::SetQuality(quality));
+            }
+        });
+        content.append(&check);
+    }
+    gtk::Popover::builder().child(&content).build()
+}
+
+fn quality_name(quality: Quality) -> &'static str {
+    match quality {
+        Quality::Mp3 => "MP3 \u{b7} 320 kbps",
+        Quality::Cd => "CD \u{b7} 16-bit / 44.1 kHz",
+        Quality::HiRes96 => "Hi-Res \u{b7} up to 24-bit / 96 kHz",
+        Quality::HiRes192 => "Hi-Res \u{b7} up to 24-bit / 192 kHz",
+    }
 }
 
 /// Let the mouse wheel over `scale` scroll what's around it instead of moving the scale.
