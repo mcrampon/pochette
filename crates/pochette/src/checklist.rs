@@ -13,9 +13,11 @@ use relm4::gtk::{self, prelude::*};
 pub struct Checklist(Rc<Inner>);
 
 struct Inner {
+    /// The button, and the count of choices checked floating over its corner.
+    overlay: gtk::Overlay,
     button: gtk::MenuButton,
-    /// The button's text, shortened when long so it doesn't widen the toolbar.
-    label: gtk::Label,
+    /// How many choices are checked, when some are.
+    count: gtk::Label,
     list: gtk::Box,
     choices: RefCell<Vec<(String, gtk::CheckButton)>>,
     /// Set while the picker changes its own checks, which isn't the user picking.
@@ -47,21 +49,31 @@ impl Checklist {
         content.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
         content.append(&scroller);
         let popover = gtk::Popover::builder().child(&content).build();
-        let label = gtk::Label::builder()
-            .label(&all_label)
-            .ellipsize(gtk::pango::EllipsizeMode::End)
-            .max_width_chars(14)
-            .build();
         let button = gtk::MenuButton::builder()
-            .child(&label)
+            .label(what)
             .always_show_arrow(true)
             .tooltip_text(what)
             .popover(&popover)
             .build();
+        let count = gtk::Label::builder()
+            .css_classes(["pochette-count"])
+            .can_target(false)
+            .visible(false)
+            .build();
+        let overlay = gtk::Overlay::builder().child(&button).build();
+        overlay.add_overlay(&count);
+        // Over the button's top left corner, sticking out of it only a little so it stays
+        // clear of what's around.
+        overlay.connect_get_child_position(|_, child| {
+            let (_, natural) = child.preferred_size();
+            let (width, height) = (natural.width(), natural.height());
+            Some(gtk::gdk::Rectangle::new(-2, -height / 2 + 6, width, height))
+        });
 
         let picker = Self(Rc::new(Inner {
+            overlay,
             button,
-            label,
+            count,
             list,
             choices: RefCell::default(),
             quiet: Cell::new(false),
@@ -77,8 +89,8 @@ impl Checklist {
         picker
     }
 
-    pub fn widget(&self) -> &gtk::MenuButton {
-        &self.0.button
+    pub fn widget(&self) -> &gtk::Overlay {
+        &self.0.overlay
     }
 
     /// Offer `names`, with those at `selected` checked.
@@ -143,7 +155,8 @@ impl Checklist {
         }
     }
 
-    /// "All Genres", "Jazz", "3 Genres", with the names in the tooltip.
+    /// The button in the accent color and the count over its corner when some choices are
+    /// checked, with their names in the tooltip.
     fn show_selection(&self) {
         let selected = self.selected();
         let choices = self.0.choices.borrow();
@@ -151,12 +164,14 @@ impl Checklist {
             .iter()
             .map(|&index| choices[index].0.as_str())
             .collect();
-        let label = match names.as_slice() {
-            [] => format!("All {}", self.0.what),
-            [name] => (*name).to_owned(),
-            names => format!("{} {}", names.len(), self.0.what),
-        };
-        self.0.label.set_label(&label);
+        let (button, count) = (&self.0.button, &self.0.count);
+        if names.is_empty() {
+            button.remove_css_class("pochette-filtered");
+        } else {
+            button.add_css_class("pochette-filtered");
+        }
+        count.set_label(&names.len().to_string());
+        count.set_visible(!names.is_empty());
         let tooltip = if names.is_empty() {
             self.0.what.clone()
         } else {

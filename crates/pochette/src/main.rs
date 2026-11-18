@@ -12,7 +12,6 @@ mod checklist;
 mod clamp;
 mod covers;
 mod discover;
-mod dropdown;
 mod favorites;
 mod format;
 mod library;
@@ -29,6 +28,7 @@ mod search_page;
 mod search_view;
 mod session_store;
 mod settings;
+mod sort_picker;
 mod split_view;
 mod tile_strip;
 

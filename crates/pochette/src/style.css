@@ -116,6 +116,24 @@
   background-color: alpha(currentColor, 0.18);
 }
 
+/* A filter with some choices picked: its name in the accent color, on the button alone (the
+   popover of choices is in the menu button too), and how many are picked over its corner. */
+.pochette-filtered > button label {
+  color: @pochette_accent;
+}
+
+.pochette-count {
+  font-size: 0.7em;
+  font-weight: 700;
+  /* Round: GTK adds the padding to these, so there is none. */
+  min-width: 16px;
+  min-height: 16px;
+  padding: 0;
+  border-radius: 9999px;
+  color: @pochette_accent_fg;
+  background-color: @pochette_accent;
+}
+
 .pochette-numeric {
   font-feature-settings: "tnum";
 }

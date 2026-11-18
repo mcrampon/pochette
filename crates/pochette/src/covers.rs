@@ -246,6 +246,29 @@ impl VisibleCovers {
         picture.set_paintable(None::<&gdk::Paintable>);
     }
 
+    /// Check the tiles once the view is drawn again, as after sorting or filtering: the view
+    /// moves the tiles it has rather than showing them again, so tiles whose covers were let
+    /// go, far away, can land on screen.
+    pub fn refresh(&self) {
+        let viewport = self.0.borrow().viewport.clone();
+        let Some(clock) = viewport.as_ref().and_then(WidgetExt::frame_clock) else {
+            self.schedule_check();
+            return;
+        };
+        let handler: Rc<RefCell<Option<glib::SignalHandlerId>>> = Rc::default();
+        let this = self.clone();
+        let once = handler.clone();
+        *handler.borrow_mut() = Some(clock.connect_after_paint(move |clock| {
+            if let Some(id) = once.borrow_mut().take() {
+                clock.disconnect(id);
+            }
+            this.schedule_check();
+        }));
+        if let Some(viewport) = viewport {
+            viewport.queue_draw();
+        }
+    }
+
     /// Check the tiles once layout is done, however many changes come before.
     fn schedule_check(&self) {
         if std::mem::replace(&mut self.0.borrow_mut().check_scheduled, true) {

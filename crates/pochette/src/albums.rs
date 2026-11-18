@@ -20,13 +20,13 @@ use crate::{
     album_tile::{self, AlbumItem},
     checklist::Checklist,
     covers::VisibleCovers,
-    dropdown::dropdown,
     favorites::Favorites,
     library::{self, Entry, Sort, View},
     navigation::{Destination, Navigator, NavigatorMsg},
     playback::CoverActions,
     player::Player,
     settings::Settings,
+    sort_picker::SortPicker,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,7 +54,7 @@ pub struct AlbumsPage {
     search: gtk::SearchEntry,
     genre_picker: Checklist,
     decade_picker: Checklist,
-    sort_menu: gtk::DropDown,
+    sort_picker: SortPicker,
     client: Option<Client>,
     player: Player,
     favorites: Favorites,
@@ -88,8 +88,9 @@ pub enum AlbumsMsg {
     Genres(Vec<usize>),
     /// The positions of the decades picked, none meaning all of them.
     Decades(Vec<usize>),
-    Sort(u32),
-    Reverse,
+    /// Sort by the sort at this position in [`Sort::ALL`], or turn it around if it's the
+    /// one already.
+    Sort(usize),
     ClearFilters,
     /// Play one of the albums shown, at random.
     PlayRandom,
@@ -201,25 +202,12 @@ impl Component for AlbumsPage {
                             connect_stop_search => |entry| entry.set_text(""),
                         },
                         #[local_ref]
-                        genre_button -> gtk::MenuButton {},
+                        genre_button -> gtk::Overlay {},
                         #[local_ref]
-                        decade_button -> gtk::MenuButton {},
+                        decade_button -> gtk::Overlay {},
                         #[local_ref]
-                        sort_menu -> gtk::DropDown {
-                            set_tooltip_text: Some("Sort By"),
+                        sort_button -> gtk::MenuButton {
                             set_margin_start: 6,
-                        },
-                        gtk::Button {
-                            #[watch]
-                            set_icon_name: if model.view.is_descending() {
-                                "view-sort-descending-symbolic"
-                            } else {
-                                "view-sort-ascending-symbolic"
-                            },
-                            #[watch]
-                            set_tooltip_text: Some(model.view.order_label()),
-                            add_css_class: "flat",
-                            connect_clicked => AlbumsMsg::Reverse,
                         },
                         gtk::Button {
                             set_icon_name: "media-playlist-shuffle-symbolic",
@@ -291,15 +279,10 @@ impl Component for AlbumsPage {
         let favorites = actions.favorites.clone();
         let sort_labels: Vec<&str> = Sort::ALL.iter().map(|sort| sort.label()).collect();
         let settings = Settings::load();
-        let sort_menu = dropdown(&sort_labels);
-        let sort_position = Sort::ALL
-            .iter()
-            .position(|sort| *sort == settings.album_sort);
-        sort_menu.set_selected(
-            sort_position
-                .and_then(|p| u32::try_from(p).ok())
-                .unwrap_or(0),
-        );
+        let input = sender.input_sender().clone();
+        let sort_picker = SortPicker::new(&sort_labels, move |position| {
+            input.emit(AlbumsMsg::Sort(position));
+        });
         let mut model = Self {
             state: State::Loading,
             entries: Vec::new(),
@@ -318,7 +301,7 @@ impl Component for AlbumsPage {
             search: gtk::SearchEntry::new(),
             genre_picker: Checklist::new("Genres"),
             decade_picker: Checklist::new("Decades"),
-            sort_menu,
+            sort_picker,
             client: None,
             nav: Navigator::new(player.clone(), actions.clone(), {
                 let input = sender.input_sender().clone();
@@ -337,7 +320,7 @@ impl Component for AlbumsPage {
         let search = &model.search;
         let genre_button = model.genre_picker.widget();
         let decade_button = model.decade_picker.widget();
-        let sort_menu = &model.sort_menu;
+        let sort_button = model.sort_picker.widget();
         let widgets = view_output!();
 
         let visible = model.visible.clone();
@@ -353,10 +336,7 @@ impl Component for AlbumsPage {
         model
             .decade_picker
             .connect_changed(move |picked| input.emit(AlbumsMsg::Decades(picked)));
-        let input = sender.input_sender().clone();
-        model
-            .sort_menu
-            .connect_selected_notify(move |menu| input.emit(AlbumsMsg::Sort(menu.selected())));
+        model.show_sort();
         // Typing anywhere in the grid searches.
         model.search.set_key_capture_widget(Some(&widgets.scroller));
         add_search_shortcut(&root, &sender);
@@ -437,7 +417,6 @@ impl Component for AlbumsPage {
             | AlbumsMsg::Genres(_)
             | AlbumsMsg::Decades(_)
             | AlbumsMsg::Sort(_)
-            | AlbumsMsg::Reverse
             | AlbumsMsg::ClearFilters) => self.change_view(msg),
 
             AlbumsMsg::FavoriteChanged { album, added } => {
@@ -520,21 +499,15 @@ impl AlbumsPage {
                 }
             }
             AlbumsMsg::Sort(position) => {
-                let sort = usize::try_from(position)
-                    .ok()
-                    .and_then(|position| Sort::ALL.get(position).copied())
-                    .unwrap_or_default();
-                if sort != self.view.sort {
+                let sort = Sort::ALL.get(position).copied().unwrap_or_default();
+                if sort == self.view.sort {
+                    self.view.reversed = !self.view.reversed;
+                } else {
                     self.view.sort = sort;
                     // Each sort starts in its natural order.
                     self.view.reversed = false;
-                    self.save_view();
-                    self.sort_grid();
-                    self.show_albums();
                 }
-            }
-            AlbumsMsg::Reverse => {
-                self.view.reversed = !self.view.reversed;
+                self.show_sort();
                 self.save_view();
                 self.sort_grid();
                 self.show_albums();
@@ -597,6 +570,16 @@ impl AlbumsPage {
             .filter_map(|decade| self.decades.iter().position(|d| d == decade))
             .collect();
         self.decade_picker.set_choices(&labels, &picked);
+    }
+
+    /// Show the sort picked, and which way it goes, in the sort button.
+    fn show_sort(&self) {
+        let position = Sort::ALL
+            .iter()
+            .position(|sort| *sort == self.view.sort)
+            .unwrap_or(0);
+        self.sort_picker
+            .show(position, self.view.is_descending(), self.view.order_label());
     }
 
     /// Remember the decades and order picked, for the next run.
@@ -662,6 +645,7 @@ impl AlbumsPage {
             .map(|entry| entry.album.id.clone())
             .collect();
         self.grid.notify_filter_changed(0);
+        self.covers.refresh();
     }
 
     fn play_random(&mut self, sender: &ComponentSender<Self>) {

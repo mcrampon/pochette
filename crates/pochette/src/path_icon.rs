@@ -6,6 +6,12 @@ use relm4::gtk::{self, glib, prelude::*, subclass::prelude::*};
 /// Two arrows, one each way: swap.
 pub const SWAP: &str = "M 2.5 5 H 13 M 10 2 L 13 5 L 10 8 M 13.5 11 H 3 M 6 8 L 3 11 L 6 14";
 
+/// An arrow pointing up: ascending.
+pub const UP: &str = "M 8 13 V 3 M 4 7 L 8 3 L 12 7";
+
+/// An arrow pointing down: descending.
+pub const DOWN: &str = "M 8 3 V 13 M 4 9 L 8 13 L 12 9";
+
 glib::wrapper! {
     pub struct PathIcon(ObjectSubclass<imp::PathIcon>)
         @extends gtk::Widget,
@@ -22,6 +28,12 @@ impl PathIcon {
         icon.set_halign(gtk::Align::Center);
         icon.set_valign(gtk::Align::Center);
         icon
+    }
+
+    pub fn set_path(&self, path: &'static str) {
+        if self.imp().path.replace(path) != path {
+            self.queue_draw();
+        }
     }
 }
 

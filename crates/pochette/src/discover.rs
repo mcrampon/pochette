@@ -145,7 +145,7 @@ impl Component for DiscoverPage {
                     set_margin_end: 36,
 
                     #[local_ref]
-                    genre_button -> gtk::MenuButton {},
+                    genre_button -> gtk::Overlay {},
                 },
 
                 #[transition = "Crossfade"]
