@@ -75,6 +75,18 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.2.0" date="2026-11-18">
+      <description>
+        <ul>
+          <li>Pick the quality to stream in from the quality badge in Now Playing</li>
+          <li>The lyrics show over the album's cover, blurred</li>
+          <li>One button for the sort and its direction in the Albums tab</li>
+          <li>The genre and decade filters show how many are picked</li>
+          <li>A clearer icon at small sizes</li>
+          <li>Fixed: covers staying grey after sorting, filtering or resizing the Now Playing pane</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-11-17">
       <description>
         <p>The first release.</p>
