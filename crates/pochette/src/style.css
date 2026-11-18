@@ -339,6 +339,18 @@ entry:focus-within {
   opacity: 1;
 }
 
+/* The lyrics' frame, over the cover blurred and greyed: a dark grey, and light text, whatever
+   the theme and the cover, to stay readable. */
+.pochette-lyrics-frame {
+  border-radius: 12px;
+  color: white;
+  background-color: #3a3a3a;
+}
+
+.pochette-lyrics-shade {
+  background-color: alpha(#3a3a3a, 0.55);
+}
+
 .pochette-lyrics-plain {
   font-size: 1.05em;
   line-height: 1.6;

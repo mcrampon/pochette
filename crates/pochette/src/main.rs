@@ -7,6 +7,7 @@ mod album_tile;
 mod albums;
 mod app;
 mod artist_page;
+mod blurred_cover;
 mod checklist;
 mod clamp;
 mod covers;

@@ -13,6 +13,7 @@ use relm4::{
 };
 
 use crate::{
+    blurred_cover::BlurredCover,
     clamp::Clamp,
     covers,
     favorites::{Favorites, Heart, with_heart},
@@ -169,7 +170,18 @@ impl Component for NowPlaying {
                                 },
                             },
 
-                            add_named: (lyrics_view, Some("lyrics")),
+                            // The lyrics, over the cover blurred and greyed.
+                            add_named[Some("lyrics")] = &gtk::Overlay {
+                                add_css_class: "pochette-lyrics-frame",
+                                set_overflow: gtk::Overflow::Hidden,
+
+                                #[local_ref]
+                                lyrics_background -> BlurredCover {},
+                                add_overlay = &gtk::Box {
+                                    add_css_class: "pochette-lyrics-shade",
+                                },
+                                add_overlay: lyrics_view,
+                            },
 
                             // After the pages, which must be there to be shown.
                             #[watch]
@@ -356,6 +368,11 @@ impl Component for NowPlaying {
         };
         let cover_box = &with_heart(&model.cover, &model.heart);
         let lyrics_view = model.lyrics.widget();
+        let lyrics_background = &BlurredCover::default();
+        let background = lyrics_background.clone();
+        model.cover.connect_paintable_notify(move |cover| {
+            background.set_paintable(cover.paintable().as_ref());
+        });
         let progress = &model.progress;
         let elapsed = &model.elapsed;
         let remaining = &model.remaining;
