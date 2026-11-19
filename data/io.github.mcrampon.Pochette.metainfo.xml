@@ -75,6 +75,14 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.3.0" date="2026-11-19">
+      <description>
+        <p>
+          The Discover tab fills the window: two rows of six albums on a wide screen, down to
+          six rows of two on a narrow one, with covers that grow and shrink with the window.
+        </p>
+      </description>
+    </release>
     <release version="0.2.0" date="2026-11-18">
       <description>
         <ul>
