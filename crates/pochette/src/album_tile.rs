@@ -14,6 +14,7 @@ use crate::{
     favorites::{Heart, with_heart},
     format,
     playback::{CoverActions, PlayButton},
+    tile_grid::TileGrid,
     tile_strip::TileStrip,
 };
 
@@ -21,6 +22,17 @@ pub use frame::CoverFrame;
 
 /// The side of a cover, in logical pixels.
 pub const COVER_SIZE: i32 = 180;
+
+/// The narrowest a cover gets in a row of the Discover tab before the row drops a column,
+/// and the narrowest it gets at all, in two columns on a narrow window.
+const MIN_COVER_SIZE: i32 = 150;
+const SMALLEST_COVER_SIZE: i32 = 100;
+
+/// The widest a cover gets in a row of the Discover tab, on a wide window.
+const MAX_COVER_SIZE: i32 = 576;
+
+/// The padding around a tile in a row: see `.pochette-row-tile` in the style sheet.
+const ROW_TILE_PADDING: i32 = 2 * 12;
 
 /// An album in a grid.
 pub struct AlbumItem {
@@ -40,18 +52,33 @@ pub struct AlbumWidgets {
     title: gtk::Label,
     artist: gtk::Label,
     caption: gtk::Label,
+    /// Whether to show the large cover whatever the screen's scale, for a cover that can
+    /// grow past the small one's size.
+    large: bool,
 }
 
 /// A tile, empty until [`AlbumWidgets::show`] fills it.
 pub fn tile() -> (gtk::Box, AlbumWidgets) {
+    tile_sized(false)
+}
+
+/// A tile whose cover grows and shrinks with the width it's given, if `fluid`, rather than
+/// staying [`COVER_SIZE`] wide.
+fn tile_sized(fluid: bool) -> (gtk::Box, AlbumWidgets) {
+    let size = if fluid { -1 } else { COVER_SIZE };
     let cover = gtk::Picture::builder()
-        .width_request(COVER_SIZE)
-        .height_request(COVER_SIZE)
+        .width_request(size)
+        .height_request(size)
         .content_fit(gtk::ContentFit::Cover)
         .overflow(gtk::Overflow::Hidden)
         .css_classes(["pochette-cover"])
         .build();
-    let (shaded, genre, date) = with_shade(&CoverFrame::new(&cover, COVER_SIZE));
+    let frame = if fluid {
+        CoverFrame::fluid(&cover, SMALLEST_COVER_SIZE, COVER_SIZE)
+    } else {
+        CoverFrame::new(&cover, COVER_SIZE)
+    };
+    let (shaded, genre, date) = with_shade(&frame);
     let heart = Heart::new();
     let cover_box = with_heart(&shaded, &heart);
     let play = PlayButton::new();
@@ -61,8 +88,10 @@ pub fn tile() -> (gtk::Box, AlbumWidgets) {
         root = gtk::Box {
             set_orientation: gtk::Orientation::Vertical,
             set_spacing: 2,
-            set_width_request: COVER_SIZE,
-            set_halign: gtk::Align::Center,
+            set_width_request: size,
+            set_halign: if fluid { gtk::Align::Fill } else { gtk::Align::Center },
+            // Takes the whole width of its column, past its natural width.
+            set_hexpand: fluid,
             set_valign: gtk::Align::Start,
             set_cursor_from_name: Some("pointer"),
             // The buttons over the cover show when the pointer is anywhere on the tile.
@@ -105,6 +134,7 @@ pub fn tile() -> (gtk::Box, AlbumWidgets) {
         title,
         artist,
         caption,
+        large: fluid,
     };
     (root, widgets)
 }
@@ -134,7 +164,7 @@ impl AlbumWidgets {
         self.heart.show(Some(album.clone()), &actions.favorites);
         self.play.show(Some(album.clone()), &actions.playback);
 
-        match cover_url(album, self.cover.scale_factor()) {
+        match cover_url(album, self.large || self.cover.scale_factor() > 1) {
             Some(url) => covers.show(&self.cover, url),
             None => covers.hide(&self.cover),
         }
@@ -196,10 +226,22 @@ fn with_shade(cover: &impl IsA<gtk::Widget>) -> (gtk::Overlay, gtk::Label, gtk::
     (overlay, genre, date)
 }
 
-/// A row of albums under `title`: as many as fit side by side. Given `see_all`, "See All"
-/// next to the title calls it, shown when some albums don't fit or Qobuz has more
-/// (`more_beyond`). Clicking an album, or pressing Enter on it, calls `open`
-/// with its index.
+/// Calls a row's handler with whether some of its tiles are hidden.
+type ConnectOverflow = Box<dyn FnOnce(Box<dyn Fn(bool)>)>;
+
+/// How a row lays out its albums.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RowLayout {
+    /// One line of covers at their size, as many as fit.
+    Strip,
+    /// Rows of covers that grow and shrink with the width: two rows of six on a wide
+    /// window, down to six rows of two on a narrow one.
+    Grid,
+}
+
+/// A row of albums under `title`, laid out as `layout`. Given `see_all`, "See All" next to
+/// the title calls it, shown when some albums don't fit or Qobuz has more (`more_beyond`).
+/// Clicking an album, or pressing Enter on it, calls `open` with its index.
 ///
 /// Returns the row, and the tiles to let go of their covers when the row goes.
 pub fn album_row(
@@ -207,19 +249,38 @@ pub fn album_row(
     albums: &[Rc<Album>],
     caption: impl Fn(&Album) -> Option<String>,
     (covers, actions): (&VisibleCovers, &CoverActions),
+    layout: RowLayout,
     open: impl Fn(usize) + 'static,
     see_all: Option<(Box<dyn Fn()>, bool)>,
 ) -> (gtk::Box, Vec<AlbumWidgets>) {
     let open = Rc::new(open);
-    let strip = TileStrip::default();
-    strip.set_margin_start(24);
-    strip.set_margin_end(24);
+    let (container, connect_overflow): (gtk::Widget, ConnectOverflow) = match layout {
+        RowLayout::Strip => {
+            let strip = TileStrip::default();
+            (
+                strip.clone().upcast(),
+                Box::new(move |f| strip.connect_overflow(f)),
+            )
+        }
+        RowLayout::Grid => {
+            let grid = TileGrid::new(
+                MIN_COVER_SIZE + ROW_TILE_PADDING,
+                MAX_COVER_SIZE + ROW_TILE_PADDING,
+            );
+            (
+                grid.clone().upcast(),
+                Box::new(move |f| grid.connect_overflow(f)),
+            )
+        }
+    };
+    container.set_margin_start(24);
+    container.set_margin_end(24);
     let mut tiles = Vec::new();
     for (index, album) in albums.iter().enumerate() {
-        let (item, widgets) = tile();
+        let (item, widgets) = tile_sized(layout == RowLayout::Grid);
         widgets.show(album, caption(album).as_deref(), covers, actions);
         let open = open.clone();
-        strip.append(&row_tile(&item, move || open(index)));
+        row_tile(&item, move || open(index)).set_parent(&container);
         tiles.push(widgets);
     }
 
@@ -234,16 +295,16 @@ pub fn album_row(
         button.connect_clicked(move |_| see_all());
         header.append(&button);
         let button = button.downgrade();
-        strip.connect_overflow(move |hidden| {
+        connect_overflow(Box::new(move |hidden| {
             if let Some(button) = button.upgrade() {
                 button.set_visible(more_beyond || hidden);
             }
-        });
+        }));
     }
 
     let row = gtk::Box::new(gtk::Orientation::Vertical, 6);
     row.append(&header);
-    row.append(&strip);
+    row.append(&container);
     (row, tiles)
 }
 
@@ -306,10 +367,10 @@ pub fn row_tile(child: &impl IsA<gtk::Widget>, open: impl Fn() + 'static) -> gtk
     item
 }
 
-/// The smallest cover that stays sharp at the screen's scale.
-fn cover_url(album: &Album, scale_factor: i32) -> Option<String> {
+/// The large cover, or the small one, whichever is wanted and there.
+fn cover_url(album: &Album, large: bool) -> Option<String> {
     let image = &album.image;
-    let sizes = if scale_factor > 1 {
+    let sizes = if large {
         [&image.large, &image.small]
     } else {
         [&image.small, &image.large]
@@ -384,6 +445,14 @@ mod frame {
             picture.set_parent(&frame);
             frame
         }
+
+        /// `picture` as a square as wide as the frame is given, from `minimum` wide, and
+        /// `natural` wide when it can be.
+        pub fn fluid(picture: &gtk::Picture, minimum: i32, natural: i32) -> Self {
+            let frame = Self::new(picture, natural);
+            frame.imp().minimum.set(Some(minimum));
+            frame
+        }
     }
 
     mod imp {
@@ -394,6 +463,8 @@ mod frame {
         #[derive(Default)]
         pub struct CoverFrame {
             pub size: Cell<i32>,
+            /// The narrowest a fluid frame gets; none for one fixed at `size`.
+            pub minimum: Cell<Option<i32>>,
         }
 
         #[glib::object_subclass]
@@ -412,9 +483,22 @@ mod frame {
         }
 
         impl WidgetImpl for CoverFrame {
-            fn measure(&self, _: gtk::Orientation, _: i32) -> (i32, i32, i32, i32) {
+            fn request_mode(&self) -> gtk::SizeRequestMode {
+                if self.minimum.get().is_some() {
+                    gtk::SizeRequestMode::HeightForWidth
+                } else {
+                    gtk::SizeRequestMode::ConstantSize
+                }
+            }
+
+            fn measure(&self, _: gtk::Orientation, for_size: i32) -> (i32, i32, i32, i32) {
                 let size = self.size.get();
-                (size, size, -1, -1)
+                match self.minimum.get() {
+                    None => (size, size, -1, -1),
+                    // Square: as tall as it's wide, and as wide as it's tall.
+                    Some(_) if for_size >= 0 => (for_size, for_size, -1, -1),
+                    Some(minimum) => (minimum, size, -1, -1),
+                }
             }
 
             fn size_allocate(&self, width: i32, height: i32, _baseline: i32) {

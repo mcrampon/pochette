@@ -403,6 +403,7 @@ impl ArtistPage {
                 &albums,
                 |_| None,
                 (&self.covers, &self.actions),
+                album_tile::RowLayout::Strip,
                 move |index| open.input(ArtistPageMsg::OpenAlbum(kind, index)),
                 Some((
                     Box::new(move || see_all.input(ArtistPageMsg::SeeAll(kind))),

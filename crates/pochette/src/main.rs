@@ -30,6 +30,7 @@ mod session_store;
 mod settings;
 mod sort_picker;
 mod split_view;
+mod tile_grid;
 mod tile_strip;
 
 use tracing_subscriber::EnvFilter;

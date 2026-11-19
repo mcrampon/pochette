@@ -616,6 +616,7 @@ impl DiscoverPage {
                 &albums,
                 |album| caption(section, album),
                 (&self.row_covers, &self.actions),
+                album_tile::RowLayout::Grid,
                 move |index| open.input(DiscoverMsg::OpenRowAlbum(section, index)),
                 Some((
                     Box::new(move || see_all.input(DiscoverMsg::SeeAll(section))),
