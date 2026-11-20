@@ -65,6 +65,8 @@ pub struct App {
     library: Option<gtk::Stack>,
     /// The tab to go back to when the search results close.
     last_tab: String,
+    /// What the library shows: a tab, the search results or the stats.
+    shown: String,
     player: Player,
     /// The albums in the user's library, which hearts add and remove.
     favorites: Favorites,
@@ -99,6 +101,8 @@ pub enum Msg {
     SearchClosed,
     /// Show the listening stats, from the main menu, rather than what's open over them.
     ShowStats,
+    /// The tab shown was clicked: back to it, from what's open over it.
+    TabClickedAgain,
     /// Open the page of an album in the library, as from Now Playing.
     OpenAlbum(Box<Album>),
     /// Bring the window to the front, as the desktop's media controls ask.
@@ -144,6 +148,7 @@ impl Component for App {
                     },
 
                     #[wrap(Some)]
+                    #[name = "switcher"]
                     set_title_widget = &gtk::StackSwitcher {
                         set_stack: Some(&library),
                         #[watch]
@@ -393,6 +398,7 @@ impl Component for App {
                 }),
             library: None,
             last_tab: "albums".to_owned(),
+            shown: "albums".to_owned(),
             player,
             favorites,
             playback,
@@ -413,6 +419,7 @@ impl Component for App {
             Settings::update(|settings| settings.pane_width = width);
         });
         follow_playback(&model.player, &sender);
+        follow_clicks_on_tab_shown(&widgets.switcher, &sender);
 
         let mut actions = RelmActionGroup::<WindowActions>::new();
         let input = sender.input_sender().clone();
@@ -530,10 +537,40 @@ impl Component for App {
             Msg::Search(query) => self.search(query),
             Msg::SearchClosed => self.show(&self.last_tab.clone()),
             Msg::ShowStats => self.show_stats(),
+            Msg::TabClickedAgain => self.home(),
             Msg::LibraryShown => self.library_shown(),
             Msg::OpenAlbum(album) => self.open_album(*album),
         }
     }
+}
+
+/// A click on the button of the tab shown, which does nothing to the switcher, takes the
+/// tab back to its own page.
+fn follow_clicks_on_tab_shown(switcher: &gtk::StackSwitcher, sender: &ComponentSender<App>) {
+    let click = gtk::GestureClick::new();
+    // Before the button, which still gets the click.
+    click.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let sender = sender.clone();
+    click.connect_pressed(move |gesture, _, x, y| {
+        let Some(switcher) = gesture.widget() else {
+            return;
+        };
+        let button = switcher
+            .pick(x, y, gtk::PickFlags::DEFAULT)
+            .and_then(|target| {
+                if target.is::<gtk::ToggleButton>() {
+                    Some(target)
+                } else {
+                    target.ancestor(gtk::ToggleButton::static_type())
+                }
+            })
+            .and_then(|button| button.downcast::<gtk::ToggleButton>().ok());
+        // Active before the click: the tab shown.
+        if button.is_some_and(|button| button.is_active()) {
+            sender.input(Msg::TabClickedAgain);
+        }
+    });
+    switcher.add_controller(click);
 }
 
 fn follow_playback(player: &Player, sender: &ComponentSender<App>) {
@@ -578,6 +615,21 @@ impl App {
         self.show("stats");
     }
 
+    /// Back to the tab shown, closing what's open over it.
+    fn home(&self) {
+        self.reset(&self.shown);
+    }
+
+    /// Take the tab named `name` back to its own page, closing what's open over it.
+    fn reset(&self, name: &str) {
+        match name {
+            "albums" => self.albums.emit(AlbumsMsg::Home),
+            "discover" => self.discover.emit(DiscoverMsg::Home),
+            "stats" => self.stats.emit(StatsViewMsg::Home),
+            _ => {}
+        }
+    }
+
     /// Show the tab, or what's beside the tabs, named `name`.
     fn show(&self, name: &str) {
         if let Some(library) = &self.library {
@@ -597,8 +649,14 @@ impl App {
         } else {
             StatsViewMsg::Hidden
         });
-        if let Some(tab) = shown.filter(|name| name != "search") {
-            self.last_tab = tab.to_string();
+        // The tab left starts over from its own page when it shows again.
+        let shown = shown.map(|name| name.to_string()).unwrap_or_default();
+        let left = std::mem::replace(&mut self.shown, shown.clone());
+        if left != shown {
+            self.reset(&left);
+        }
+        if shown != "search" {
+            self.last_tab = shown;
         }
         // Over the library, the pane hides the tab the user just picked.
         if self.collapsed {

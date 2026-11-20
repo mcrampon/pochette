@@ -115,6 +115,8 @@ pub enum DiscoverMsg {
     Nav(NavigatorMsg),
     /// Open a page over Discover, as from Now Playing.
     OpenPage(Destination),
+    /// Back to the sections, closing a section's page and those opened over it.
+    Home,
 }
 
 #[derive(Debug)]
@@ -479,6 +481,10 @@ impl Component for DiscoverPage {
                 }
             }
             DiscoverMsg::OpenPage(destination) => self.nav.open(destination),
+            DiscoverMsg::Home => {
+                self.nav.home();
+                self.update_section(DiscoverMsg::CloseSection, &sender);
+            }
             DiscoverMsg::Nav(msg) => {
                 if self.nav.update(msg) {
                     let _ = sender.output(DiscoverOutput::SessionExpired);

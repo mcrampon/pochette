@@ -82,6 +82,8 @@ pub enum AlbumsMsg {
     Nav(NavigatorMsg),
     /// Open a page over the albums, as from Now Playing.
     OpenPage(Destination),
+    /// Back to the albums, closing the pages opened over them.
+    Home,
     Search(String),
     FocusSearch,
     /// The positions of the genres picked, none meaning all of them.
@@ -385,6 +387,7 @@ impl Component for AlbumsPage {
                 self.nav.open(Destination::Album(Box::new(album)));
             }
             AlbumsMsg::OpenPage(destination) => self.nav.open(destination),
+            AlbumsMsg::Home => self.nav.home(),
             AlbumsMsg::Nav(msg) => {
                 if self.nav.update(msg) {
                     let _ = sender.output(AlbumsOutput::SessionExpired);
