@@ -87,6 +87,11 @@ enum Line {
     Listen(Listen),
 }
 
+/// Now, in Unix time.
+pub fn now() -> i64 {
+    glib::real_time() / 1_000_000
+}
+
 fn dir() -> PathBuf {
     glib::user_data_dir().join("pochette")
 }

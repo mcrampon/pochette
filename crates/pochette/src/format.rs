@@ -1,5 +1,25 @@
 //! How values read in the UI.
 
+use relm4::gtk::glib;
+
+const MONTHS: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+const FULL_MONTHS: [&str; 12] = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+];
+
 /// A track length: "3:33", or "1:02:05" past an hour.
 pub fn track_duration(seconds: u32) -> String {
     let (hours, minutes, seconds) = (seconds / 3600, seconds / 60 % 60, seconds % 60);
@@ -129,9 +149,6 @@ fn decode_entity(entity: &str) -> Option<char> {
 
 /// A release date from Qobuz's `YYYY-MM-DD`: "13 Nov 2026". Whatever doesn't parse stays as is.
 pub fn release_date(date: &str) -> String {
-    const MONTHS: [&str; 12] = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-    ];
     let mut parts = date.splitn(3, '-');
     let (Some(year), Some(month), Some(day)) = (parts.next(), parts.next(), parts.next()) else {
         return date.to_owned();
@@ -143,6 +160,46 @@ pub fn release_date(date: &str) -> String {
     match (month, day.parse::<u8>()) {
         (Some(month), Ok(day)) => format!("{day} {month} {year}"),
         _ => date.to_owned(),
+    }
+}
+
+/// "1 play", "12 plays".
+pub fn play_count(count: u32) -> String {
+    if count == 1 {
+        "1 play".to_owned()
+    } else {
+        format!("{count} plays")
+    }
+}
+
+/// When something happened, from `now`, both in Unix time: "today", "yesterday", "3 days
+/// ago", "2 weeks ago", "in March", "in March 2025".
+pub fn ago(at: i64, now: i64) -> String {
+    let (Ok(then), Ok(today)) = (
+        glib::DateTime::from_unix_local(at),
+        glib::DateTime::from_unix_local(now),
+    ) else {
+        return String::new();
+    };
+    // Calendar days apart, whatever the hours.
+    let day = |date: &glib::DateTime| {
+        glib::DateTime::from_local(date.year(), date.month(), date.day_of_month(), 12, 0, 0.0)
+            .map(|noon| noon.to_unix() / 86_400)
+            .unwrap_or_default()
+    };
+    let days = day(&today) - day(&then);
+    let month = FULL_MONTHS
+        .get(usize::try_from(then.month() - 1).unwrap_or_default())
+        .copied()
+        .unwrap_or_default();
+    match days {
+        ..=0 => "today".to_owned(),
+        1 => "yesterday".to_owned(),
+        2..=6 => format!("{days} days ago"),
+        7..=13 => "a week ago".to_owned(),
+        14..=31 => format!("{} weeks ago", days / 7),
+        _ if then.year() == today.year() => format!("in {month}"),
+        _ => format!("in {month} {}", then.year()),
     }
 }
 
@@ -166,6 +223,32 @@ mod tests {
         assert_eq!(album_duration(3558), "59 min");
         assert_eq!(album_duration(3725), "1 h 2 min");
         assert_eq!(album_duration(7190), "2 h");
+    }
+
+    #[test]
+    fn formats_plays() {
+        assert_eq!(play_count(1), "1 play");
+        assert_eq!(play_count(0), "0 plays");
+    }
+
+    #[test]
+    fn formats_how_long_ago() {
+        let at = |month, day, hour| {
+            glib::DateTime::from_local(2026, month, day, hour, 0, 0.0)
+                .unwrap()
+                .to_unix()
+        };
+        let now = at(11, 20, 9);
+        assert_eq!(ago(at(11, 20, 1), now), "today");
+        assert_eq!(ago(at(11, 19, 23), now), "yesterday");
+        assert_eq!(ago(at(11, 17, 12), now), "3 days ago");
+        assert_eq!(ago(at(11, 10, 12), now), "a week ago");
+        assert_eq!(ago(at(10, 30, 12), now), "3 weeks ago");
+        assert_eq!(ago(at(3, 2, 12), now), "in March");
+        let last_year = glib::DateTime::from_local(2025, 3, 2, 12, 0, 0.0)
+            .unwrap()
+            .to_unix();
+        assert_eq!(ago(last_year, now), "in March 2025");
     }
 
     #[test]

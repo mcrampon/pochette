@@ -8,7 +8,7 @@ use qobuz::{
 };
 use relm4::{
     Component, ComponentParts, ComponentSender,
-    gtk::{self, gdk, pango, prelude::*},
+    gtk::{self, gdk, glib, pango, prelude::*},
 };
 use tokio::task::JoinHandle;
 
@@ -16,9 +16,10 @@ use crate::{
     clamp::Clamp,
     covers,
     favorites::{Favorites, Heart, with_heart},
-    format,
+    format, history,
     navigation::{Destination, PageOutput},
     player::{Player, State, Status},
+    plays::Plays,
 };
 
 /// The widest the page's content gets, so it stays readable in a wide window.
@@ -48,6 +49,7 @@ pub struct AlbumPage {
     track_list: gtk::Box,
     /// The track rows, with the id of their track.
     rows: Vec<(u64, gtk::ListBoxRow)>,
+    plays: Plays,
     player: Player,
     playback: Status,
 }
@@ -75,11 +77,12 @@ pub enum AlbumPageMsg {
     /// Play the album from this track.
     PlayTrack(u64),
     PlaybackChanged(Status),
+    PlaysChanged,
 }
 
 #[relm4::component(pub)]
 impl Component for AlbumPage {
-    type Init = (Player, Favorites);
+    type Init = (Player, Favorites, Plays);
     type Input = AlbumPageMsg;
     type Output = PageOutput;
     type CommandOutput = ();
@@ -226,6 +229,14 @@ impl Component for AlbumPage {
                             },
                             gtk::Label {
                                 #[watch]
+                                set_label: &model.played(),
+                                #[watch]
+                                set_visible: !model.played().is_empty(),
+                                set_xalign: 0.0,
+                                add_css_class: "dim-label",
+                            },
+                            gtk::Label {
+                                #[watch]
                                 set_label: &model.quality(),
                                 #[watch]
                                 set_visible: !model.quality().is_empty(),
@@ -318,11 +329,20 @@ impl Component for AlbumPage {
     }
 
     fn init(
-        (player, favorites): (Player, Favorites),
+        (player, favorites, plays): (Player, Favorites, Plays),
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         follow_playback(&player, &sender);
+        let input = sender.input_sender().clone();
+        plays.connect_changed(move || {
+            // Until the page closes.
+            if input.send(AlbumPageMsg::PlaysChanged).is_ok() {
+                glib::ControlFlow::Continue
+            } else {
+                glib::ControlFlow::Break
+            }
+        });
         let model = Self {
             client: None,
             album: None,
@@ -340,6 +360,7 @@ impl Component for AlbumPage {
             favorites,
             track_list: gtk::Box::default(),
             rows: Vec::new(),
+            plays,
             playback: player.status().borrow().clone(),
             player,
         };
@@ -417,6 +438,8 @@ impl Component for AlbumPage {
                 }
             }
             AlbumPageMsg::PlayTrack(track_id) => self.play(Some(track_id)),
+            // The plays show again, as the page does after any message.
+            AlbumPageMsg::PlaysChanged => {}
             AlbumPageMsg::PlaybackChanged(status) => {
                 self.playback = status;
                 self.highlight_playing_track();
@@ -458,6 +481,19 @@ impl AlbumPage {
             Some(error) if ours => error.clone(),
             _ => String::new(),
         }
+    }
+
+    /// "12 plays · last played yesterday"
+    fn played(&self) -> String {
+        let Some(album) = &self.album else {
+            return String::new();
+        };
+        let plays = self.plays.history().album(&album.id);
+        let Some(last) = plays.last else {
+            return String::new();
+        };
+        let last = format::ago(last, history::now());
+        format!("{} · last played {last}", format::play_count(plays.count))
     }
 
     fn highlight_playing_track(&self) {

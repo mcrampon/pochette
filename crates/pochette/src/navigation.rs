@@ -186,7 +186,11 @@ impl Navigator {
         let page = match destination {
             Destination::Album(album) => {
                 let page = AlbumPage::builder()
-                    .launch((self.player.clone(), self.actions.favorites.clone()))
+                    .launch((
+                        self.player.clone(),
+                        self.actions.favorites.clone(),
+                        self.actions.plays.clone(),
+                    ))
                     .connect_receiver(to_navigator(&self.forward));
                 page.emit(AlbumPageMsg::Show {
                     client,
