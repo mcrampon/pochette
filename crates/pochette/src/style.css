@@ -388,3 +388,47 @@ entry:focus-within {
   font-size: 1.05em;
   line-height: 1.6;
 }
+
+/* The listening stats. */
+.pochette-card {
+  padding: 18px;
+  border-radius: 12px;
+  background-color: alpha(currentColor, 0.05);
+}
+
+.pochette-stat {
+  font-size: 2em;
+  font-weight: 800;
+  color: @pochette_accent;
+}
+
+.pochette-subheading {
+  font-size: 1.2em;
+  font-weight: 700;
+}
+
+.pochette-bar {
+  border-radius: 6px 6px 2px 2px;
+  background-color: @pochette_accent;
+}
+
+.pochette-ranking {
+  background: none;
+}
+
+.pochette-ranking > row {
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+levelbar.pochette-meter block.filled {
+  background-color: @pochette_accent;
+}
+
+.pochette-bar-column:hover .pochette-bar {
+  background-color: shade(@pochette_accent, 1.2);
+}
+
+.pochette-bar-column:hover label {
+  opacity: 1;
+}

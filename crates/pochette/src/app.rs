@@ -26,9 +26,11 @@ use crate::{
     session_store::SessionStore,
     settings::Settings,
     split_view::SplitView,
+    stats_view::{StatsView, StatsViewMsg, StatsViewOutput},
 };
 
 relm4::new_action_group!(WindowActions, "win");
+relm4::new_stateless_action!(StatsAction, WindowActions, "stats");
 relm4::new_stateless_action!(SignOutAction, WindowActions, "sign-out");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,6 +59,8 @@ pub struct App {
     now_playing: Controller<NowPlaying>,
     /// Search results, beside the tabs.
     search_view: Controller<SearchView>,
+    /// The listening stats, beside the tabs too.
+    stats: Controller<StatsView>,
     /// The tabs and the search results.
     library: Option<gtk::Stack>,
     /// The tab to go back to when the search results close.
@@ -93,6 +97,8 @@ pub enum Msg {
     Search(String),
     /// The search results were closed.
     SearchClosed,
+    /// Show the listening stats, from the main menu, rather than what's open over them.
+    ShowStats,
     /// Open the page of an album in the library, as from Now Playing.
     OpenAlbum(Box<Album>),
     /// Bring the window to the front, as the desktop's media controls ask.
@@ -316,6 +322,7 @@ impl Component for App {
                         add_titled: (model.albums.widget(), Some("albums"), "Albums"),
                         // Without a title, so without a button: the search bar shows it.
                         add_named: (model.search_view.widget(), Some("search")),
+                        add_named: (model.stats.widget(), Some("stats")),
                         // The library first: Discover is for when there's time to explore.
                         set_visible_child_name: "albums",
                         connect_visible_child_notify => Msg::LibraryShown,
@@ -328,6 +335,7 @@ impl Component for App {
 
     menu! {
         main_menu: {
+            "Listening Stats" => StatsAction,
             "Sign Out" => SignOutAction,
         }
     }
@@ -378,6 +386,11 @@ impl Component for App {
                     SearchViewOutput::Closed => Msg::SearchClosed,
                     SearchViewOutput::SessionExpired => Msg::SessionExpired,
                 }),
+            stats: StatsView::builder()
+                .launch((player.clone(), actions.clone()))
+                .forward(sender.input_sender(), |output| match output {
+                    StatsViewOutput::SessionExpired => Msg::SessionExpired,
+                }),
             library: None,
             last_tab: "albums".to_owned(),
             player,
@@ -402,6 +415,10 @@ impl Component for App {
         follow_playback(&model.player, &sender);
 
         let mut actions = RelmActionGroup::<WindowActions>::new();
+        let input = sender.input_sender().clone();
+        actions.add_action(RelmAction::<StatsAction>::new_stateless(move |_| {
+            input.emit(Msg::ShowStats);
+        }));
         let input = sender.input_sender().clone();
         actions.add_action(RelmAction::<SignOutAction>::new_stateless(move |_| {
             input.emit(Msg::SignOut);
@@ -511,11 +528,8 @@ impl Component for App {
             Msg::Collapsed(collapsed) => self.collapsed = collapsed,
             Msg::Raise => root.present(),
             Msg::Search(query) => self.search(query),
-            Msg::SearchClosed => {
-                if let Some(library) = &self.library {
-                    library.set_visible_child_name(&self.last_tab);
-                }
-            }
+            Msg::SearchClosed => self.show(&self.last_tab.clone()),
+            Msg::ShowStats => self.show_stats(),
             Msg::LibraryShown => self.library_shown(),
             Msg::OpenAlbum(album) => self.open_album(*album),
         }
@@ -549,11 +563,25 @@ impl App {
         match shown.as_deref() {
             Some("search") => self.search_view.emit(SearchViewMsg::OpenPage(destination)),
             Some("discover") => self.discover.emit(DiscoverMsg::OpenPage(destination)),
+            Some("stats") => self.stats.emit(StatsViewMsg::OpenPage(destination)),
             _ => self.albums.emit(AlbumsMsg::OpenPage(destination)),
         }
         // Over the library, the pane would hide the page.
         if self.collapsed {
             self.pane_open = false;
+        }
+    }
+
+    /// Show the listening stats, rather than what was opened over them.
+    fn show_stats(&self) {
+        self.stats.emit(StatsViewMsg::Home);
+        self.show("stats");
+    }
+
+    /// Show the tab, or what's beside the tabs, named `name`.
+    fn show(&self, name: &str) {
+        if let Some(library) = &self.library {
+            library.set_visible_child_name(name);
         }
     }
 
@@ -563,6 +591,12 @@ impl App {
             .library
             .as_ref()
             .and_then(gtk::Stack::visible_child_name);
+        // Read the plays again each time, which syncing may have changed.
+        self.stats.emit(if shown.as_deref() == Some("stats") {
+            StatsViewMsg::Show
+        } else {
+            StatsViewMsg::Hidden
+        });
         if let Some(tab) = shown.filter(|name| name != "search") {
             self.last_tab = tab.to_string();
         }
@@ -602,6 +636,8 @@ impl App {
             .emit(DiscoverMsg::Show(account.client.clone()));
         self.search_view
             .emit(SearchViewMsg::SetClient(Some(account.client.clone())));
+        self.stats
+            .emit(StatsViewMsg::SetClient(Some(account.client.clone())));
         self.account = Some(account);
         self.screen = Screen::SignedIn;
     }
@@ -616,6 +652,7 @@ impl App {
         self.albums.emit(AlbumsMsg::Clear);
         self.discover.emit(DiscoverMsg::Clear);
         self.search_view.emit(SearchViewMsg::SetClient(None));
+        self.stats.emit(StatsViewMsg::SetClient(None));
         self.screen = Screen::SignedOut;
         if let Some(store) = self.store.clone() {
             relm4::spawn(async move {

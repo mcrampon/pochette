@@ -50,6 +50,12 @@ impl Plays {
         self.0.history.borrow()
     }
 
+    /// Read the logs again, which syncing may have brought plays from other machines to.
+    pub fn reload(&self) {
+        self.0.history.replace(History::load());
+        self.changed();
+    }
+
     /// Call `f` whenever the plays change, until it breaks.
     pub fn connect_changed(&self, f: impl Fn() -> ControlFlow + 'static) {
         self.0.listeners.borrow_mut().push(Box::new(f));

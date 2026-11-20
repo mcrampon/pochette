@@ -172,6 +172,21 @@ pub fn play_count(count: u32) -> String {
     }
 }
 
+/// Time spent listening: "45 min", "12 h", or "1,204 h" past a thousand hours.
+pub fn listening_time(seconds: u64) -> String {
+    let minutes = (seconds + 30) / 60;
+    if minutes < 60 {
+        return format!("{minutes} min");
+    }
+    let hours = (minutes + 30) / 60;
+    let (thousands, rest) = (hours / 1000, hours % 1000);
+    if thousands > 0 {
+        format!("{thousands},{rest:03} h")
+    } else {
+        format!("{hours} h")
+    }
+}
+
 /// When something happened, from `now`, both in Unix time: "today", "yesterday", "3 days
 /// ago", "2 weeks ago", "in March", "in March 2025".
 pub fn ago(at: i64, now: i64) -> String {
@@ -203,6 +218,24 @@ pub fn ago(at: i64, now: i64) -> String {
     }
 }
 
+/// A month by its number, from 1: "January".
+pub fn month(month: i32) -> &'static str {
+    usize::try_from(month - 1)
+        .ok()
+        .and_then(|index| FULL_MONTHS.get(index))
+        .copied()
+        .unwrap_or_default()
+}
+
+/// A month by its number, from 1: "Jan".
+pub fn short_month(month: i32) -> &'static str {
+    usize::try_from(month - 1)
+        .ok()
+        .and_then(|index| MONTHS.get(index))
+        .copied()
+        .unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -229,6 +262,9 @@ mod tests {
     fn formats_plays() {
         assert_eq!(play_count(1), "1 play");
         assert_eq!(play_count(0), "0 plays");
+        assert_eq!(listening_time(1500), "25 min");
+        assert_eq!(listening_time(5 * 3600 + 1000), "5 h");
+        assert_eq!(listening_time(1_204 * 3600), "1,204 h");
     }
 
     #[test]

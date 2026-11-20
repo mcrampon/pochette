@@ -9,6 +9,7 @@ mod app;
 mod artist_page;
 mod blurred_cover;
 mod checklist;
+mod choice_picker;
 mod clamp;
 mod covers;
 mod discover;
@@ -33,6 +34,7 @@ mod session_store;
 mod settings;
 mod sort_picker;
 mod split_view;
+mod stats_view;
 mod tile_grid;
 mod tile_strip;
 

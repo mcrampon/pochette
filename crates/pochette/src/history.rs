@@ -66,6 +66,22 @@ impl AlbumRecord {
             length,
         }
     }
+
+    /// The album, as tiles and pages take it: what's missing, they load.
+    pub fn to_album(&self) -> Option<Album> {
+        let json = serde_json::json!({
+            "id": self.id,
+            "title": self.title,
+            "version": self.version,
+            "artist": {"id": self.artist.id, "name": self.artist.name},
+            "image": {"small": self.cover, "large": self.cover_large},
+            "genre": self.genre.as_ref().map(|name| serde_json::json!({"id": 0, "name": name})),
+            "release_date_original": self.released,
+            "duration": self.length,
+            "streamable": true,
+        });
+        serde_json::from_value(json).ok()
+    }
 }
 
 /// Some of an album heard: a track, from its start until the player left it.
@@ -148,6 +164,67 @@ pub struct AlbumPlays {
     pub count: u32,
     /// When it was last played, in Unix time.
     pub last: Option<i64>,
+}
+
+/// A time span to sum up: all time, a year, or a month of a year, from 1.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Period {
+    All,
+    Year(i32),
+    Month(i32, i32),
+}
+
+impl Period {
+    fn contains(self, at: i64) -> bool {
+        let (year, month, _) = local(at);
+        match self {
+            Self::All => true,
+            Self::Year(y) => year == y,
+            Self::Month(y, m) => (year, month) == (y, m),
+        }
+    }
+
+    /// Where `at` goes in the timeline: its year for all time, its month for a year, its
+    /// day for a month.
+    fn bucket(self, at: i64) -> i32 {
+        let (year, month, day) = local(at);
+        match self {
+            Self::All => year,
+            Self::Year(_) => month,
+            Self::Month(..) => day,
+        }
+    }
+}
+
+/// The year, month and day of `at`, in the local time zone.
+fn local(at: i64) -> (i32, i32, i32) {
+    glib::DateTime::from_unix_local(at)
+        .map(|date| (date.year(), date.month(), date.day_of_month()))
+        .unwrap_or_default()
+}
+
+/// How many days `month` of `year` has.
+fn days_in_month(year: i32, month: i32) -> i32 {
+    glib::DateTime::from_local(year, month, 1, 12, 0, 0.0)
+        .and_then(|first| first.add_months(1))
+        .and_then(|next| next.add_days(-1))
+        .map_or(31, |last| last.day_of_month())
+}
+
+/// What a period's listening adds up to, the most played first.
+#[derive(Debug, Clone, Default)]
+pub struct Summary {
+    /// The seconds heard.
+    pub time: u64,
+    pub album_plays: u32,
+    /// Albums with their plays and the seconds heard.
+    pub albums: Vec<(AlbumRecord, u32, u64)>,
+    /// Artists with the seconds heard.
+    pub artists: Vec<(ArtistRecord, u64)>,
+    /// Genres with the seconds heard.
+    pub genres: Vec<(String, u64)>,
+    /// The seconds heard by year for all time, by month for a year, by day for a month.
+    pub timeline: Vec<(i32, u64)>,
 }
 
 /// Everything listened to, on every machine, and the plays it adds up to.
@@ -274,6 +351,115 @@ impl History {
     pub fn album(&self, id: &str) -> AlbumPlays {
         self.by_album.get(id).copied().unwrap_or_default()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.listens.is_empty()
+    }
+
+    /// The years with listening, the latest first.
+    pub fn years(&self) -> Vec<i32> {
+        let mut years: Vec<i32> = self.listens.iter().map(|l| local(l.at).0).collect();
+        years.sort_unstable_by(|a, b| b.cmp(a));
+        years.dedup();
+        years
+    }
+
+    /// The months of `year` with listening, from January.
+    pub fn months(&self, year: i32) -> Vec<i32> {
+        let mut months: Vec<i32> = self
+            .listens
+            .iter()
+            .map(|listen| local(listen.at))
+            .filter(|(y, _, _)| *y == year)
+            .map(|(_, month, _)| month)
+            .collect();
+        months.sort_unstable();
+        months.dedup();
+        months
+    }
+
+    pub fn summary(&self, period: Period) -> Summary {
+        let mut summary = Summary::default();
+
+        let mut album_plays: HashMap<&str, u32> = HashMap::new();
+        for (album, _) in self
+            .album_plays
+            .iter()
+            .filter(|(_, at)| period.contains(*at))
+        {
+            *album_plays.entry(album).or_default() += 1;
+            summary.album_plays += 1;
+        }
+
+        let mut album_time: HashMap<&str, u64> = HashMap::new();
+        let mut artist_time: HashMap<&ArtistRecord, u64> = HashMap::new();
+        let mut genre_time: HashMap<&str, u64> = HashMap::new();
+        let mut timeline: HashMap<i32, u64> = HashMap::new();
+        for listen in self.listens.iter().filter(|l| period.contains(l.at)) {
+            let heard = u64::from(listen.heard);
+            summary.time += heard;
+            *album_time.entry(&listen.album).or_default() += heard;
+            if let Some(album) = self.albums.get(&listen.album) {
+                *artist_time.entry(&album.artist).or_default() += heard;
+                if let Some(genre) = &album.genre {
+                    *genre_time.entry(genre).or_default() += heard;
+                }
+            }
+            *timeline.entry(period.bucket(listen.at)).or_default() += heard;
+        }
+
+        summary.albums = album_time
+            .iter()
+            .filter_map(|(id, time)| {
+                let album = self.albums.get(*id)?.clone();
+                Some((
+                    album,
+                    album_plays.get(id).copied().unwrap_or_default(),
+                    *time,
+                ))
+            })
+            .collect();
+        summary.albums.sort_by(|a, b| {
+            b.1.cmp(&a.1)
+                .then(b.2.cmp(&a.2))
+                .then(a.0.title.cmp(&b.0.title))
+        });
+        summary.artists = artist_time
+            .into_iter()
+            .map(|(artist, time)| (artist.clone(), time))
+            .collect();
+        summary
+            .artists
+            .sort_by(|a, b| b.1.cmp(&a.1).then(a.0.name.cmp(&b.0.name)));
+        summary.genres = genre_time
+            .into_iter()
+            .map(|(genre, time)| (genre.to_owned(), time))
+            .collect();
+        summary
+            .genres
+            .sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+        summary.timeline = self.timeline(period, &timeline);
+        summary
+    }
+
+    /// The seconds heard in each part of `period`, from those heard in the parts with
+    /// some.
+    fn timeline(&self, period: Period, heard: &HashMap<i32, u64>) -> Vec<(i32, u64)> {
+        let buckets = match period {
+            Period::All => {
+                let years = self.years();
+                match (years.last(), years.first()) {
+                    (Some(&first), Some(&last)) => first..=last,
+                    _ => return Vec::new(),
+                }
+            }
+            Period::Year(_) => 1..=12,
+            Period::Month(year, month) => 1..=days_in_month(year, month),
+        };
+        buckets
+            .map(|bucket| (bucket, heard.get(&bucket).copied().unwrap_or_default()))
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -361,6 +547,51 @@ mod tests {
     }
 
     #[test]
+    fn sums_up_a_year_and_a_month() {
+        let mut history = History::default();
+        sit(&mut history, "old", 5, day(1, 0) - 365 * 24 * 3600, 300);
+        sit(&mut history, "a", 5, day(3, 0), 300);
+        sit(&mut history, "old", 5, day(3, 4), 300);
+        sit(&mut history, "a", 5, day(5, 0), 300);
+        let mut record = album("b", "Bill Evans", 1500);
+        record.genre = Some("Bebop".into());
+        history.add(record, listen("b", day(5, 4), 30));
+
+        assert_eq!(history.years(), [2026, 2025]);
+        assert_eq!(history.months(2026), [3, 5]);
+        let year = history.summary(Period::Year(2026));
+        assert_eq!(year.album_plays, 3);
+        assert_eq!(year.time, 15 * 300 + 30);
+        let albums: Vec<(&str, u32)> = year
+            .albums
+            .iter()
+            .map(|(album, plays, _)| (album.id.as_str(), *plays))
+            .collect();
+        assert_eq!(albums, [("a", 2), ("old", 1), ("b", 0)]);
+        assert_eq!(year.artists[0].0.name, "Miles Davis");
+        assert_eq!(year.genres[1], ("Bebop".to_owned(), 30));
+        assert_eq!(year.timeline.len(), 12);
+        assert_eq!(year.timeline[2], (3, 3000));
+        assert_eq!(year.timeline[4], (5, 1530));
+
+        let may = history.summary(Period::Month(2026, 5));
+        assert_eq!(may.album_plays, 1);
+        assert_eq!(may.timeline.len(), 31);
+        assert_eq!(may.timeline[14], (15, 1530));
+
+        let all = history.summary(Period::All);
+        assert_eq!(all.album_plays, 4);
+        assert_eq!(all.timeline, [(2025, 1500), (2026, 4530)]);
+    }
+
+    #[test]
+    fn knows_the_length_of_months() {
+        assert_eq!(days_in_month(2026, 2), 28);
+        assert_eq!(days_in_month(2028, 2), 29);
+        assert_eq!(days_in_month(2026, 12), 31);
+    }
+
+    #[test]
     fn reads_logs_skipping_broken_lines_and_older_fields() {
         let mut history = History::default();
         let album = serde_json::to_string(&Line::Album(album("a", "Zaz", 600))).unwrap();
@@ -369,5 +600,6 @@ mod tests {
         history.read(&format!("{album}\n{heard}\n{{\"listen\": {{\"at\"\n"));
         history.settle();
         assert_eq!(history.album("a").count, 1);
+        assert!(history.albums["a"].to_album().is_some());
     }
 }
