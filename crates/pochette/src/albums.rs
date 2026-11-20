@@ -17,7 +17,7 @@ use relm4::{
 use tokio::task::JoinHandle;
 
 use crate::{
-    album_tile::{self, AlbumItem},
+    album_tile::{self, AlbumItem, FluidAlbumItem},
     checklist::Checklist,
     covers::VisibleCovers,
     favorites::Favorites,
@@ -48,7 +48,7 @@ pub struct AlbumsPage {
     /// How many albums the grid shows.
     shown: usize,
     /// Every album, in order; the filter hides those not in `visible`.
-    grid: TypedGridView<AlbumItem, gtk::NoSelection>,
+    grid: TypedGridView<FluidAlbumItem, gtk::NoSelection>,
     /// The albums the search and filters let through, by id.
     visible: Rc<RefCell<HashSet<String>>>,
     search: gtk::SearchEntry,
@@ -330,7 +330,7 @@ impl Component for AlbumsPage {
         let visible = model.visible.clone();
         model
             .grid
-            .add_filter(move |item: &AlbumItem| visible.borrow().contains(&item.album.id));
+            .add_filter(move |item: &FluidAlbumItem| visible.borrow().contains(&item.album.id));
 
         let input = sender.input_sender().clone();
         model
@@ -345,7 +345,7 @@ impl Component for AlbumsPage {
         model.search.set_key_capture_widget(Some(&widgets.scroller));
         add_search_shortcut(&root, &sender);
 
-        album_tile::fit_columns(&model.grid.view);
+        album_tile::fit_fluid_columns(&model.grid.view);
         let input = sender.input_sender().clone();
         model.favorites.connect_changed(move |album, added| {
             input.emit(AlbumsMsg::FavoriteChanged {
@@ -623,13 +623,14 @@ impl AlbumsPage {
             .view
             .sorted(&self.entries, &self.actions.plays.history());
         self.grid.clear();
-        self.grid
-            .extend_from_iter(all.into_iter().map(|entry| AlbumItem {
+        self.grid.extend_from_iter(all.into_iter().map(|entry| {
+            FluidAlbumItem(AlbumItem {
                 album: entry.album.clone(),
                 caption: None,
                 covers: self.covers.clone(),
                 actions: self.actions.clone(),
-            }));
+            })
+        }));
     }
 
     /// Put the albums of the grid in the order picked.
@@ -641,7 +642,7 @@ impl AlbumsPage {
             .enumerate()
             .map(|(rank, entry)| (entry.album.id.as_str(), rank))
             .collect();
-        let rank = |item: &AlbumItem| ranks.get(item.album.id.as_str()).copied();
+        let rank = |item: &FluidAlbumItem| ranks.get(item.album.id.as_str()).copied();
         self.grid.sort(|a, b| rank(a).cmp(&rank(b)));
     }
 

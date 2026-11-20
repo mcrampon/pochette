@@ -23,13 +23,23 @@ pub use frame::CoverFrame;
 /// The side of a cover, in logical pixels.
 pub const COVER_SIZE: i32 = 180;
 
-/// The narrowest a cover gets in a row of the Discover tab before the row drops a column,
-/// and the narrowest it gets at all, in two columns on a narrow window.
-const MIN_COVER_SIZE: i32 = 150;
+/// The narrowest a cover gets in the rows of the Discover tab and the Albums tab's grid,
+/// before they drop a column; and the narrowest it gets at all, in two columns on a narrow
+/// window.
+const MIN_COVER_SIZE: i32 = 175;
 const SMALLEST_COVER_SIZE: i32 = 100;
 
 /// The widest a cover gets in a row of the Discover tab, on a wide window.
 const MAX_COVER_SIZE: i32 = 576;
+
+/// The widest a cover gets in the Albums tab's grid: eight columns of them fill a 4K screen.
+const MAX_GRID_COVER_SIZE: i32 = 444;
+
+/// The padding around a tile in that grid: its own, and its cell's from the theme.
+const GRID_TILE_PADDING: i32 = 2 * 12 + 2 * 3;
+
+/// How many columns the Albums tab's grid shows at most, while its covers aren't too wide.
+const GRID_COLUMNS: i32 = 8;
 
 /// The padding around a tile in a row: see `.pochette-row-tile` in the style sheet.
 const ROW_TILE_PADDING: i32 = 2 * 12;
@@ -174,6 +184,35 @@ impl AlbumWidgets {
         covers.hide(&self.cover);
         self.heart.clear();
         self.play.clear();
+    }
+}
+
+/// An album in a grid whose covers grow and shrink with its width, as the Albums tab's:
+/// see [`fit_fluid_columns`].
+pub struct FluidAlbumItem(pub AlbumItem);
+
+impl std::ops::Deref for FluidAlbumItem {
+    type Target = AlbumItem;
+
+    fn deref(&self) -> &AlbumItem {
+        &self.0
+    }
+}
+
+impl RelmGridItem for FluidAlbumItem {
+    type Root = gtk::Box;
+    type Widgets = AlbumWidgets;
+
+    fn setup(_item: &gtk::ListItem) -> (gtk::Box, AlbumWidgets) {
+        tile_sized(true)
+    }
+
+    fn bind(&mut self, widgets: &mut AlbumWidgets, root: &mut gtk::Box) {
+        self.0.bind(widgets, root);
+    }
+
+    fn unbind(&mut self, widgets: &mut AlbumWidgets, root: &mut gtk::Box) {
+        self.0.unbind(widgets, root);
     }
 }
 
@@ -422,6 +461,46 @@ pub fn fit_columns(grid: &gtk::GridView) {
     });
 }
 
+/// Give `grid`, of [`FluidAlbumItem`]s, as many columns as fit its width, as the window
+/// resizes, like the rows of the Discover tab: eight while the covers are no narrower than
+/// [`MIN_COVER_SIZE`], then one fewer each time they would be, down to two. On a screen so
+/// wide eight would be wider than [`MAX_GRID_COVER_SIZE`], more columns instead.
+pub fn fit_fluid_columns(grid: &gtk::GridView) {
+    let Some(adjustment) = grid.hadjustment() else {
+        return;
+    };
+    let grid = grid.downgrade();
+    let pending = Rc::new(std::cell::Cell::new(false));
+    adjustment.connect_page_size_notify(move |adjustment| {
+        // Not while the grid is being laid out, which is when the width changes; and once
+        // for all the widths until then, from the last: a count worked out from an earlier
+        // one could leave the grid with too many columns.
+        if pending.replace(true) {
+            return;
+        }
+        let (grid, adjustment, pending) = (grid.clone(), adjustment.clone(), pending.clone());
+        glib::idle_add_local_once(move || {
+            pending.set(false);
+            // Without the grid's padding already.
+            #[expect(clippy::cast_possible_truncation, reason = "widths are small")]
+            let columns = fluid_columns(adjustment.page_size() as i32);
+            // Only the most columns: the fewest are what make the grid as wide at least,
+            // and then the window too.
+            if let Some(grid) = grid.upgrade().filter(|grid| grid.max_columns() != columns) {
+                grid.set_max_columns(columns);
+            }
+        });
+    });
+}
+
+/// How many columns of fluid tiles a grid `width` wide shows.
+fn fluid_columns(width: i32) -> u32 {
+    let fit = (width / (MIN_COVER_SIZE + GRID_TILE_PADDING)).clamp(2, GRID_COLUMNS);
+    let widest = MAX_GRID_COVER_SIZE + GRID_TILE_PADDING;
+    let needed = (width + widest - 1) / widest;
+    u32::try_from(fit.max(needed)).unwrap_or(2)
+}
+
 /// Holds a picture at a given size, square, whatever the size of its image: a cover, or
 /// an artist's portrait.
 ///
@@ -515,5 +594,32 @@ mod frame {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The columns of a window `width` wide, without the grid's padding.
+    fn columns(width: i32) -> u32 {
+        fluid_columns(width - GRID_SIDE_PADDING)
+    }
+
+    #[test]
+    fn fits_eight_columns_from_a_full_hd_screen_to_a_4k_one() {
+        assert_eq!(columns(1920), 8);
+        assert_eq!(columns(3840), 8);
+        // Then covers stop growing.
+        assert_eq!(columns(3900), 9);
+    }
+
+    #[test]
+    fn drops_a_column_when_covers_would_get_too_narrow() {
+        // Eight columns of 175 pixel covers, with their padding.
+        assert_eq!(columns(8 * 205 + 48), 8);
+        assert_eq!(columns(8 * 205 + 47), 7);
+        assert_eq!(columns(400), 2);
+        assert_eq!(columns(200), 2);
     }
 }
