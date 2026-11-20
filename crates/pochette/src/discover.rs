@@ -59,7 +59,9 @@ pub struct DiscoverPage {
     error: String,
     genres: Vec<Genre>,
     genre_ids: Vec<u64>,
+    /// The genres, over the rows and over a section's grid, picking the same.
     genre_picker: Checklist,
+    section_genre_picker: Checklist,
     /// The rows, refilled when the genre changes.
     rows: gtk::Box,
     /// The albums of each row, in order.
@@ -236,6 +238,7 @@ impl Component for DiscoverPage {
                 gtk::Box {
                     set_spacing: 12,
                     set_margin_top: 12,
+                    set_margin_bottom: 12,
                     set_margin_start: 24,
                     set_margin_end: 36,
 
@@ -250,10 +253,10 @@ impl Component for DiscoverPage {
                         set_label: model.section.map_or("", title),
                         add_css_class: "pochette-heading",
                     },
-                    gtk::Label {
-                        #[watch]
-                        set_label: &model.genre_names(),
-                        add_css_class: "dim-label",
+                    #[local_ref]
+                    section_genre_button -> gtk::Overlay {
+                        set_margin_start: 12,
+                        set_valign: gtk::Align::Center,
                     },
                 },
 
@@ -339,6 +342,7 @@ impl Component for DiscoverPage {
             genres: Vec::new(),
             genre_ids: Settings::load().discover_genres,
             genre_picker: Checklist::new("Genres"),
+            section_genre_picker: Checklist::new("Genres"),
             rows: gtk::Box::default(),
             row_albums: Vec::new(),
             row_tiles: Vec::new(),
@@ -360,6 +364,7 @@ impl Component for DiscoverPage {
         };
         let nav_stack = model.nav.widget();
         let genre_button = model.genre_picker.widget();
+        let section_genre_button = model.section_genre_picker.widget();
         let rows = &model.rows;
         let grid_view = &model.grid.view;
         let widgets = view_output!();
@@ -367,6 +372,10 @@ impl Component for DiscoverPage {
         let input = sender.input_sender().clone();
         model
             .genre_picker
+            .connect_changed(move |picked| input.emit(DiscoverMsg::Genres(picked)));
+        let input = sender.input_sender().clone();
+        model
+            .section_genre_picker
             .connect_changed(move |picked| input.emit(DiscoverMsg::Genres(picked)));
 
         model.row_covers.attach(&widgets.home_scroller);
@@ -430,6 +439,9 @@ impl Component for DiscoverPage {
                 }
             }
             DiscoverMsg::Genres(picked) => {
+                // The other picker shows the same.
+                self.genre_picker.select(&picked);
+                self.section_genre_picker.select(&picked);
                 let genre_ids: Vec<u64> = picked
                     .into_iter()
                     .filter_map(|index| self.genres.get(index))
@@ -521,6 +533,10 @@ impl DiscoverPage {
                                 covers: self.grid_covers.clone(),
                                 actions: self.actions.clone(),
                             }));
+                        // The grid shows again once it has albums, as after picking genres:
+                        // its tiles aren't laid out until then, and the view keeps the size
+                        // it had, so nothing else would check them again.
+                        self.grid_covers.refresh();
                     }
                     Err(err) => {
                         Self::failed(sender, "more albums", &err);
@@ -547,22 +563,13 @@ impl DiscoverPage {
             .map(|(index, _)| index)
             .collect();
         self.genre_picker.set_choices(&names, &picked);
+        self.section_genre_picker.set_choices(&names, &picked);
         // Saved genres Qobuz no longer has.
         if picked.len() != self.genre_ids.len() {
             let known: Vec<u64> = picked.iter().map(|&index| self.genres[index].id).collect();
             self.genre_ids = known;
             self.load_home(sender);
         }
-    }
-
-    /// The genres picked: "Jazz · Classique".
-    fn genre_names(&self) -> String {
-        self.genres
-            .iter()
-            .filter(|genre| self.genre_ids.contains(&genre.id))
-            .map(|genre| genre.name.as_str())
-            .collect::<Vec<_>>()
-            .join(" · ")
     }
 
     fn load_home(&mut self, sender: &ComponentSender<Self>) {

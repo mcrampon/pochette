@@ -118,6 +118,18 @@ impl Checklist {
         self.show_selection();
     }
 
+    /// Check those at `selected` and uncheck the others, without counting as a change: to
+    /// show what another checklist of the same choices has.
+    pub fn select(&self, selected: &[usize]) {
+        let inner = &self.0;
+        inner.quiet.set(true);
+        for (index, (_, check)) in inner.choices.borrow().iter().enumerate() {
+            check.set_active(selected.contains(&index));
+        }
+        inner.quiet.set(false);
+        self.show_selection();
+    }
+
     /// Uncheck everything, which counts as one change.
     pub fn clear(&self) {
         let inner = &self.0;
