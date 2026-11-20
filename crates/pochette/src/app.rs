@@ -21,6 +21,7 @@ use crate::{
     now_playing::{NowPlaying, NowPlayingOutput},
     playback::{CoverActions, Playback},
     player::{Player, State},
+    plays::Plays,
     search_view::{SearchView, SearchViewMsg, SearchViewOutput},
     session_store::SessionStore,
     settings::Settings,
@@ -338,6 +339,7 @@ impl Component for App {
         let actions = CoverActions {
             favorites: favorites.clone(),
             playback: playback.clone(),
+            plays: Plays::new(&player),
         };
         let settings = Settings::load();
         player.set_volume(settings.volume);

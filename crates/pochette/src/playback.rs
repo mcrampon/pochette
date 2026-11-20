@@ -11,13 +11,16 @@ use relm4::gtk::{self, prelude::*};
 use crate::{
     favorites::Favorites,
     player::{Player, State},
+    plays::Plays,
 };
 
-/// What the buttons over a cover do: play the album, add it to the favorites.
+/// What the buttons over a cover do: play the album, add it to the favorites. With the
+/// play history, which the pages they lead to show.
 #[derive(Clone)]
 pub struct CoverActions {
     pub favorites: Favorites,
     pub playback: Playback,
+    pub plays: Plays,
 }
 
 /// Plays albums from their covers. Cheap to clone: every clone is the same.

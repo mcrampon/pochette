@@ -100,6 +100,8 @@ pub enum AlbumsMsg {
         album: Box<Album>,
         added: bool,
     },
+    /// Something was played, which moves albums when sorting by plays.
+    PlaysChanged,
 }
 
 #[derive(Debug)]
@@ -349,6 +351,11 @@ impl Component for AlbumsPage {
                 added,
             });
         });
+        let input = sender.input_sender().clone();
+        model.actions.plays.connect_changed(move || {
+            input.emit(AlbumsMsg::PlaysChanged);
+            glib::ControlFlow::Continue
+        });
         model.covers.attach(&widgets.scroller);
         ComponentParts { model, widgets }
     }
@@ -440,6 +447,7 @@ impl Component for AlbumsPage {
                     self.refilter();
                 }
             }
+            AlbumsMsg::PlaysChanged => self.plays_changed(),
             AlbumsMsg::PlayRandom => self.play_random(&sender),
             AlbumsMsg::RandomLoaded(result) => {
                 let result = *result;
@@ -461,6 +469,14 @@ impl Component for AlbumsPage {
 }
 
 impl AlbumsPage {
+    /// Sorted by plays, albums move as they're played.
+    fn plays_changed(&mut self) {
+        if self.view.sort.uses_plays() {
+            self.sort_grid();
+            self.refilter();
+        }
+    }
+
     /// Search, filter or sort the albums.
     fn change_view(&mut self, msg: AlbumsMsg) {
         match msg {
@@ -600,7 +616,9 @@ impl AlbumsPage {
     /// which lets the grid keep the tiles of the albums that stay: refilling it instead
     /// would redraw hundreds of tiles at every key typed.
     fn fill_grid(&mut self) {
-        let all = self.view.sorted(&self.entries);
+        let all = self
+            .view
+            .sorted(&self.entries, &self.actions.plays.history());
         self.grid.clear();
         self.grid
             .extend_from_iter(all.into_iter().map(|entry| AlbumItem {
@@ -615,7 +633,7 @@ impl AlbumsPage {
     fn sort_grid(&self) {
         let ranks: HashMap<&str, usize> = self
             .view
-            .sorted(&self.entries)
+            .sorted(&self.entries, &self.actions.plays.history())
             .into_iter()
             .enumerate()
             .map(|(rank, entry)| (entry.album.id.as_str(), rank))
@@ -638,7 +656,9 @@ impl AlbumsPage {
 
     /// Show the albums the search and filters let through, staying where the grid was.
     fn refilter(&mut self) {
-        let shown = self.view.apply(&self.entries);
+        let shown = self
+            .view
+            .apply(&self.entries, &self.actions.plays.history());
         self.shown = shown.len();
         *self.visible.borrow_mut() = shown
             .into_iter()
@@ -652,7 +672,9 @@ impl AlbumsPage {
         let Some(client) = self.client.clone() else {
             return;
         };
-        let shown = self.view.apply(&self.entries);
+        let shown = self
+            .view
+            .apply(&self.entries, &self.actions.plays.history());
         if shown.is_empty() {
             return;
         }

@@ -6,6 +6,8 @@ use qobuz::models::Album;
 use serde::{Deserialize, Serialize};
 use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
 
+use crate::history::History;
+
 /// `text` in lower case and without accents, so "Beyoncé" matches "beyonce".
 pub fn fold(text: &str) -> String {
     text.nfd()
@@ -64,15 +66,19 @@ pub enum Sort {
     Title,
     Artist,
     ReleaseDate,
+    LastPlayed,
+    PlayCount,
 }
 
 impl Sort {
     /// In the order the sort menu lists them.
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 6] = [
         Self::DateAdded,
         Self::Title,
         Self::Artist,
         Self::ReleaseDate,
+        Self::LastPlayed,
+        Self::PlayCount,
     ];
 
     pub fn label(self) -> &'static str {
@@ -81,18 +87,34 @@ impl Sort {
             Self::Title => "Title",
             Self::Artist => "Artist",
             Self::ReleaseDate => "Release Date",
+            Self::LastPlayed => "Last Played",
+            Self::PlayCount => "Play Count",
         }
     }
 
-    /// Dates go newest first, names from A to Z.
+    /// Dates go newest first, and counts highest first; names from A to Z.
     fn newest_first(self) -> bool {
-        matches!(self, Self::DateAdded | Self::ReleaseDate)
+        !matches!(self, Self::Title | Self::Artist)
     }
 
-    fn compare(self, a: &Entry, b: &Entry) -> Ordering {
+    /// Whether the order depends on the plays.
+    pub fn uses_plays(self) -> bool {
+        matches!(self, Self::LastPlayed | Self::PlayCount)
+    }
+
+    fn compare(self, a: &Entry, b: &Entry, history: &History) -> Ordering {
         let release = |entry: &Entry| entry.album.release_date_original.clone();
+        let added = || b.album.favorited_at.cmp(&a.album.favorited_at);
+        let (plays_a, plays_b) = (history.album(&a.album.id), history.album(&b.album.id));
         match self {
-            Self::DateAdded => b.album.favorited_at.cmp(&a.album.favorited_at),
+            Self::DateAdded => added(),
+            // Albums never played last.
+            Self::LastPlayed => plays_b.last.cmp(&plays_a.last).then_with(added),
+            Self::PlayCount => plays_b
+                .count
+                .cmp(&plays_a.count)
+                .then_with(|| plays_b.last.cmp(&plays_a.last))
+                .then_with(added),
             Self::Title => a.title.cmp(&b.title).then_with(|| a.artist.cmp(&b.artist)),
             // An artist's albums in the order they came out.
             Self::Artist => a
@@ -120,7 +142,7 @@ pub struct View {
 }
 
 impl View {
-    pub fn apply<'a>(&self, entries: &'a [Entry]) -> Vec<&'a Entry> {
+    pub fn apply<'a>(&self, entries: &'a [Entry], history: &History) -> Vec<&'a Entry> {
         let words: Vec<String> = fold(&self.query)
             .split_whitespace()
             .map(str::to_owned)
@@ -141,20 +163,20 @@ impl View {
                         .is_some_and(|decade| self.decades.contains(&decade))
             })
             .collect();
-        self.sort(&mut shown);
+        self.sort(&mut shown, history);
         shown
     }
 
     /// All of `entries`, whatever the search and filters, in order.
-    pub fn sorted<'a>(&self, entries: &'a [Entry]) -> Vec<&'a Entry> {
+    pub fn sorted<'a>(&self, entries: &'a [Entry], history: &History) -> Vec<&'a Entry> {
         let mut all: Vec<&Entry> = entries.iter().collect();
-        self.sort(&mut all);
+        self.sort(&mut all, history);
         all
     }
 
-    fn sort(&self, entries: &mut [&Entry]) {
+    fn sort(&self, entries: &mut [&Entry], history: &History) {
         // Stable, so ties keep the order Qobuz gave.
-        entries.sort_by(|a, b| self.sort.compare(a, b));
+        entries.sort_by(|a, b| self.sort.compare(a, b, history));
         if self.reversed {
             entries.reverse();
         }
@@ -167,6 +189,13 @@ impl View {
 
     /// How the order reads: "Newest First", "A to Z"…
     pub fn order_label(&self) -> &'static str {
+        match (self.sort, self.reversed) {
+            (Sort::LastPlayed, false) => return "Most Recent First",
+            (Sort::LastPlayed, true) => return "Least Recent First",
+            (Sort::PlayCount, false) => return "Most Played First",
+            (Sort::PlayCount, true) => return "Least Played First",
+            _ => {}
+        }
         match (self.sort.newest_first(), self.reversed) {
             (true, false) => "Newest First",
             (true, true) => "Oldest First",
@@ -245,13 +274,19 @@ mod tests {
             query: "beyonce".into(),
             ..View::default()
         };
-        assert_eq!(titles(&view.apply(&library)), ["Lemonade"]);
+        assert_eq!(
+            titles(&view.apply(&library, &History::default())),
+            ["Lemonade"]
+        );
 
         let view = View {
             query: "  davis   brew ".into(),
             ..View::default()
         };
-        assert_eq!(titles(&view.apply(&library)), ["Bitches Brew"]);
+        assert_eq!(
+            titles(&view.apply(&library, &History::default())),
+            ["Bitches Brew"]
+        );
     }
 
     #[test]
@@ -262,7 +297,10 @@ mod tests {
             decades: vec![1950],
             ..View::default()
         };
-        assert_eq!(titles(&view.apply(&library)), ["Kind of Blue"]);
+        assert_eq!(
+            titles(&view.apply(&library, &History::default())),
+            ["Kind of Blue"]
+        );
     }
 
     #[test]
@@ -273,7 +311,7 @@ mod tests {
             ..View::default()
         };
         assert_eq!(
-            titles(&view.apply(&library)),
+            titles(&view.apply(&library, &History::default())),
             ["Bitches Brew", "Kind of Blue"]
         );
     }
@@ -284,7 +322,10 @@ mod tests {
             genres: vec!["Pop".into(), "Chanson française".into()],
             ..View::default()
         };
-        assert_eq!(titles(&view.apply(&library)), ["Écoute", "Lemonade"]);
+        assert_eq!(
+            titles(&view.apply(&library, &History::default())),
+            ["Écoute", "Lemonade"]
+        );
     }
 
     #[test]
@@ -297,7 +338,7 @@ mod tests {
                     reversed,
                     ..View::default()
                 }
-                .apply(&library),
+                .apply(&library, &History::default()),
             )
         };
         assert_eq!(
@@ -319,6 +360,64 @@ mod tests {
     }
 
     #[test]
+    fn sorts_by_plays() {
+        use crate::history::{AlbumRecord, ArtistRecord, Listen};
+
+        let library = library();
+        let mut history = History::default();
+        // Lemonade played twice, long ago; Kind of Blue once, lately; a third of Écoute, which
+        // isn't a play.
+        for (album, at, heard) in [
+            ("Lemonade", 0, 600),
+            ("Lemonade", 100_000, 600),
+            ("Kind of Blue", 200_000, 600),
+            ("Écoute", 300_000, 200),
+        ] {
+            let record = AlbumRecord {
+                id: album.into(),
+                title: album.into(),
+                version: None,
+                artist: ArtistRecord {
+                    id: 1,
+                    name: "Someone".into(),
+                },
+                genre: None,
+                cover: None,
+                cover_large: None,
+                released: None,
+                length: 600,
+            };
+            let listen = Listen {
+                at,
+                album: album.into(),
+                heard,
+            };
+            history.add(record, listen);
+        }
+        let sorted = |sort, reversed| {
+            let view = View {
+                sort,
+                reversed,
+                ..View::default()
+            };
+            titles(&view.apply(&library, &history))
+        };
+        assert_eq!(
+            sorted(Sort::PlayCount, false),
+            ["Lemonade", "Kind of Blue", "Écoute", "Bitches Brew"]
+        );
+        assert_eq!(
+            sorted(Sort::LastPlayed, false),
+            ["Kind of Blue", "Lemonade", "Écoute", "Bitches Brew"]
+        );
+        // Never played first: the least recently played.
+        assert_eq!(
+            sorted(Sort::LastPlayed, true),
+            ["Bitches Brew", "Écoute", "Lemonade", "Kind of Blue"]
+        );
+    }
+
+    #[test]
     fn sorts_everything_whatever_the_filters() {
         let library = library();
         let view = View {
@@ -327,7 +426,7 @@ mod tests {
             ..View::default()
         };
         let all: Vec<&str> = view
-            .sorted(&library)
+            .sorted(&library, &History::default())
             .iter()
             .map(|entry| entry.album.title.as_str())
             .collect();

@@ -16,9 +16,11 @@ use qobuz::{
     models::{Album, Track},
 };
 use tokio::{
-    sync::{mpsc, oneshot, watch},
+    sync::{broadcast, mpsc, oneshot, watch},
     task::JoinHandle,
 };
+
+use crate::history::{AlbumRecord, Listen, Log};
 
 /// Within this much of a track's start, "previous" goes to the previous track rather than
 /// back to the start of this one.
@@ -77,7 +79,11 @@ pub struct Player {
     status: watch::Receiver<Status>,
     /// To read the position and set the volume, which needs no help from the actor.
     playbin: gst::Element,
+    heard: broadcast::Sender<Heard>,
 }
+
+/// A track heard, and its album, as the play history keeps them.
+pub type Heard = (AlbumRecord, Listen);
 
 impl std::fmt::Debug for Player {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -115,12 +121,14 @@ impl Player {
             .map_err(|err| gst::glib::Error::new(gst::CoreError::MissingPlugin, &err.message))?;
         let (commands, receiver) = mpsc::unbounded_channel();
         let (status_sender, status) = watch::channel(Status::default());
-        let actor = Actor::new(playbin.clone(), status_sender);
+        let (heard, _) = broadcast::channel(16);
+        let actor = Actor::new(playbin.clone(), status_sender, heard.clone());
         relm4::spawn(actor.run(receiver));
         Ok(Self {
             commands,
             status,
             playbin,
+            heard,
         })
     }
 
@@ -189,6 +197,11 @@ impl Player {
         self.status.clone()
     }
 
+    /// Each track heard, once the player leaves it, after it's in the play history.
+    pub fn heard(&self) -> broadcast::Receiver<Heard> {
+        self.heard.subscribe()
+    }
+
     fn send(&self, command: Command) {
         // The actor only ends with the app.
         let _ = self.commands.send(command);
@@ -230,10 +243,29 @@ struct Actor {
     report: Option<Report>,
     /// Reports of tracks no longer playing that may still be on their way to Qobuz.
     sending: Vec<JoinHandle<()>>,
+    /// The track being heard, until the player leaves it for the play history.
+    listening: Option<Listening>,
+    /// Whether the track starting is the one heard, starting again in another quality.
+    same_listening: bool,
+    log: Log,
+    heard: broadcast::Sender<Heard>,
+}
+
+/// A track being heard.
+struct Listening {
+    index: usize,
+    at: SystemTime,
+    heard: Duration,
+    /// Only a preview, which isn't listening to the album.
+    sample: bool,
 }
 
 impl Actor {
-    fn new(playbin: gst::Element, status: watch::Sender<Status>) -> Self {
+    fn new(
+        playbin: gst::Element,
+        status: watch::Sender<Status>,
+        heard: broadcast::Sender<Heard>,
+    ) -> Self {
         let upcoming: Arc<Mutex<Option<Upcoming>>> = Arc::default();
         let switched: Arc<Mutex<Option<Upcoming>>> = Arc::default();
 
@@ -268,6 +300,10 @@ impl Actor {
             wants_playing: false,
             report: None,
             sending: Vec::new(),
+            listening: None,
+            same_listening: false,
+            log: Log::default(),
+            heard,
         }
     }
 
@@ -384,6 +420,7 @@ impl Actor {
         };
         let position = self.position();
         self.retire_report(false);
+        self.same_listening = true;
         self.play(index).await;
         self.resume_at = Some(position);
         if state == State::Paused {
@@ -433,6 +470,9 @@ impl Actor {
         } else {
             report.stretch_ended(position);
         }
+        if let Some(listening) = &mut self.listening {
+            listening.heard += report.heard;
+        }
         self.sending.retain(|sending| !sending.is_finished());
         self.sending.append(&mut report.sending);
     }
@@ -477,6 +517,7 @@ impl Actor {
     /// Stop the stream, reporting what was listened to.
     async fn stop(&mut self) {
         self.retire_report(false);
+        self.end_listening();
         for sending in self.sending.drain(..) {
             let _ = tokio::time::timeout(Duration::from_secs(5), sending).await;
         }
@@ -510,6 +551,7 @@ impl Actor {
                 if let Some(next) = next.filter(|&next| next < self.queue.len()) {
                     self.play(next).await;
                 } else {
+                    self.end_listening();
                     let _ = self.playbin.set_state(gst::State::Null);
                     self.current = None;
                     self.wants_playing = false;
@@ -545,7 +587,8 @@ impl Actor {
 
     /// A track's stream started: report it, show it, and get the next one ready.
     fn track_started(&mut self, started: &Upcoming) {
-        let Some(track) = self.queue.get(started.index) else {
+        let queue = self.queue.clone();
+        let Some(track) = queue.get(started.index) else {
             return;
         };
         tracing::info!(
@@ -559,13 +602,27 @@ impl Actor {
             }
         );
         self.current = Some(started.index);
+        let same = std::mem::take(&mut self.same_listening)
+            && self
+                .listening
+                .as_ref()
+                .is_some_and(|listening| listening.index == started.index);
+        if !same {
+            self.end_listening();
+            self.listening = Some(Listening {
+                index: started.index,
+                at: SystemTime::now(),
+                heard: Duration::ZERO,
+                sample: started.file.sample,
+            });
+        }
         self.quality = if started.file.format_id == Quality::Mp3 as u32 {
             Some("MP3 \u{b7} 320 kbps".to_owned())
         } else {
             crate::format::audio_quality(started.file.bit_depth, started.file.sampling_rate)
         };
         if let Some(client) = &self.client {
-            self.report = Report::start(client.clone(), track, &started.file);
+            self.report = Some(Report::start(client.clone(), track, &started.file));
         }
         // Paused when its stream changed while paused.
         let state = if self.wants_playing {
@@ -600,9 +657,41 @@ impl Actor {
 
     fn fail(&mut self, error: &str) {
         self.retire_report(false);
+        self.end_listening();
         let _ = self.playbin.set_state(gst::State::Null);
         self.wants_playing = false;
         self.publish(State::Stopped, Some(error.to_owned()));
+    }
+
+    /// Done with the track heard: into the play history it goes.
+    fn end_listening(&mut self) {
+        let Some(listening) = self.listening.take() else {
+            return;
+        };
+        let (Some(album), Some(track)) = (&self.album, self.queue.get(listening.index)) else {
+            return;
+        };
+        let heard = u32::try_from(listening.heard.as_secs()).unwrap_or(u32::MAX);
+        if listening.sample || heard == 0 {
+            return;
+        }
+        let length = self.queue.iter().map(|track| track.duration).sum();
+        let record = AlbumRecord::new(album, length);
+        let at = listening
+            .at
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .ok()
+            .and_then(|since| i64::try_from(since.as_secs()).ok())
+            .unwrap_or_default();
+        let listen = Listen {
+            at,
+            album: album.id.clone(),
+            heard: heard.min(track.duration.max(1)),
+        };
+        if let Err(err) = self.log.append(&record, &listen) {
+            tracing::warn!("cannot add to the play history: {err}");
+        }
+        let _ = self.heard.send((record, listen));
     }
 
     fn publish(&self, state: State, error: Option<String>) {
@@ -637,10 +726,13 @@ fn position(playbin: &gst::Element) -> Option<Duration> {
 struct Report {
     client: Client,
     track_id: u64,
-    blob: String,
+    /// What Qobuz needs to hear about it; without it, nothing is told.
+    blob: Option<String>,
     /// Ties the stretches of this play together.
     play_id: String,
     duration: Duration,
+    /// How long it was heard, over all its stretches.
+    heard: Duration,
     /// When and where in the track the current stretch started.
     stretch: Option<(SystemTime, Duration)>,
     /// Reports being sent, so quitting can wait for them.
@@ -648,28 +740,31 @@ struct Report {
 }
 
 impl Report {
-    /// Report that `track` started; `None` when Qobuz gave nothing to report it with.
-    fn start(client: Client, track: &Track, file: &FileUrl) -> Option<Self> {
-        let Some(blob) = file.blob.clone() else {
-            tracing::debug!("no blob to report the streaming of track {}", track.id);
-            return None;
-        };
+    /// Report that `track` started, if Qobuz gave something to report it with.
+    fn start(client: Client, track: &Track, file: &FileUrl) -> Self {
         let (track_id, format_id) = (track.id, file.format_id);
-        let reporting = client.clone();
-        let sending = relm4::spawn(async move {
-            if let Err(err) = reporting.report_streaming_start(track_id, format_id).await {
-                tracing::warn!("cannot report the start of track {track_id}: {err}");
-            }
-        });
-        Some(Self {
+        let blob = file.blob.clone();
+        let mut sending = Vec::new();
+        if blob.is_some() {
+            let reporting = client.clone();
+            sending.push(relm4::spawn(async move {
+                if let Err(err) = reporting.report_streaming_start(track_id, format_id).await {
+                    tracing::warn!("cannot report the start of track {track_id}: {err}");
+                }
+            }));
+        } else {
+            tracing::debug!("no blob to report the streaming of track {track_id}");
+        }
+        Self {
             client,
             track_id,
             blob,
             play_id: uuid::Uuid::new_v4().to_string(),
             duration: Duration::from_secs(track.duration.into()),
+            heard: Duration::ZERO,
             stretch: Some((SystemTime::now(), Duration::ZERO)),
-            sending: vec![sending],
-        })
+            sending,
+        }
     }
 
     fn stretch_started(&mut self, position: Duration) {
@@ -682,15 +777,14 @@ impl Report {
         let Some((started_at, started_from)) = self.stretch.take() else {
             return;
         };
-        let duration = position
-            .saturating_sub(started_from)
-            .min(self.duration)
-            .as_secs();
-        if duration == 0 {
+        let stretch = position.saturating_sub(started_from).min(self.duration);
+        self.heard += stretch;
+        let duration = stretch.as_secs();
+        let Some(blob) = self.blob.clone().filter(|_| duration > 0) else {
             return;
-        }
+        };
         let event = StreamingEnd {
-            blob: self.blob.clone(),
+            blob,
             track_context_uuid: self.play_id.clone(),
             start_stream: humantime::format_rfc3339_millis(started_at).to_string(),
             online: true,
