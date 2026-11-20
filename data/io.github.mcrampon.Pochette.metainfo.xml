@@ -19,6 +19,7 @@
     <ul>
       <li>Albums: your saved albums, to search, filter by genre and decade, sort, or play at random</li>
       <li>Discover: Qobuz's new releases, press awards and ideal discography, by genre</li>
+      <li>Listening stats: your top albums, artists and genres, and how much you listened, by month or year</li>
       <li>Lyrics that follow the song, looked up on LRCLIB while you show them</li>
       <li>Hi-Res streaming, up to what your subscription allows</li>
       <li>Media keys and desktop media controls, through MPRIS</li>
@@ -75,6 +76,19 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.0.0" date="2026-11-20">
+      <description>
+        <ul>
+          <li>Listening stats, from the main menu: time listened, album plays, top albums, artists and genres, by month, year or all time</li>
+          <li>Sort albums by when they were last played, or how many times</li>
+          <li>Album pages show how many times you played them</li>
+          <li>The genre filter on Discover's See All pages too</li>
+          <li>The Now Playing button is labelled when the window has room</li>
+          <li>Leaving a tab, or clicking it again, takes it back to its own page</li>
+          <li>Fixed: a search bar taking the focus when changing pages</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.3.0" date="2026-11-19">
       <description>
         <p>

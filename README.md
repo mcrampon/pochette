@@ -16,6 +16,8 @@ and is not affiliated with Qobuz.
 
 - **Albums**: your saved albums, to search, filter by genre and decade, sort, or play at random
 - **Discover**: Qobuz's new releases, press awards and ideal discography, by genre
+- **Listening stats**: your top albums, artists and genres, and how much you listened, by
+  month or year
 - **Lyrics** that follow the song, looked up on [LRCLIB](https://lrclib.net) while you show them
 - **Hi-Res** streaming, up to what your subscription allows
 - **Media keys** and desktop media controls, through MPRIS
@@ -61,6 +63,10 @@ Qobuz could change that at any time, which would break Pochette until it's updat
 Pochette talks to Qobuz, and to nobody else, except for lyrics: while you show them, it sends
 the title, artist, album and length of the track playing to [LRCLIB](https://lrclib.net) to
 find them. Covers are cached in `$XDG_CACHE_HOME/pochette`.
+
+What you play is logged in `$XDG_DATA_HOME/pochette`, for the stats and to sort albums by
+plays. It stays on your computer: each one writes its own file, so syncing that folder
+between computers, with Syncthing for instance, adds up their plays.
 
 ## Layout
 
