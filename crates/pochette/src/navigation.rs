@@ -156,6 +156,9 @@ impl Navigator {
 
     /// Back to the tab's own page, closing all the others.
     pub fn home(&mut self) {
+        for (_, page) in &self.pages {
+            drop_focus_within(&page.widget());
+        }
         self.leaving
             .extend(self.pages.drain(..).map(|(_, page)| page));
         self.stack.set_visible_child_name("home");
@@ -246,6 +249,9 @@ impl Navigator {
             (Some(results), Some(client)) => {
                 results.emit(SearchPageMsg::Show { client, query });
                 if self.pages.len() > 1 {
+                    for (_, page) in &self.pages[1..] {
+                        drop_focus_within(&page.widget());
+                    }
                     self.leaving
                         .extend(self.pages.drain(1..).map(|(_, page)| page));
                     self.stack.set_visible_child(&self.pages[0].1.widget());
@@ -267,6 +273,7 @@ impl Navigator {
         let Some((_, page)) = self.pages.pop() else {
             return;
         };
+        drop_focus_within(&page.widget());
         self.leaving.push(page);
         match self.pages.last() {
             Some((_, under)) => self.stack.set_visible_child(&under.widget()),
@@ -287,5 +294,21 @@ impl Navigator {
         for page in self.leaving.drain(..) {
             self.stack.remove(&page.widget());
         }
+    }
+}
+
+/// Let go of the focus if `widget` or what's in it has it, before `widget` goes out of
+/// sight. Otherwise GTK hands the focus to the first widget around that takes it, which
+/// is often a search bar: typing would then search.
+pub fn drop_focus_within(widget: &impl IsA<gtk::Widget>) {
+    let Some(root) = widget.root() else {
+        return;
+    };
+    let widget = widget.as_ref();
+    if root
+        .focus()
+        .is_some_and(|focus| focus == *widget || focus.is_ancestor(widget))
+    {
+        root.set_focus(None::<&gtk::Widget>);
     }
 }

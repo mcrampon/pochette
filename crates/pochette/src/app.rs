@@ -17,7 +17,7 @@ use crate::{
     favorites::Favorites,
     icon_label::{HeaderFit, IconLabel},
     mpris,
-    navigation::Destination,
+    navigation::{self, Destination},
     now_playing::{NowPlaying, NowPlayingOutput},
     playback::{CoverActions, Playback},
     player::{Player, State},
@@ -546,6 +546,9 @@ impl Component for App {
 
 /// A click on the button of the tab shown, which does nothing to the switcher, takes the
 /// tab back to its own page.
+///
+/// A click on any of them first takes the focus from the page shown, if it has it: the
+/// stack would hand it to the first widget of the page it shows next, often a search bar.
 fn follow_clicks_on_tab_shown(switcher: &gtk::StackSwitcher, sender: &ComponentSender<App>) {
     let click = gtk::GestureClick::new();
     // Before the button, which still gets the click.
@@ -555,6 +558,12 @@ fn follow_clicks_on_tab_shown(switcher: &gtk::StackSwitcher, sender: &ComponentS
         let Some(switcher) = gesture.widget() else {
             return;
         };
+        if let Some(stack) = switcher
+            .downcast_ref::<gtk::StackSwitcher>()
+            .and_then(gtk::StackSwitcher::stack)
+        {
+            navigation::drop_focus_within(&stack);
+        }
         let button = switcher
             .pick(x, y, gtk::PickFlags::DEFAULT)
             .and_then(|target| {
@@ -633,6 +642,8 @@ impl App {
     /// Show the tab, or what's beside the tabs, named `name`.
     fn show(&self, name: &str) {
         if let Some(library) = &self.library {
+            // Or the stack hands it to the first widget of the page shown: a search bar.
+            navigation::drop_focus_within(library);
             library.set_visible_child_name(name);
         }
     }
