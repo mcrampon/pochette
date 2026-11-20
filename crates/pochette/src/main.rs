@@ -14,6 +14,7 @@ mod covers;
 mod discover;
 mod favorites;
 mod format;
+mod icon_label;
 mod library;
 mod lyrics;
 mod lyrics_view;

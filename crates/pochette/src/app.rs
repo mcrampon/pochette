@@ -15,6 +15,7 @@ use crate::{
     albums::{AlbumsMsg, AlbumsOutput, AlbumsPage},
     discover::{DiscoverMsg, DiscoverOutput, DiscoverPage},
     favorites::Favorites,
+    icon_label::{HeaderFit, IconLabel},
     mpris,
     navigation::Destination,
     now_playing::{NowPlaying, NowPlayingOutput},
@@ -112,52 +113,59 @@ impl Component for App {
         gtk::ApplicationWindow {
             set_title: Some("Pochette"),
             set_default_size: (1100, 760),
-
+            // Lets the Now Playing button's label go when the header bar is short of room.
             #[wrap(Some)]
-            set_titlebar = &gtk::HeaderBar {
-                pack_start = &gtk::SearchEntry {
-                    set_placeholder_text: Some("Search Qobuz"),
-                    set_width_request: 260,
-                    // Each search is a request: wait for the typing to pause.
-                    set_search_delay: 300,
-                    #[watch]
-                    set_visible: model.screen == Screen::SignedIn,
-                    connect_search_changed[sender] => move |entry| {
-                        sender.input(Msg::Search(entry.text().into()));
-                    },
-                    // Enter shows the results again, after picking a tab.
-                    connect_activate[sender] => move |entry| {
-                        sender.input(Msg::Search(entry.text().into()));
-                    },
-                    connect_stop_search => |entry| entry.set_text(""),
-                },
-
+            #[name = "header_fit"]
+            set_titlebar = &HeaderFit {
                 #[wrap(Some)]
-                set_title_widget = &gtk::StackSwitcher {
-                    set_stack: Some(&library),
-                    #[watch]
-                    set_visible: model.screen == Screen::SignedIn,
-                },
+                set_child = &gtk::HeaderBar {
+                    pack_start = &gtk::SearchEntry {
+                        set_placeholder_text: Some("Search Qobuz"),
+                        set_width_request: 260,
+                        // Each search is a request: wait for the typing to pause.
+                        set_search_delay: 300,
+                        #[watch]
+                        set_visible: model.screen == Screen::SignedIn,
+                        connect_search_changed[sender] => move |entry| {
+                            sender.input(Msg::Search(entry.text().into()));
+                        },
+                        // Enter shows the results again, after picking a tab.
+                        connect_activate[sender] => move |entry| {
+                            sender.input(Msg::Search(entry.text().into()));
+                        },
+                        connect_stop_search => |entry| entry.set_text(""),
+                    },
 
-                pack_end = &gtk::MenuButton {
-                    set_icon_name: "open-menu-symbolic",
-                    set_tooltip_text: Some("Main Menu"),
-                    set_menu_model: Some(&main_menu),
-                    #[watch]
-                    set_visible: model.screen == Screen::SignedIn,
-                },
+                    #[wrap(Some)]
+                    set_title_widget = &gtk::StackSwitcher {
+                        set_stack: Some(&library),
+                        #[watch]
+                        set_visible: model.screen == Screen::SignedIn,
+                    },
 
-                pack_end = &gtk::ToggleButton {
-                    set_icon_name: "audio-x-generic-symbolic",
-                    set_tooltip_text: Some("Now Playing"),
-                    #[watch]
-                    set_visible: model.screen == Screen::SignedIn && model.playing,
-                    #[watch]
-                    #[block_signal(pane_toggled)]
-                    set_active: model.pane_open,
-                    connect_toggled[sender] => move |button| {
-                        sender.input(Msg::ShowPane(button.is_active()));
-                    } @pane_toggled,
+                    pack_end = &gtk::MenuButton {
+                        set_icon_name: "open-menu-symbolic",
+                        set_tooltip_text: Some("Main Menu"),
+                        set_menu_model: Some(&main_menu),
+                        #[watch]
+                        set_visible: model.screen == Screen::SignedIn,
+                    },
+
+                    pack_end = &gtk::ToggleButton {
+                        // Its label goes when the header bar is short of room.
+                        set_child: Some(&now_playing_label),
+                        // Its padding is an icon's, which the label balances.
+                        add_css_class: "image-button",
+                        set_tooltip_text: Some("Now Playing"),
+                        #[watch]
+                        set_visible: model.screen == Screen::SignedIn && model.playing,
+                        #[watch]
+                        #[block_signal(pane_toggled)]
+                        set_active: model.pane_open,
+                        connect_toggled[sender] => move |button| {
+                            sender.input(Msg::ShowPane(button.is_active()));
+                        } @pane_toggled,
+                    },
                 },
             },
 
@@ -377,7 +385,9 @@ impl Component for App {
             pane_open: false,
             collapsed: false,
         };
+        let now_playing_label = IconLabel::new("audio-x-generic-symbolic", "Now Playing");
         let widgets = view_output!();
+        widgets.header_fit.set_label(&now_playing_label);
         model.library = Some(widgets.library.clone());
         let input = sender.input_sender().clone();
         widgets
