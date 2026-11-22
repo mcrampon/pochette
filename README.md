@@ -18,6 +18,8 @@ and is not affiliated with Qobuz.
 - **Discover**: Qobuz's new releases, press awards and ideal discography, by genre
 - **Listening stats**: your top albums, artists and genres, and how much you listened, by
   month or year
+- **Devices**: your plays synced between your computers on the same network, even while
+  Pochette is closed
 - **Lyrics** that follow the song, looked up on [LRCLIB](https://lrclib.net) while you show them
 - **Hi-Res** streaming, up to what your subscription allows
 - **Media keys** and desktop media controls, through MPRIS
@@ -58,6 +60,28 @@ in your keyring through the Secret Service API (GNOME Keyring, KWallet, KeePassX
 Pochette talks to Qobuz the way its web player does, with the web player's own credentials.
 Qobuz could change that at any time, which would break Pochette until it's updated.
 
+## Syncing devices
+
+Devices, in the main menu, pairs this computer with your others: open it on both, on the same
+network, pick the other one, and check that both show the same code. From then on, they send
+each other the plays the other lacks whenever they're on the same network, over an encrypted
+connection only they can open ([Noise](https://noiseprotocol.org), with each computer's own
+key).
+
+A small service, `pochette --sync`, does it, with no window. It runs while Pochette is open,
+and, unless you turn it off in Devices, while it's closed: it then starts with your session,
+from an [XDG autostart](https://specifications.freedesktop.org/autostart-spec/latest/) entry
+in `$XDG_CONFIG_HOME/autostart`. Desktops that don't read those, as some tiling window managers,
+need `pochette --sync` added to their own startup.
+
+Computers find each other with mDNS, and sync over TCP. A firewall must let through:
+
+- TCP port 45617, to sync
+- UDP port 5353 (mDNS), to find each other; without it, pair by address instead
+
+Some networks keep their devices apart, as many public and guest Wi-Fi networks do: there,
+computers can't sync.
+
 ## Privacy
 
 Pochette talks to Qobuz, and to nobody else, except for lyrics: while you show them, it sends
@@ -65,8 +89,13 @@ the title, artist, album and length of the track playing to [LRCLIB](https://lrc
 find them. Covers are cached in `$XDG_CACHE_HOME/pochette`.
 
 What you play is logged in `$XDG_DATA_HOME/pochette`, for the stats and to sort albums by
-plays. It stays on your computer: each one writes its own file, so syncing that folder
-between computers, with Syncthing for instance, adds up their plays.
+plays. It stays on your computers: only those you pair get it, over your local network. Each
+computer writes its own file, so syncing that folder by other means, as with Syncthing, adds
+up their plays too. Each computer's key and the computers it's paired with are kept in
+`$XDG_STATE_HOME/pochette`.
+
+While paired, or while Devices is open, Pochette announces itself on the local network, with
+the computer's name, for the others to find it.
 
 ## Layout
 

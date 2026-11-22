@@ -12,6 +12,7 @@ mod checklist;
 mod choice_picker;
 mod clamp;
 mod covers;
+mod devices;
 mod discover;
 mod favorites;
 mod format;
@@ -36,8 +37,11 @@ mod settings;
 mod sort_picker;
 mod split_view;
 mod stats_view;
+mod sync;
 mod tile_grid;
 mod tile_strip;
+
+use std::process::ExitCode;
 
 use tracing_subscriber::EnvFilter;
 
@@ -56,19 +60,20 @@ fn show_icon() {
     }
 }
 
-fn main() {
+fn main() -> ExitCode {
     // Before GTK, which would need a display and reject these options.
     match std::env::args().nth(1).as_deref() {
         Some("--version" | "-V") => {
             println!("pochette {}", env!("CARGO_PKG_VERSION"));
-            return;
+            return ExitCode::SUCCESS;
         }
         Some("--help" | "-h") => {
             println!(
-                "Usage: pochette [--version | --help]\n\n\
-                 A native Linux player for Qobuz, built around albums."
+                "Usage: pochette [--version | --help | --sync]\n\n\
+                 A native Linux player for Qobuz, built around albums.\n\n\
+                 --sync  sync the plays with the paired devices, without a window"
             );
-            return;
+            return ExitCode::SUCCESS;
         }
         _ => {}
     }
@@ -77,10 +82,15 @@ fn main() {
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .init();
 
+    if std::env::args().nth(1).as_deref() == Some("--sync") {
+        return sync::run();
+    }
+
     let relm = relm4::RelmApp::new(APP_ID);
     show_icon();
     relm4::set_global_css(include_str!("style.css"));
     accent::follow();
     covers::prune_cache();
     relm.run::<app::App>(());
+    ExitCode::SUCCESS
 }

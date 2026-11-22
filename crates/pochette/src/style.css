@@ -396,6 +396,15 @@ entry:focus-within {
   background-color: alpha(currentColor, 0.05);
 }
 
+/* A device, in the Devices window. */
+.pochette-device {
+  padding: 10px 14px;
+}
+
+.pochette-device-name {
+  font-weight: 700;
+}
+
 .pochette-stat {
   font-size: 2em;
   font-weight: 800;

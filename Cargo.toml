@@ -22,6 +22,11 @@ humantime = "2"
 uuid = { version = "1", features = ["v4"] }
 unicode-normalization = "0.1"
 mpris-server = { version = "0.11", features = ["tokio"] }
+# Syncing plays between devices: their discovery, encrypted connections, and the app's
+# link to the service that syncs.
+mdns-sd = "0.21"
+snow = "0.10"
+zbus = { version = "6", default-features = false, features = ["tokio"] }
 regex = "1"
 reqwest = { version = "0.13", features = ["json", "query", "form"] }
 base64 = "0.23"

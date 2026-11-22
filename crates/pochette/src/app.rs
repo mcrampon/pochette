@@ -13,6 +13,7 @@ use tokio::task::JoinHandle;
 use crate::{
     account::{self, Account},
     albums::{AlbumsMsg, AlbumsOutput, AlbumsPage},
+    devices::{Devices, DevicesMsg},
     discover::{DiscoverMsg, DiscoverOutput, DiscoverPage},
     favorites::Favorites,
     icon_label::{HeaderFit, IconLabel},
@@ -31,6 +32,7 @@ use crate::{
 
 relm4::new_action_group!(WindowActions, "win");
 relm4::new_stateless_action!(StatsAction, WindowActions, "stats");
+relm4::new_stateless_action!(DevicesAction, WindowActions, "devices");
 relm4::new_stateless_action!(SignOutAction, WindowActions, "sign-out");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -61,6 +63,8 @@ pub struct App {
     search_view: Controller<SearchView>,
     /// The listening stats, beside the tabs too.
     stats: Controller<StatsView>,
+    /// The devices the plays sync with, in a window of its own.
+    devices: Controller<Devices>,
     /// The tabs and the search results.
     library: Option<gtk::Stack>,
     /// The tab to go back to when the search results close.
@@ -341,6 +345,7 @@ impl Component for App {
     menu! {
         main_menu: {
             "Listening Stats" => StatsAction,
+            "Devices" => DevicesAction,
             "Sign Out" => SignOutAction,
         }
     }
@@ -396,6 +401,7 @@ impl Component for App {
                 .forward(sender.input_sender(), |output| match output {
                     StatsViewOutput::SessionExpired => Msg::SessionExpired,
                 }),
+            devices: Devices::builder().transient_for(&root).launch(()).detach(),
             library: None,
             last_tab: "albums".to_owned(),
             shown: "albums".to_owned(),
@@ -426,12 +432,17 @@ impl Component for App {
         actions.add_action(RelmAction::<StatsAction>::new_stateless(move |_| {
             input.emit(Msg::ShowStats);
         }));
+        let devices = model.devices.sender().clone();
+        actions.add_action(RelmAction::<DevicesAction>::new_stateless(move |_| {
+            devices.emit(DevicesMsg::Open);
+        }));
         let input = sender.input_sender().clone();
         actions.add_action(RelmAction::<SignOutAction>::new_stateless(move |_| {
             input.emit(Msg::SignOut);
         }));
         actions.register_for_widget(&root);
 
+        crate::sync::client::start_if_paired();
         sender.input(Msg::Start);
         ComponentParts { model, widgets }
     }

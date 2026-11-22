@@ -1,9 +1,9 @@
 //! What the user listened to, and when: a log of every track heard, from which the play
 //! counts, the last plays and the stats are worked out. No UI here, so it can be tested.
 //!
-//! Each machine appends to its own file, `$XDG_DATA_HOME/pochette/plays-<host>.jsonl`, and
-//! reads them all: syncing that folder between machines adds up their plays, without two
-//! machines ever writing to the same file.
+//! Each machine appends to its own file, `$XDG_DATA_HOME/pochette/plays-<host>-<tag>.jsonl`
+//! (see `sync::device`), and reads them all: syncing them between machines adds up their
+//! plays, without two machines ever writing to the same file.
 
 use std::{
     collections::HashMap,
@@ -114,17 +114,7 @@ fn dir() -> PathBuf {
 
 /// This machine's log, which it alone writes to.
 fn own_file() -> PathBuf {
-    let host: String = glib::host_name()
-        .chars()
-        .map(|c| {
-            if c.is_alphanumeric() || c == '-' {
-                c
-            } else {
-                '_'
-            }
-        })
-        .collect();
-    dir().join(format!("plays-{host}.jsonl"))
+    crate::sync::device::own_log().to_path_buf()
 }
 
 /// Writes this machine's log.
