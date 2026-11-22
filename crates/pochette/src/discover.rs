@@ -147,6 +147,8 @@ impl Component for DiscoverPage {
                     set_margin_bottom: 12,
                     set_margin_start: 36,
                     set_margin_end: 36,
+                    // At the right, where the Albums tab has its filters.
+                    set_halign: gtk::Align::End,
 
                     #[local_ref]
                     genre_button -> gtk::Overlay {},
@@ -254,6 +256,8 @@ impl Component for DiscoverPage {
                         #[watch]
                         set_label: model.section.map_or("", title),
                         add_css_class: "pochette-heading",
+                        set_hexpand: true,
+                        set_xalign: 0.0,
                     },
                     #[local_ref]
                     section_genre_button -> gtk::Overlay {
