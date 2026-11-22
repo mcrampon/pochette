@@ -22,6 +22,7 @@ use crate::{
     favorites::{Favorites, Heart, with_heart},
     format,
     lyrics_view::{LyricsView, LyricsViewMsg},
+    outputs::OutputPicker,
     path_icon::{self, PathIcon},
     player::{Player, State, Status},
     settings::Settings,
@@ -67,6 +68,8 @@ pub struct NowPlaying {
     scrubs: u64,
     /// Tells the latest volume change from the earlier ones.
     volume_changes: u64,
+    /// Picks the audio output, at the end of the volume's row.
+    output_picker: OutputPicker,
     seeked_at: Option<Instant>,
 }
 
@@ -317,6 +320,10 @@ impl Component for NowPlaying {
                                 set_icon_name: Some("audio-volume-high-symbolic"),
                                 add_css_class: "dim-label",
                             },
+                            #[local_ref]
+                            output_button -> gtk::MenuButton {
+                                set_margin_start: 6,
+                            },
                         },
                     },
 
@@ -354,6 +361,7 @@ impl Component for NowPlaying {
         follow_playback(&player, &sender);
         tick(&sender);
         let lyrics = LyricsView::builder().launch(player.clone()).detach();
+        let output_picker = OutputPicker::new(&player);
         let model = Self {
             status: player.status().borrow().clone(),
             player,
@@ -377,6 +385,7 @@ impl Component for NowPlaying {
             scrub: None,
             scrubs: 0,
             volume_changes: 0,
+            output_picker,
             seeked_at: None,
         };
         let cover_box = &with_heart(&model.cover, &model.heart);
@@ -391,6 +400,7 @@ impl Component for NowPlaying {
         let elapsed = &model.elapsed;
         let remaining = &model.remaining;
         let queue_list = &model.queue_list;
+        let output_button = model.output_picker.widget();
         // The cover opens the album's page too.
         let click = gtk::GestureClick::new();
         let input = sender.input_sender().clone();

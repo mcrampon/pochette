@@ -1,2 +1,2 @@
 # Names that are words, not code, in doc comments.
-doc-valid-idents = ["GStreamer", ".."]
+doc-valid-idents = ["GStreamer", "PipeWire", "PulseAudio", ".."]

@@ -1,7 +1,11 @@
 //! A button that picks one of a few choices, such as a year: its label is the choice
-//! picked, and its popover lists them all, a check at the end of the one picked.
+//! picked, or it's an icon, and its popover lists them all, a check at the end of the one
+//! picked.
 
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 
 use relm4::gtk::{self, prelude::*};
 
@@ -15,6 +19,8 @@ struct Inner {
     list: gtk::Box,
     /// The choices' rows, and their checks.
     rows: RefCell<Vec<(String, gtk::Image)>>,
+    /// Whether the button shows the choice picked, rather than an icon.
+    labelled: Cell<bool>,
     #[expect(clippy::type_complexity)]
     on_pick: RefCell<Option<Box<dyn Fn(usize)>>>,
 }
@@ -34,8 +40,20 @@ impl ChoicePicker {
             popover,
             list,
             rows: RefCell::default(),
+            labelled: Cell::new(true),
             on_pick: RefCell::default(),
         }))
+    }
+
+    /// A picker showing `icon` rather than the choice picked, which its tooltip tells.
+    pub fn with_icon(icon: &str, tooltip: &str) -> Self {
+        let picker = Self::new(tooltip);
+        let button = &picker.0.button;
+        button.set_always_show_arrow(false);
+        button.set_icon_name(icon);
+        button.set_has_frame(false);
+        picker.0.labelled.set(false);
+        picker
     }
 
     pub fn widget(&self) -> &gtk::MenuButton {
@@ -56,6 +74,10 @@ impl ChoicePicker {
                     .label(name)
                     .xalign(0.0)
                     .hexpand(true)
+                    // Long names, as some audio outputs have, cut short.
+                    .max_width_chars(40)
+                    .ellipsize(gtk::pango::EllipsizeMode::End)
+                    .tooltip_text(name)
                     .build(),
             );
             let check = gtk::Image::builder()
@@ -91,10 +113,15 @@ impl ChoicePicker {
         for (index, (name, check)) in rows.iter().enumerate() {
             // Hidden rather than gone, so the rows stay as wide whichever is picked.
             check.set_opacity(if index == picked { 1.0 } else { 0.0 });
-            if index == picked {
+            if index == picked && self.0.labelled.get() {
                 self.0.button.set_label(name);
             }
         }
+    }
+
+    /// Call `f` as the popover is about to show, to offer the choices of the moment.
+    pub fn connect_opening(&self, f: impl Fn() + 'static) {
+        self.0.button.set_create_popup_func(move |_| f());
     }
 
     /// Call `f` with the position of the choice the user picks.

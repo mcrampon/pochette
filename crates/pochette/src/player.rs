@@ -109,6 +109,9 @@ enum Command {
     Seek(Duration),
     /// Stream in this quality at best, from now on: the track playing too.
     SetQuality(Quality),
+    /// Play through this sink, or the system's default output when `None`: the track
+    /// playing too.
+    SetOutput(Option<gst::Element>),
     /// Stop, and answer once the last listening is reported.
     Stop(Option<oneshot::Sender<()>>),
 }
@@ -165,6 +168,12 @@ impl Player {
     /// Stream in `quality` at best, the track playing included.
     pub fn set_quality(&self, quality: Quality) {
         self.send(Command::SetQuality(quality));
+    }
+
+    /// Play through `sink`, or the system's default output when `None`, the track playing
+    /// included.
+    pub fn set_output(&self, sink: Option<gst::Element>) {
+        self.send(Command::SetOutput(sink));
     }
 
     /// Where playback is in the current track.
@@ -365,6 +374,7 @@ impl Actor {
             }
             Command::Seek(position) => self.seek(position),
             Command::SetQuality(quality) => self.set_quality(quality).await,
+            Command::SetOutput(sink) => self.set_output(sink).await,
             Command::Stop(done) => {
                 self.stop().await;
                 self.album = None;
@@ -414,12 +424,32 @@ impl Actor {
             return;
         }
         self.best_quality = quality;
+        self.restart_track(|_| {}).await;
+    }
+
+    /// Play through `sink`, or the default output: the track playing starts again on it,
+    /// where it was, paused if it was.
+    async fn set_output(&mut self, sink: Option<gst::Element>) {
+        // The sink only changes while the stream is stopped.
+        self.restart_track(move |playbin| {
+            let _ = playbin.set_state(gst::State::Null);
+            playbin.set_property("audio-sink", sink);
+        })
+        .await;
+    }
+
+    /// Start the track playing again where it was, paused if it was, once `change` has
+    /// changed what it plays through: its stream, or its output. Without a track, only
+    /// `change`.
+    async fn restart_track(&mut self, change: impl FnOnce(&gst::Element)) {
         let state = self.status.borrow().state;
         let Some(index) = self.current.filter(|_| state != State::Stopped) else {
+            change(&self.playbin);
             return;
         };
         let position = self.position();
         self.retire_report(false);
+        change(&self.playbin);
         self.same_listening = true;
         self.play(index).await;
         self.resume_at = Some(position);

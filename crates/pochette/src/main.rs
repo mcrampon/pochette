@@ -23,6 +23,7 @@ mod lyrics_view;
 mod mpris;
 mod navigation;
 mod now_playing;
+mod outputs;
 mod path_icon;
 mod playback;
 mod player;

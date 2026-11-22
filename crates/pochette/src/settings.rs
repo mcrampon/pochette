@@ -29,6 +29,8 @@ pub struct Settings {
     pub discover_genres: Vec<u64>,
     /// The best quality to stream in.
     pub quality: Quality,
+    /// The audio output to play through, by its id, or the system's default when `None`.
+    pub output: Option<String>,
 }
 
 impl Default for Settings {
@@ -43,6 +45,7 @@ impl Default for Settings {
             album_sort_reversed: false,
             discover_genres: Vec::new(),
             quality: Quality::default(),
+            output: None,
         }
     }
 }
