@@ -76,6 +76,16 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.1.0" date="2026-11-22">
+      <description>
+        <ul>
+          <li>Pick the audio output from the Now Playing pane</li>
+          <li>The Albums tab's covers grow and shrink with the window, as Discover's</li>
+          <li>Covers are never smaller than 175 pixels</li>
+          <li>Discover's genre filter is at the right, as the Albums tab's</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.0" date="2026-11-20">
       <description>
         <ul>
