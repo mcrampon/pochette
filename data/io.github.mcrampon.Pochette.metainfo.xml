@@ -77,6 +77,14 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.2.0" date="2026-11-23">
+      <description>
+        <ul>
+          <li>Devices, in the main menu: sync your plays between your computers on the same network, over an encrypted connection, once they're paired</li>
+          <li>Syncing keeps going while Pochette is closed, unless turned off</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.1.0" date="2026-11-22">
       <description>
         <ul>
