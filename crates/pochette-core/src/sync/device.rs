@@ -80,7 +80,18 @@ impl Identity {
             BASE64.encode(&identity.public)
         )?;
         file.sync_all()?;
-        let linked = fs::hard_link(&aside, path);
+        let linked = match fs::hard_link(&aside, path) {
+            // Where hard links aren't allowed, as in Android's app folders, where the app is
+            // alone: moved in place instead, unless a key got there first.
+            Err(err) if err.kind() != io::ErrorKind::AlreadyExists => {
+                if path.exists() {
+                    Err(io::ErrorKind::AlreadyExists.into())
+                } else {
+                    fs::rename(&aside, path)
+                }
+            }
+            linked => linked,
+        };
         let _ = fs::remove_file(&aside);
         match linked {
             Ok(()) => Ok(identity),
