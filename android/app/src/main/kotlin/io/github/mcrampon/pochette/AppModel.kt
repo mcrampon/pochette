@@ -8,6 +8,7 @@ import io.github.mcrampon.pochette.core.AlbumCard
 import io.github.mcrampon.pochette.core.LibraryView
 import io.github.mcrampon.pochette.core.PochetteException
 import io.github.mcrampon.pochette.core.Sort
+import io.github.mcrampon.pochette.playback.Playback
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +38,7 @@ data class Library(
 )
 
 /** What the screens show, and what they ask of the core. */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class AppModel(app: Application) : AndroidViewModel(app) {
     private val core = (app as PochetteApp).core
     private val sessions = SessionStore(app)
@@ -46,6 +48,12 @@ class AppModel(app: Application) : AndroidViewModel(app) {
 
     private val _library = MutableStateFlow(Library())
     val library: StateFlow<Library> = _library.asStateFlow()
+
+    val playback = Playback(app)
+
+    /** Something that went wrong, to show once. */
+    private val _notice = MutableStateFlow<String?>(null)
+    val notice: StateFlow<String?> = _notice.asStateFlow()
 
     private var view = LibraryView("", emptyList(), emptyList(), Sort.DATE_ADDED, false)
     private var signingIn: Job? = null
@@ -99,7 +107,29 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         _stage.value = Stage.SignedOut()
     }
 
+    /** Play `album` from its first track. */
+    fun play(album: AlbumCard) {
+        viewModelScope.launch {
+            try {
+                playback.play(core.album(album.id))
+            } catch (expired: PochetteException.SignedOut) {
+                signOut()
+            } catch (err: PochetteException) {
+                _notice.value = "Can't play “${album.title}”: ${err.message}"
+            }
+        }
+    }
+
+    fun noticeShown() {
+        _notice.value = null
+    }
+
+    override fun onCleared() {
+        playback.release()
+    }
+
     fun signOut() {
+        playback.stop()
         core.signOut()
         sessions.clear()
         _library.value = Library()

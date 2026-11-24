@@ -23,6 +23,7 @@ import io.github.mcrampon.pochette.ui.SignInScreen
 import io.github.mcrampon.pochette.ui.StartingScreen
 import kotlinx.coroutines.launch
 
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class MainActivity : ComponentActivity() {
     private val model: AppModel by viewModels()
 
@@ -50,7 +51,19 @@ class MainActivity : ComponentActivity() {
                             )
                         is Stage.SignedIn -> {
                             val library by model.library.collectAsStateWithLifecycle()
-                            AlbumsScreen(library, onRefresh = model::refresh, onSignOut = model::signOut)
+                            val now by model.playback.now.collectAsStateWithLifecycle()
+                            val notice by model.notice.collectAsStateWithLifecycle()
+                            AlbumsScreen(
+                                library,
+                                now,
+                                notice,
+                                onRefresh = model::refresh,
+                                onSignOut = model::signOut,
+                                onPlay = model::play,
+                                onPlayPause = model.playback::playPause,
+                                onNext = model.playback::next,
+                                onNoticeShown = model::noticeShown,
+                            )
                         }
                     }
                 }
