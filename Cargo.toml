@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
+# What desktop builds build: the Android library only when asked for, with `-p`.
+default-members = ["crates/pochette", "crates/pochette-core", "crates/qobuz"]
 
 [workspace.package]
 version = "1.2.3"

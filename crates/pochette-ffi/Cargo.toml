@@ -1,0 +1,42 @@
+[package]
+name = "pochette-ffi"
+description = "Pochette's core for the Android app, through Kotlin bindings that UniFFI generates"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+name = "pochette_ffi"
+# The library the Android app loads, and a Rust one for the tests.
+crate-type = ["cdylib", "lib"]
+
+[[bin]]
+# Generates the Kotlin bindings from the built library: Gradle runs it.
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["bindgen"]
+
+[features]
+bindgen = ["uniffi/cli"]
+
+# The workspace's, but for `unsafe_code`: the code UniFFI generates needs it.
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+
+[dependencies]
+pochette-core.workspace = true
+qobuz.workspace = true
+reqwest.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+uniffi = "0.32"
+
+# Android's certificate store is only reachable through Java: Mozilla's roots instead.
+[target.'cfg(target_os = "android")'.dependencies]
+webpki-root-certs = "1"

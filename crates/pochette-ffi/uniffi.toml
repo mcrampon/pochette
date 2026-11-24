@@ -1,0 +1,4 @@
+# How UniFFI generates the Kotlin bindings.
+[bindings.kotlin]
+package_name = "io.github.mcrampon.pochette.core"
+cdylib_name = "pochette_ffi"
