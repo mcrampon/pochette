@@ -12,7 +12,7 @@ use relm4::gtk::glib;
 fn path() -> PathBuf {
     glib::user_config_dir()
         .join("autostart")
-        .join(format!("{}.Sync.desktop", crate::APP_ID))
+        .join(format!("{}.Sync.desktop", crate::app_id()))
 }
 
 pub fn is_enabled() -> bool {

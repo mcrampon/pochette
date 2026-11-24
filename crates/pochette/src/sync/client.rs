@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use super::{BUS_NAME, INTERFACE, OBJECT_PATH, Status};
+use super::{INTERFACE, OBJECT_PATH, Status, bus_name};
 
 /// How long the service may take to start.
 const START_TIMEOUT: Duration = Duration::from_secs(5);
@@ -37,8 +37,7 @@ impl Client {
         let dbus = zbus::fdo::DBusProxy::new(&self.bus).await?;
         Ok(dbus
             .name_has_owner(
-                BUS_NAME
-                    .try_into()
+                zbus::names::BusName::try_from(bus_name())
                     .expect("the service's name is a bus name"),
             )
             .await
@@ -71,7 +70,7 @@ impl Client {
     {
         let reply = self
             .bus
-            .call_method(Some(BUS_NAME), OBJECT_PATH, Some(INTERFACE), method, body)
+            .call_method(Some(bus_name()), OBJECT_PATH, Some(INTERFACE), method, body)
             .await?;
         Ok(reply.body().deserialize()?)
     }

@@ -37,7 +37,7 @@ mod sync;
 mod tile_grid;
 mod tile_strip;
 
-use std::process::ExitCode;
+use std::{process::ExitCode, sync::OnceLock};
 
 pub use pochette_core::{format, history, library, lyrics};
 
@@ -45,6 +45,41 @@ use tracing_subscriber::EnvFilter;
 
 /// The application id, which names the app to the desktop (D-Bus, `.desktop` file, Flatpak).
 const APP_ID: &str = "io.github.mcrampon.Pochette";
+
+/// Set to a name, as `Test`, it runs a separate instance of Pochette, for development: with
+/// an app id, MPRIS name and sync service of its own, beside the Pochette installed, which
+/// would otherwise take its place. Its folders are still the user's: point `XDG_*` elsewhere.
+const INSTANCE_VARIABLE: &str = "POCHETTE_INSTANCE";
+
+/// This run's instance, if it's a separate one: letters, digits and `_`, a letter first,
+/// as a part of a D-Bus name must be.
+fn instance() -> Option<&'static str> {
+    static INSTANCE: OnceLock<Option<String>> = OnceLock::new();
+    INSTANCE
+        .get_or_init(|| {
+            let instance = std::env::var(INSTANCE_VARIABLE).ok()?;
+            let valid = instance.starts_with(|c: char| c.is_ascii_alphabetic())
+                && instance
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_');
+            if !valid {
+                eprintln!("{INSTANCE_VARIABLE} must be letters, digits and _, a letter first");
+                return None;
+            }
+            Some(instance)
+        })
+        .as_deref()
+}
+
+/// The app id this run goes by on the session bus: [`APP_ID`], and its instance if it's a
+/// separate one.
+fn app_id() -> &'static str {
+    static ID: OnceLock<String> = OnceLock::new();
+    ID.get_or_init(|| match instance() {
+        Some(instance) => format!("{APP_ID}.{instance}"),
+        None => APP_ID.to_owned(),
+    })
+}
 
 /// Give the windows the icon installed under the app id, from `data/icons`. Only when it
 /// is installed: title bars that show the icon would show a missing one instead.
@@ -105,7 +140,10 @@ fn main() -> ExitCode {
         return sync::run();
     }
 
-    let relm = relm4::RelmApp::new(APP_ID);
+    if let Some(instance) = instance() {
+        tracing::info!("running as the separate instance {instance}");
+    }
+    let relm = relm4::RelmApp::new(app_id());
     show_icon();
     relm4::set_global_css(include_str!("style.css"));
     accent::follow();

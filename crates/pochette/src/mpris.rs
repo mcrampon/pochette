@@ -15,8 +15,13 @@ use crate::{
     player::{Player, State, Status},
 };
 
-/// The bus name is `org.mpris.MediaPlayer2.` and this.
-const BUS_NAME: &str = "Pochette";
+/// The bus name is `org.mpris.MediaPlayer2.` and this, and a separate instance's name.
+fn bus_name() -> String {
+    crate::app_id().strip_prefix(crate::APP_ID).map_or_else(
+        || "Pochette".to_owned(),
+        |instance| format!("Pochette{instance}"),
+    )
+}
 
 /// How often the position the desktop shows is brought up to date.
 const POSITION_EVERY: Duration = Duration::from_secs(1);
@@ -51,7 +56,7 @@ pub fn start(player: Player, raise: impl Fn() + Send + 'static) {
 }
 
 async fn serve(player: Player, raise: impl Fn() + 'static) -> mpris_server::zbus::Result<()> {
-    let mpris = mpris_server::Player::builder(BUS_NAME)
+    let mpris = mpris_server::Player::builder(&bus_name())
         .identity("Pochette")
         .desktop_entry(crate::APP_ID)
         .can_raise(true)

@@ -14,7 +14,10 @@ pub use pochette_core::sync::{PORT, PeerStatus, Stage, Status, device, has_peers
 
 pub use service::run;
 
-/// The service's name on the session bus, which only one can hold.
-pub const BUS_NAME: &str = "io.github.mcrampon.Pochette.Sync";
+/// The service's name on the session bus, which only one can hold: the app's, and `.Sync`.
+pub fn bus_name() -> String {
+    format!("{}.Sync", crate::app_id())
+}
+
 pub const OBJECT_PATH: &str = "/io/github/mcrampon/Pochette/Sync";
 pub const INTERFACE: &str = "io.github.mcrampon.Pochette.Sync1";
