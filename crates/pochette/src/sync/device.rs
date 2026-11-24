@@ -194,6 +194,9 @@ pub fn own_log() -> &'static Path {
             })
         });
         if let Some(existing) = existing {
+            // An older Pochette, which only knows the log after the host name, may have
+            // written to it since.
+            merge_legacy(&legacy, &existing);
             return existing;
         }
         let own = dir.join(format!("{LOG_PREFIX}{host}{tag}"));
@@ -208,6 +211,50 @@ pub fn own_log() -> &'static Path {
         }
         own
     })
+}
+
+/// Move the lines of `legacy`, if it's there, to the end of `own`, which then shares them.
+fn merge_legacy(legacy: &Path, own: &Path) {
+    // Taken aside first: only one of the app and the service can, so only one merges it.
+    let aside = legacy.with_extension(format!("merging-{}", std::process::id()));
+    match fs::rename(legacy, &aside) {
+        Ok(()) => {}
+        Err(err) if err.kind() == io::ErrorKind::NotFound => return,
+        Err(err) => {
+            tracing::warn!("cannot merge {}: {err}", legacy.display());
+            return;
+        }
+    }
+    let merged = (|| {
+        let mut text = fs::read_to_string(&aside)?;
+        if !text.is_empty() && !text.ends_with('\n') {
+            text.push('\n');
+        }
+        let mut file = fs::OpenOptions::new().append(true).open(own)?;
+        // Its last line may be unfinished, if it was cut short.
+        let length = file.metadata()?.len();
+        if length > 0 {
+            let mut last = [0];
+            let mut reader = fs::File::open(own)?;
+            std::io::Seek::seek(&mut reader, io::SeekFrom::Start(length - 1))?;
+            std::io::Read::read_exact(&mut reader, &mut last)?;
+            if last[0] != b'\n' {
+                text.insert(0, '\n');
+            }
+        }
+        file.write_all(text.as_bytes())
+    })();
+    match merged {
+        Ok(()) => {
+            tracing::info!("merged {} into {}", legacy.display(), own.display());
+            let _ = fs::remove_file(&aside);
+        }
+        Err(err) => {
+            tracing::warn!("cannot merge {}: {err}", legacy.display());
+            // Back, for the next time.
+            let _ = fs::rename(&aside, legacy);
+        }
+    }
 }
 
 /// A shared log, as far as it can be shared: up to its last whole line.
@@ -323,6 +370,26 @@ mod tests {
         assert!(!is_shared_log("plays-a/b-3fa29c0e.jsonl"));
         assert!(!is_shared_log("other-laptop-3fa29c0e.jsonl"));
         assert_eq!(log_tag("3fa29c0e99"), "-3fa29c0e.jsonl");
+    }
+
+    #[test]
+    fn merges_a_log_written_after_the_host_name_alone() {
+        let dir = std::env::temp_dir().join(format!("pochette-merge-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let legacy = dir.join("plays-desktop.jsonl");
+        let own = dir.join("plays-desktop-3657a131.jsonl");
+        fs::write(&own, "a\nb cut").unwrap();
+        fs::write(&legacy, "c\nd\n").unwrap();
+        merge_legacy(&legacy, &own);
+        assert_eq!(fs::read_to_string(&own).unwrap(), "a\nb cut\nc\nd\n");
+        assert!(!legacy.exists());
+        // Nothing left aside.
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
+        // Nothing to merge.
+        merge_legacy(&legacy, &own);
+        assert_eq!(fs::read_to_string(&own).unwrap(), "a\nb cut\nc\nd\n");
+        fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

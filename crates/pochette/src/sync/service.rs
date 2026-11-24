@@ -557,6 +557,16 @@ impl Service {
         peer.last_sync = Some(history::now());
         name.clone_into(&mut peer.name);
         if let Some(address) = address {
+            // Also those kept twice, as an IPv4 address mapped in IPv6 and as itself.
+            let canonical =
+                |known: &SocketAddr| SocketAddr::new(known.ip().to_canonical(), known.port());
+            peer.addresses = peer.addresses.iter().map(canonical).collect();
+            let mut seen = Vec::new();
+            peer.addresses.retain(|known| {
+                let first = !seen.contains(known);
+                seen.push(*known);
+                first
+            });
             peer.addresses.retain(|known| *known != address);
             peer.addresses.insert(0, address);
             peer.addresses.truncate(4);
@@ -595,7 +605,11 @@ impl Service {
             their_tag: &device::log_tag(id),
         };
         let synced = protocol::sync_as_caller(&mut channel, &logs).await?;
-        Ok((SocketAddr::new(address.ip(), port), name, synced))
+        Ok((
+            SocketAddr::new(address.ip().to_canonical(), port),
+            name,
+            synced,
+        ))
     }
 
     async fn accept(self: Arc<Self>, listener: TcpListener) {
@@ -637,7 +651,7 @@ impl Service {
             .await;
         }
         let id = device::hex(&channel.remote);
-        let address = SocketAddr::new(from.ip(), port);
+        let address = SocketAddr::new(from.ip().to_canonical(), port);
         match purpose {
             Purpose::Sync => self.answer_sync(channel, &id, &name, address).await,
             Purpose::Pair => self.answer_pairing(channel, id, name, address).await,
@@ -730,7 +744,7 @@ impl Service {
             }
             channel.send(&self.hello(Purpose::Pair)).await?;
             let (their_name, port) = expect_hello(&mut channel).await?;
-            let address = SocketAddr::new(address.ip(), port);
+            let address = SocketAddr::new(address.ip().to_canonical(), port);
             self.confirm(channel, id, their_name, address, true).await
         }
         .await;
