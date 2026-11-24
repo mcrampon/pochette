@@ -6,7 +6,7 @@
 
 use std::{
     sync::{Arc, Mutex},
-    time::{Duration, SystemTime},
+    time::{Duration, Instant, SystemTime},
 };
 
 use futures_util::StreamExt;
@@ -25,6 +25,15 @@ use crate::history::{AlbumRecord, Listen, Log};
 /// Within this much of a track's start, "previous" goes to the previous track rather than
 /// back to the start of this one.
 const RESTART_WITHIN: Duration = Duration::from_secs(3);
+
+/// How long the address of a stream can be counted on: Qobuz's expire, an hour after
+/// they're given as of 2026. The next track's is fetched again past it.
+const FRESH_FOR: Duration = Duration::from_mins(30);
+
+/// A stream that breaks off, as when its connection closed during a long pause and its
+/// address expired since, starts again from a new address, unless it already did this
+/// recently: then what breaks it isn't the address.
+const RECOVER_EVERY: Duration = Duration::from_secs(30);
 
 /// What the player is doing.
 #[derive(Debug, Clone, Default)]
@@ -221,6 +230,21 @@ impl Player {
 struct Upcoming {
     index: usize,
     file: FileUrl,
+    fetched: Instant,
+}
+
+impl Upcoming {
+    fn new(index: usize, file: FileUrl) -> Self {
+        Self {
+            index,
+            file,
+            fetched: Instant::now(),
+        }
+    }
+
+    fn is_fresh(&self) -> bool {
+        self.fetched.elapsed() < FRESH_FOR
+    }
 }
 
 struct Actor {
@@ -249,6 +273,10 @@ struct Actor {
     prefetch: Option<JoinHandle<()>>,
     /// Whether the user wants sound: buffering pauses the stream, but not the user.
     wants_playing: bool,
+    /// When the stream playing last broke off and started again.
+    recovered_at: Option<Instant>,
+    /// What broke the stream that started again: what it still says comes too late.
+    broken_source: Option<gst::Object>,
     report: Option<Report>,
     /// Reports of tracks no longer playing that may still be on their way to Qobuz.
     sending: Vec<JoinHandle<()>>,
@@ -286,6 +314,11 @@ impl Actor {
             move |values| {
                 let playbin = values[0].get::<gst::Element>().ok()?;
                 let next = upcoming.lock().ok()?.take()?;
+                // Expired, after a long pause: the track ends, and the next one starts
+                // from a new address, after a gap.
+                if !next.is_fresh() {
+                    return None;
+                }
                 playbin.set_property("uri", &next.file.url);
                 *switched.lock().ok()? = Some(next);
                 None
@@ -307,6 +340,8 @@ impl Actor {
             switched,
             prefetch: None,
             wants_playing: false,
+            recovered_at: None,
+            broken_source: None,
             report: None,
             sending: Vec::new(),
             listening: None,
@@ -405,7 +440,7 @@ impl Actor {
             Ok(file) => {
                 let _ = self.playbin.set_state(gst::State::Null);
                 self.playbin.set_property("uri", &file.url);
-                self.starting = Some(Upcoming { index, file });
+                self.starting = Some(Upcoming::new(index, file));
                 if let Err(err) = self.playbin.set_state(gst::State::Playing) {
                     self.fail(&format!("Can't start playback: {err}"));
                 }
@@ -535,6 +570,14 @@ impl Actor {
             State::Paused => {
                 self.wants_playing = true;
                 let _ = self.playbin.set_state(gst::State::Playing);
+                // After a long pause, the next track's address may have expired.
+                let expired = self
+                    .upcoming
+                    .lock()
+                    .is_ok_and(|upcoming| upcoming.as_ref().is_some_and(|next| !next.is_fresh()));
+                if expired && let Some(index) = self.current {
+                    self.prefetch_next(index + 1);
+                }
                 if let Some(report) = &mut self.report {
                     report.stretch_started(position);
                 }
@@ -574,6 +617,10 @@ impl Actor {
                 }
             }
             MessageView::Eos(_) => {
+                // What was left of a stream that broke off, which is starting again.
+                if self.broken_source.is_some() {
+                    return;
+                }
                 // The next stream wasn't ready in time, or this was the last track.
                 tracing::debug!("the stream ended");
                 self.retire_report(true);
@@ -608,7 +655,27 @@ impl Actor {
                 }
             }
             MessageView::Error(err) => {
+                let source = err.src().cloned();
+                if source.is_some() && source == self.broken_source {
+                    return;
+                }
                 tracing::warn!("playback failed: {} ({:?})", err.error(), err.debug());
+                // The stream couldn't be read: its address may have expired.
+                let recoverable = err.error().is::<gst::ResourceError>()
+                    && self
+                        .recovered_at
+                        .is_none_or(|at| at.elapsed() >= RECOVER_EVERY);
+                if recoverable && self.current.is_some() {
+                    tracing::info!("starting the stream again, from a new address");
+                    self.recovered_at = Some(Instant::now());
+                    self.broken_source = source;
+                    // Stopped now: it would otherwise play what it has left, and end.
+                    self.restart_track(|playbin| {
+                        let _ = playbin.set_state(gst::State::Null);
+                    })
+                    .await;
+                    return;
+                }
                 self.fail(&err.error().to_string());
             }
             _ => {}
@@ -632,6 +699,7 @@ impl Actor {
             }
         );
         self.current = Some(started.index);
+        self.broken_source = None;
         let same = std::mem::take(&mut self.same_listening)
             && self
                 .listening
@@ -677,7 +745,7 @@ impl Actor {
             match client.file_url(track_id, quality).await {
                 Ok(file) => {
                     if let Ok(mut upcoming) = upcoming.lock() {
-                        *upcoming = Some(Upcoming { index, file });
+                        *upcoming = Some(Upcoming::new(index, file));
                     }
                 }
                 Err(err) => tracing::warn!("cannot get the next track ready: {err}"),
