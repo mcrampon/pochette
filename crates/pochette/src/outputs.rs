@@ -13,7 +13,9 @@ struct Output {
     /// What tells it apart across runs: the sink's name on the sound server.
     id: String,
     name: String,
-    device: gst::Device,
+    /// It, from each device provider that lists it: PipeWire's and PulseAudio's, on
+    /// PipeWire.
+    devices: Vec<gst::Device>,
 }
 
 /// Finds the audio outputs. Without a device monitor, as when there's no sound server to
@@ -34,14 +36,24 @@ fn monitor() -> Option<gst::DeviceMonitor> {
 /// PipeWire's and PulseAudio's both do on PipeWire with GStreamer's PipeWire plugin.
 fn outputs(monitor: Option<&gst::DeviceMonitor>) -> Vec<Output> {
     let mut outputs: Vec<Output> = Vec::new();
-    for device in monitor.map(gst::DeviceMonitor::devices).unwrap_or_default() {
+    // PipeWire's provider hides PulseAudio's from the monitor, but PipeWire's sink
+    // crackles where PulseAudio's, through PipeWire's PulseAudio server, doesn't: ask
+    // PulseAudio's too. Without a PulseAudio server, it has none.
+    let pulse = gst::DeviceProviderFactory::by_name("pulsedeviceprovider")
+        .map(|provider| provider.devices())
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|device| device.has_classes("Audio/Sink"));
+    let devices = monitor.map(gst::DeviceMonitor::devices).unwrap_or_default();
+    for device in devices.into_iter().chain(pulse) {
         let id = id(&device);
-        if outputs.iter().all(|output| output.id != id) {
-            outputs.push(Output {
+        match outputs.iter_mut().find(|output| output.id == id) {
+            Some(output) => output.devices.push(device),
+            None => outputs.push(Output {
                 id,
                 name: device.display_name().to_string(),
-                device,
-            });
+                devices: vec![device],
+            }),
         }
     }
     outputs
@@ -65,16 +77,35 @@ fn id(device: &gst::Device) -> String {
         .unwrap_or_else(|| device.display_name().to_string())
 }
 
-/// The sink to play through output `id`, if it's there.
+/// The sink to play through output `id`, if it's there: of its providers', the one
+/// GStreamer ranks highest, which is also the one it plays the default output through.
+/// On PipeWire, that's PulseAudio's sink, through PipeWire's PulseAudio server: PipeWire's
+/// own sink, which GStreamer doesn't rank, crackles.
 fn sink(outputs: &[Output], id: &str) -> Option<gst::Element> {
     let output = outputs.iter().find(|output| output.id == id)?;
-    match output.device.create_element(None) {
-        Ok(sink) => Some(sink),
-        Err(err) => {
-            tracing::warn!("cannot play through {}: {err}", output.name);
-            None
-        }
-    }
+    let rank = |sink: &gst::Element| {
+        sink.factory()
+            .map_or(gst::Rank::NONE, |factory| factory.rank())
+    };
+    let sink = output
+        .devices
+        .iter()
+        .filter_map(|device| match device.create_element(None) {
+            Ok(sink) => Some(sink),
+            Err(err) => {
+                tracing::warn!("cannot play through {}: {err}", output.name);
+                None
+            }
+        })
+        .max_by_key(rank)?;
+    tracing::info!(
+        "playing through {} with {}",
+        output.name,
+        sink.factory()
+            .map(|factory| factory.name().to_string())
+            .unwrap_or_default()
+    );
+    Some(sink)
 }
 
 /// A button picking the output to play through: the system's default, or one of the
