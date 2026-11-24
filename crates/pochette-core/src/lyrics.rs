@@ -165,6 +165,7 @@ fn parse_time(time: &str) -> Option<Duration> {
 }
 
 /// Which of `lines` is sung at `position`: the last one started, if any is.
+#[must_use]
 pub fn current_line(lines: &[Line], position: Duration) -> Option<usize> {
     lines
         .partition_point(|line| line.at <= position)
@@ -261,7 +262,7 @@ mod live {
             album: album.to_owned(),
             duration,
         };
-        let lyrics = find(&crate::account::http_client(), &song).await.unwrap();
+        let lyrics = find(&reqwest::Client::new(), &song).await.unwrap();
         let kind = match &lyrics {
             Lyrics::Synced(lines) => format!("{} timed lines", lines.len()),
             Lyrics::Plain(text) => format!("plain, {} chars", text.len()),

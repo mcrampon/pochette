@@ -13,7 +13,6 @@ use std::{
 };
 
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
-use relm4::gtk::glib;
 
 use super::channel::NOISE_PATTERN;
 
@@ -93,12 +92,14 @@ impl Identity {
     }
 
     /// The device's id, which the others know it by.
+    #[must_use]
     pub fn id(&self) -> String {
         hex(&self.public)
     }
 }
 
 /// The id of the device whose public key is this.
+#[must_use]
 pub fn hex(bytes: &[u8]) -> String {
     use std::fmt::Write;
     bytes.iter().fold(String::new(), |mut text, byte| {
@@ -108,42 +109,31 @@ pub fn hex(bytes: &[u8]) -> String {
 }
 
 /// Where the key and the paired devices are kept.
+#[must_use]
 pub fn state_dir() -> PathBuf {
-    glib::user_state_dir().join("pochette")
+    crate::platform().state_dir.clone()
 }
 
 /// Where the logs of plays are kept.
+#[must_use]
 pub fn data_dir() -> PathBuf {
-    glib::user_data_dir().join("pochette")
+    crate::platform().data_dir.clone()
 }
 
 /// What this device is called, to the others.
+#[must_use]
 pub fn name() -> String {
-    let name = glib::host_name();
-    let name = name.trim();
-    if name.is_empty() || name == "localhost" {
-        "Pochette".to_owned()
-    } else {
-        name.to_owned()
-    }
+    crate::platform().device_name.clone()
 }
 
-/// The host name, as it can be in a file name.
+/// The device's name, as it can be in a file name.
 fn host_for_file() -> String {
-    glib::host_name()
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '-' {
-                c
-            } else {
-                '_'
-            }
-        })
-        .collect()
+    crate::platform().file_name.clone()
 }
 
 /// The end of the names of the logs a device writes, from its id: `-` and the id's first 8
 /// characters, as in `plays-laptop-3fa29c0e.jsonl`.
+#[must_use]
 pub fn log_tag(id: &str) -> String {
     format!("-{}{LOG_SUFFIX}", id.get(..8).unwrap_or(id))
 }
@@ -151,6 +141,7 @@ pub fn log_tag(id: &str) -> String {
 /// Whether `name` is that of a log devices share, which only says where it comes from:
 /// `plays-`, letters, digits, `-` or `_`, the device's tag. Others, such as a log copied
 /// in by hand, stay on this device.
+#[must_use]
 pub fn is_shared_log(name: &str) -> bool {
     let Some(stem) = name
         .strip_prefix(LOG_PREFIX)
@@ -264,16 +255,19 @@ pub struct Log {
 }
 
 impl Log {
+    #[must_use]
     pub fn digest(&self) -> String {
         digest(&self.text)
     }
 }
 
+#[must_use]
 pub fn digest(text: &str) -> String {
     format!("{:x}", md5::compute(text))
 }
 
 /// The logs this device shares, its own and those it got from others.
+#[must_use]
 pub fn shared_logs(dir: &Path) -> Vec<Log> {
     let Ok(entries) = fs::read_dir(dir) else {
         return Vec::new();
@@ -302,6 +296,7 @@ pub fn shared_logs(dir: &Path) -> Vec<Log> {
 }
 
 /// How big each shared log is, to tell when they change.
+#[must_use]
 pub fn logs_signature(dir: &Path) -> Vec<(String, u64)> {
     let Ok(entries) = fs::read_dir(dir) else {
         return Vec::new();

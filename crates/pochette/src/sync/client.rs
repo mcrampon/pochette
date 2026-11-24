@@ -127,7 +127,7 @@ fn spawn() -> io::Result<()> {
 
 /// Start the service if this device is paired with others, to sync while the app is open.
 pub fn start_if_paired() {
-    if !super::service::has_peers() {
+    if !super::has_peers() {
         return;
     }
     relm4::spawn(async {

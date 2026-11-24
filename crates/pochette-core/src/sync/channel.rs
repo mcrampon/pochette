@@ -225,6 +225,7 @@ async fn read_frame(reader: &mut (impl AsyncReadExt + Unpin)) -> Result<Vec<u8>>
 
 /// The code both devices show while pairing, from their handshake: the same on both only
 /// if they're talking to each other.
+#[must_use]
 pub fn pairing_code(handshake_hash: &[u8]) -> String {
     let bytes: [u8; 4] = handshake_hash
         .get(..4)

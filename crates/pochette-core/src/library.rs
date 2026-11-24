@@ -27,6 +27,7 @@ pub struct Entry {
 }
 
 impl Entry {
+    #[must_use]
     pub fn new(album: Album) -> Self {
         let label = album.label.as_ref().map(|label| label.name.as_str());
         let search = fold(
@@ -81,6 +82,7 @@ impl Sort {
         Self::PlayCount,
     ];
 
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::DateAdded => "Date Added",
@@ -98,6 +100,7 @@ impl Sort {
     }
 
     /// Whether the order depends on the plays.
+    #[must_use]
     pub fn uses_plays(self) -> bool {
         matches!(self, Self::LastPlayed | Self::PlayCount)
     }
@@ -168,6 +171,7 @@ impl View {
     }
 
     /// All of `entries`, whatever the search and filters, in order.
+    #[must_use]
     pub fn sorted<'a>(&self, entries: &'a [Entry], history: &History) -> Vec<&'a Entry> {
         let mut all: Vec<&Entry> = entries.iter().collect();
         self.sort(&mut all, history);
@@ -183,11 +187,13 @@ impl View {
     }
 
     /// Whether anything hides some of the albums.
+    #[must_use]
     pub fn is_filtered(&self) -> bool {
         !self.query.trim().is_empty() || !self.genres.is_empty() || !self.decades.is_empty()
     }
 
     /// How the order reads: "Newest First", "A to Z"…
+    #[must_use]
     pub fn order_label(&self) -> &'static str {
         match (self.sort, self.reversed) {
             (Sort::LastPlayed, false) => return "Most Recent First",
@@ -205,12 +211,14 @@ impl View {
     }
 
     /// Whether the list goes from high to low: newest first, or Z to A.
+    #[must_use]
     pub fn is_descending(&self) -> bool {
         self.sort.newest_first() != self.reversed
     }
 }
 
 /// The genres of `entries`, in alphabetical order.
+#[must_use]
 pub fn genres(entries: &[Entry]) -> Vec<String> {
     let mut genres: Vec<String> = entries
         .iter()
@@ -222,6 +230,7 @@ pub fn genres(entries: &[Entry]) -> Vec<String> {
 }
 
 /// The decades of `entries`, newest first.
+#[must_use]
 pub fn decades(entries: &[Entry]) -> Vec<u16> {
     let mut decades: Vec<u16> = entries.iter().filter_map(|entry| entry.decade).collect();
     decades.sort_unstable_by(|a, b| b.cmp(a));

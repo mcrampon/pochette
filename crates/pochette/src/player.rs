@@ -11,8 +11,9 @@ use std::{
 
 use futures_util::StreamExt;
 use gstreamer::{self as gst, prelude::*};
+use pochette_core::listening;
 use qobuz::{
-    Client, FileUrl, Quality, StreamingEnd,
+    Client, FileUrl, Quality,
     models::{Album, Track},
 };
 use tokio::{
@@ -536,7 +537,7 @@ impl Actor {
             report.stretch_ended(position);
         }
         if let Some(listening) = &mut self.listening {
-            listening.heard += report.heard;
+            listening.heard += report.heard();
         }
         self.sending.retain(|sending| !sending.is_finished());
         self.sending.append(&mut report.sending);
@@ -766,25 +767,18 @@ impl Actor {
         let Some(listening) = self.listening.take() else {
             return;
         };
-        let (Some(album), Some(track)) = (&self.album, self.queue.get(listening.index)) else {
+        let Some(album) = &self.album else {
             return;
         };
-        let heard = u32::try_from(listening.heard.as_secs()).unwrap_or(u32::MAX);
-        if listening.sample || heard == 0 {
+        let Some((record, listen)) = listening::listen(
+            album,
+            &self.queue,
+            listening.index,
+            listening.at,
+            listening.heard,
+            listening.sample,
+        ) else {
             return;
-        }
-        let length = self.queue.iter().map(|track| track.duration).sum();
-        let record = AlbumRecord::new(album, length);
-        let at = listening
-            .at
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .ok()
-            .and_then(|since| i64::try_from(since.as_secs()).ok())
-            .unwrap_or_default();
-        let listen = Listen {
-            at,
-            album: album.id.clone(),
-            heard: heard.min(track.duration.max(1)),
         };
         if let Err(err) = self.log.append(&record, &listen) {
             tracing::warn!("cannot add to the play history: {err}");
@@ -819,86 +813,44 @@ fn position(playbin: &gst::Element) -> Option<Duration> {
     Some(Duration::from_nanos(position.nseconds()))
 }
 
-/// What we tell Qobuz about the listening of one track: that it started, then each stretch
-/// listened to without interruption.
+/// What we tell Qobuz about the listening of one track, as the core has it, sent as it
+/// goes, on relm4's runtime.
 struct Report {
-    client: Client,
-    track_id: u64,
-    /// What Qobuz needs to hear about it; without it, nothing is told.
-    blob: Option<String>,
-    /// Ties the stretches of this play together.
-    play_id: String,
-    duration: Duration,
-    /// How long it was heard, over all its stretches.
-    heard: Duration,
-    /// When and where in the track the current stretch started.
-    stretch: Option<(SystemTime, Duration)>,
+    inner: listening::Report,
     /// Reports being sent, so quitting can wait for them.
     sending: Vec<JoinHandle<()>>,
 }
 
 impl Report {
-    /// Report that `track` started, if Qobuz gave something to report it with.
     fn start(client: Client, track: &Track, file: &FileUrl) -> Self {
-        let (track_id, format_id) = (track.id, file.format_id);
-        let blob = file.blob.clone();
-        let mut sending = Vec::new();
-        if blob.is_some() {
-            let reporting = client.clone();
-            sending.push(relm4::spawn(async move {
-                if let Err(err) = reporting.report_streaming_start(track_id, format_id).await {
-                    tracing::warn!("cannot report the start of track {track_id}: {err}");
-                }
-            }));
-        } else {
-            tracing::debug!("no blob to report the streaming of track {track_id}");
-        }
-        Self {
-            client,
-            track_id,
-            blob,
-            play_id: uuid::Uuid::new_v4().to_string(),
-            duration: Duration::from_secs(track.duration.into()),
-            heard: Duration::ZERO,
-            stretch: Some((SystemTime::now(), Duration::ZERO)),
-            sending,
-        }
+        let mut report = Self {
+            inner: listening::Report::start(client, track, file),
+            sending: Vec::new(),
+        };
+        report.send();
+        report
     }
 
     fn stretch_started(&mut self, position: Duration) {
-        if self.stretch.is_none() {
-            self.stretch = Some((SystemTime::now(), position));
-        }
+        self.inner.stretch_started(position);
     }
 
     fn stretch_ended(&mut self, position: Duration) {
-        let Some((started_at, started_from)) = self.stretch.take() else {
-            return;
-        };
-        let stretch = position.saturating_sub(started_from).min(self.duration);
-        self.heard += stretch;
-        let duration = stretch.as_secs();
-        let Some(blob) = self.blob.clone().filter(|_| duration > 0) else {
-            return;
-        };
-        let event = StreamingEnd {
-            blob,
-            track_context_uuid: self.play_id.clone(),
-            start_stream: humantime::format_rfc3339_millis(started_at).to_string(),
-            online: true,
-            local: false,
-            duration,
-        };
-        let (client, track_id) = (self.client.clone(), self.track_id);
-        self.sending.push(relm4::spawn(async move {
-            if let Err(err) = client.report_streaming_end(&event).await {
-                tracing::warn!("cannot report the listening of track {track_id}: {err}");
-            }
-        }));
+        self.inner.stretch_ended(position);
+        self.send();
     }
 
-    /// The track played to its end.
     fn finished(&mut self) {
-        self.stretch_ended(self.duration);
+        self.inner.finished();
+        self.send();
+    }
+
+    fn heard(&self) -> Duration {
+        self.inner.heard()
+    }
+
+    fn send(&mut self) {
+        self.sending
+            .extend(self.inner.take_sending().into_iter().map(relm4::spawn));
     }
 }

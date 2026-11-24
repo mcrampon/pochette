@@ -11,6 +11,7 @@ repository = "https://github.com/mcrampon/pochette"
 
 [workspace.dependencies]
 qobuz = { path = "crates/qobuz" }
+pochette-core = { path = "crates/pochette-core" }
 oo7 = "0.7"
 # Plain GTK, no libadwaita: 4.14 is what current distributions ship.
 gtk = { package = "gtk4", version = "0.11", features = ["v4_14"] }
@@ -19,6 +20,8 @@ relm4 = "0.11"
 gstreamer = "0.25"
 futures-util = "0.3"
 humantime = "2"
+# Local time, without GLib, for the stats: it reads Android's time zones too.
+jiff = "0.2"
 uuid = { version = "1", features = ["v4"] }
 unicode-normalization = "0.1"
 mpris-server = { version = "0.11", features = ["tokio"] }

@@ -11,14 +11,13 @@ workspace = true
 
 [dependencies]
 qobuz.workspace = true
+pochette-core.workspace = true
 reqwest.workspace = true
 oo7.workspace = true
 gtk.workspace = true
 relm4.workspace = true
 gstreamer.workspace = true
 futures-util.workspace = true
-humantime.workspace = true
-uuid.workspace = true
 unicode-normalization.workspace = true
 mpris-server.workspace = true
 mdns-sd.workspace = true

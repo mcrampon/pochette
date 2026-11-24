@@ -15,11 +15,7 @@ mod covers;
 mod devices;
 mod discover;
 mod favorites;
-mod format;
-mod history;
 mod icon_label;
-mod library;
-mod lyrics;
 mod lyrics_view;
 mod mpris;
 mod navigation;
@@ -43,6 +39,8 @@ mod tile_strip;
 
 use std::process::ExitCode;
 
+pub use pochette_core::{format, history, library, lyrics};
+
 use tracing_subscriber::EnvFilter;
 
 /// The application id, which names the app to the desktop (D-Bus, `.desktop` file, Flatpak).
@@ -58,6 +56,26 @@ fn show_icon() {
     if installed {
         gtk::Window::set_default_icon_name(APP_ID);
     }
+}
+
+/// Where the app keeps things, as XDG has it, and the host name, for the core.
+fn tell_core_the_platform() {
+    use relm4::gtk::glib;
+
+    let host = glib::host_name();
+    let host = host.trim();
+    let device_name = if host.is_empty() || host == "localhost" {
+        "Pochette"
+    } else {
+        host
+    };
+    pochette_core::init(pochette_core::Platform {
+        data_dir: glib::user_data_dir().join("pochette"),
+        state_dir: glib::user_state_dir().join("pochette"),
+        device_name: device_name.to_owned(),
+        // What logs were named after before devices had keys: keep it, to find them.
+        file_name: pochette_core::file_name(&glib::host_name()),
+    });
 }
 
 fn main() -> ExitCode {
@@ -82,6 +100,7 @@ fn main() -> ExitCode {
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .init();
 
+    tell_core_the_platform();
     if std::env::args().nth(1).as_deref() == Some("--sync") {
         return sync::run();
     }

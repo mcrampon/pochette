@@ -13,7 +13,6 @@ use std::{
 };
 
 use qobuz::models::Album;
-use relm4::gtk::glib;
 use serde::{Deserialize, Serialize};
 
 /// Within a sitting, listens of the same album no further apart than this: a longer
@@ -50,6 +49,7 @@ pub struct ArtistRecord {
 
 impl AlbumRecord {
     /// `album`, whose tracks that can be played last `length` seconds.
+    #[must_use]
     pub fn new(album: &Album, length: u32) -> Self {
         Self {
             id: album.id.clone(),
@@ -68,6 +68,7 @@ impl AlbumRecord {
     }
 
     /// The album, as tiles and pages take it: what's missing, they load.
+    #[must_use]
     pub fn to_album(&self) -> Option<Album> {
         let json = serde_json::json!({
             "id": self.id,
@@ -103,13 +104,11 @@ enum Line {
     Listen(Listen),
 }
 
-/// Now, in Unix time.
-pub fn now() -> i64 {
-    glib::real_time() / 1_000_000
-}
+pub use crate::time::now;
+use crate::time::{days_in_month, local};
 
 fn dir() -> PathBuf {
-    glib::user_data_dir().join("pochette")
+    crate::platform().data_dir.clone()
 }
 
 /// This machine's log, which it alone writes to.
@@ -184,21 +183,6 @@ impl Period {
             Self::Month(..) => day,
         }
     }
-}
-
-/// The year, month and day of `at`, in the local time zone.
-fn local(at: i64) -> (i32, i32, i32) {
-    glib::DateTime::from_unix_local(at)
-        .map(|date| (date.year(), date.month(), date.day_of_month()))
-        .unwrap_or_default()
-}
-
-/// How many days `month` of `year` has.
-fn days_in_month(year: i32, month: i32) -> i32 {
-    glib::DateTime::from_local(year, month, 1, 12, 0, 0.0)
-        .and_then(|first| first.add_months(1))
-        .and_then(|next| next.add_days(-1))
-        .map_or(31, |last| last.day_of_month())
 }
 
 /// What a period's listening adds up to, the most played first.
@@ -338,15 +322,18 @@ impl History {
         plays
     }
 
+    #[must_use]
     pub fn album(&self, id: &str) -> AlbumPlays {
         self.by_album.get(id).copied().unwrap_or_default()
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.listens.is_empty()
     }
 
     /// The years with listening, the latest first.
+    #[must_use]
     pub fn years(&self) -> Vec<i32> {
         let mut years: Vec<i32> = self.listens.iter().map(|l| local(l.at).0).collect();
         years.sort_unstable_by(|a, b| b.cmp(a));
@@ -355,6 +342,7 @@ impl History {
     }
 
     /// The months of `year` with listening, from January.
+    #[must_use]
     pub fn months(&self, year: i32) -> Vec<i32> {
         let mut months: Vec<i32> = self
             .listens
@@ -368,6 +356,7 @@ impl History {
         months
     }
 
+    #[must_use]
     pub fn summary(&self, period: Period) -> Summary {
         let mut summary = Summary::default();
 
@@ -458,10 +447,7 @@ mod tests {
 
     /// Noon on the 15th of `month` 2026, local time.
     fn day(month: i32, hour_offset: i64) -> i64 {
-        glib::DateTime::from_local(2026, month, 15, 12, 0, 0.0)
-            .unwrap()
-            .to_unix()
-            + hour_offset * 3600
+        crate::time::local_unix(2026, month, 15, 12).unwrap() + hour_offset * 3600
     }
 
     fn album(id: &str, artist: &str, length: u32) -> AlbumRecord {
