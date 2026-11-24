@@ -5,6 +5,8 @@
 
     <application
         android:name=".PochetteApp"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:label="Pochette"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar">

@@ -149,16 +149,24 @@ fn runtime() -> &'static tokio::runtime::Runtime {
     })
 }
 
-/// Run `future` on the runtime, and wait for it.
+/// Run `future` on the runtime, and wait for it. Cancelled with the call, as when Kotlin
+/// cancels the coroutine waiting for it.
 async fn run<T: Send + 'static>(
     future: impl Future<Output = Result<T>> + Send + 'static,
 ) -> Result<T> {
-    runtime()
-        .spawn(future)
-        .await
-        .map_err(|err| PochetteError::Failed {
-            message: format!("The call stopped: {err}"),
-        })?
+    /// Aborts the task when the call is dropped before it's done.
+    struct Abort(tokio::task::AbortHandle);
+    impl Drop for Abort {
+        fn drop(&mut self) {
+            self.0.abort();
+        }
+    }
+
+    let task = runtime().spawn(future);
+    let _abort = Abort(task.abort_handle());
+    task.await.map_err(|err| PochetteError::Failed {
+        message: format!("The call stopped: {err}"),
+    })?
 }
 
 /// `mutex`, even if a thread panicked holding it: what it guards stays usable.
