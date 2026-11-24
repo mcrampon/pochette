@@ -76,6 +76,8 @@ impl Pochette {
     /// Pochette, keeping its things where `config` says. Call it once.
     #[uniffi::constructor]
     pub fn new(config: Config) -> Result<Arc<Self>> {
+        #[cfg(target_os = "android")]
+        log_to_logcat();
         pochette_core::init(pochette_core::Platform {
             data_dir: PathBuf::from(&config.data_dir),
             state_dir: PathBuf::from(&config.state_dir),
@@ -100,6 +102,16 @@ impl Pochette {
             }),
         }))
     }
+}
+
+/// Send the core's logs to logcat, tagged "Pochette".
+#[cfg(target_os = "android")]
+fn log_to_logcat() {
+    use tracing_subscriber::{EnvFilter, prelude::*};
+
+    let _ = tracing_subscriber::registry()
+        .with(paranoid_android::layer("Pochette").with_filter(EnvFilter::new("info,mdns_sd=warn")))
+        .try_init();
 }
 
 /// The app's version, as the desktop's: "1.2.3".

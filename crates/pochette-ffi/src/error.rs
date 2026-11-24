@@ -1,7 +1,8 @@
 //! What goes wrong, as Kotlin catches it.
 
-/// Why a call failed, with a message to show.
+/// Why a call failed, with a message to show: Kotlin gets it as the exception's message.
 #[derive(Debug, thiserror::Error, uniffi::Error)]
+#[uniffi(flat_error)]
 pub enum PochetteError {
     /// Not signed in, or Qobuz no longer takes the session: sign in again.
     #[error("{message}")]

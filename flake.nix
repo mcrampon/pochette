@@ -61,11 +61,12 @@
                 };
                 overlays = [ rust-overlay.overlays.default ];
               };
-              buildTools = "36.1.0";
+              buildTools = "37.0.0";
               ndk = "29.0.14206865";
               sdk =
                 (androidPkgs.androidenv.composeAndroidPackages {
-                  platformVersions = [ "36" ];
+                  # What the app compiles against: current AndroidX needs Android 17's.
+                  platformVersions = [ "37.0" ];
                   buildToolsVersions = [ buildTools ];
                   includeNDK = true;
                   ndkVersions = [ ndk ];
@@ -92,7 +93,8 @@
                 sdk
                 androidPkgs.cargo-ndk
                 androidPkgs.jdk21
-                androidPkgs.gradle
+                # AGP 9 needs Gradle 9.
+                androidPkgs.gradle_9
                 # aws-lc-rs builds C sources, for each Android target too
                 androidPkgs.cmake
                 androidPkgs.pkg-config
