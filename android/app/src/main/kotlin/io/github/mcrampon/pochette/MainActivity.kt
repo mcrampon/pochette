@@ -32,7 +32,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        comeBackOnceSignedIn()
+        comeBackOnceRedirected()
         setContent {
             PochetteTheme {
                 Surface(Modifier.fillMaxSize()) {
@@ -67,19 +67,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** Once signed in, close the sign-in page, which is above the app, and show the albums. */
-    private fun comeBackOnceSignedIn() {
+    /**
+     * Once signed in on Qobuz's page, come back above it, in case the browser didn't follow
+     * the link back to the app: Android may refuse, as the app is in the background.
+     */
+    private fun comeBackOnceRedirected() {
         lifecycleScope.launch {
             var signingIn = false
             model.stage.collect { stage ->
                 if (stage is Stage.SignedOut && stage.url != null) {
                     signingIn = true
-                } else if (stage is Stage.SignedIn && signingIn) {
+                } else if (signingIn) {
                     signingIn = false
-                    startActivity(
-                        Intent(this@MainActivity, MainActivity::class.java)
-                            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
-                    )
+                    if (stage is Stage.Starting) {
+                        // singleTask: closes what's above the app in its task.
+                        startActivity(Intent(this@MainActivity, MainActivity::class.java))
+                    }
                 }
             }
         }

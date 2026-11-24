@@ -80,9 +80,13 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         signingIn =
             viewModelScope.launch {
                 try {
-                    val signIn = core.beginSignIn()
+                    val signIn = core.beginSignIn(SIGNED_IN)
                     _stage.value = Stage.SignedOut(url = signIn.url())
                     open(signIn.url())
+                    signIn.redirected()
+                    // Android keeps apps in the background off the network: the screen
+                    // brings the app back, if the browser didn't, before Qobuz is asked.
+                    _stage.value = Stage.Starting
                     signedIn(signIn.finish())
                 } catch (err: PochetteException) {
                     _stage.value = Stage.SignedOut(error = err.message)
@@ -128,4 +132,9 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun albums(): List<AlbumCard> = withContext(Dispatchers.Default) { core.library(view) }
+
+    companion object {
+        /** Opens the app: the browser goes there once signed in. See the manifest. */
+        const val SIGNED_IN = "io.github.mcrampon.pochette://signed-in"
+    }
 }

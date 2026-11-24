@@ -16,6 +16,10 @@ use crate::{Account, Inner, Pochette, PochetteError, Result, lock, run};
 /// How long the user has to sign in, once the page opened.
 const SIGN_IN_TIMEOUT: Duration = Duration::from_mins(10);
 
+/// How many times to try reaching Qobuz with the code, a second apart: Android keeps an app
+/// in the background off the network, and the app may not be in front yet.
+const EXCHANGE_TRIES: u32 = 10;
+
 /// The signed-in user, and their client.
 pub(crate) struct SignedIn {
     pub client: Client,
@@ -40,16 +44,18 @@ impl Pochette {
         .await
     }
 
-    /// Start signing in: open the [`SignIn::url`] in a browser, then wait for
-    /// [`SignIn::finish`].
-    pub async fn begin_sign_in(&self) -> Result<Arc<SignIn>> {
+    /// Start signing in: open the [`SignIn::url`] in a browser, wait for
+    /// [`SignIn::redirected`], then [`SignIn::finish`]. Once signed in on the page, the
+    /// browser goes on to `return_to`, a link that brings the app back.
+    pub async fn begin_sign_in(&self, return_to: String) -> Result<Arc<SignIn>> {
         let inner = Arc::clone(&self.inner);
         run(async move {
             let app_id = qobuz::fetch_app_id(&inner.http).await?;
-            let login = BrowserLogin::start(&app_id).await?;
+            let login = BrowserLogin::start(&app_id).await?.return_to(&return_to);
             Ok(Arc::new(SignIn {
                 url: login.url().to_string(),
-                login: Mutex::new(Some((login, app_id))),
+                app_id,
+                progress: Mutex::new(Progress::Waiting(login)),
                 inner,
             }))
         })
@@ -86,8 +92,23 @@ impl Pochette {
 #[derive(uniffi::Object)]
 pub struct SignIn {
     url: String,
-    login: Mutex<Option<(BrowserLogin, String)>>,
+    app_id: String,
+    progress: Mutex<Progress>,
     inner: Arc<Inner>,
+}
+
+enum Progress {
+    /// For the user to sign in on the page.
+    Waiting(BrowserLogin),
+    /// Signed in on the page: the code to trade for a session.
+    Redirected(String),
+    Over,
+}
+
+fn over() -> PochetteError {
+    PochetteError::Failed {
+        message: "This sign-in is over: start another".to_owned(),
+    }
 }
 
 #[uniffi::export]
@@ -98,22 +119,47 @@ impl SignIn {
         self.url.clone()
     }
 
-    /// Wait for the user to sign in on the page, up to 10 minutes. Cancel the call to give
-    /// up.
+    /// Wait for the user to sign in on the page, up to 10 minutes: then bring the app to
+    /// the front, if the browser didn't, and [`SignIn::finish`]. Cancel the call to give up.
+    pub async fn redirected(&self) -> Result<()> {
+        let progress = std::mem::replace(&mut *lock(&self.progress), Progress::Over);
+        let Progress::Waiting(login) = progress else {
+            return Err(over());
+        };
+        let code = run(async move {
+            match tokio::time::timeout(SIGN_IN_TIMEOUT, login.wait_for_code()).await {
+                Ok(code) => Ok(code?),
+                Err(_) => Err(PochetteError::Failed {
+                    message: "The sign-in took too long. Try again.".to_owned(),
+                }),
+            }
+        })
+        .await?;
+        *lock(&self.progress) = Progress::Redirected(code);
+        Ok(())
+    }
+
+    /// Trade the code from the page for a session, and sign in with it.
     pub async fn finish(&self) -> Result<Account> {
-        let Some((login, app_id)) = lock(&self.login).take() else {
-            return Err(PochetteError::Failed {
-                message: "This sign-in is over: start another".to_owned(),
-            });
+        let progress = std::mem::replace(&mut *lock(&self.progress), Progress::Over);
+        let Progress::Redirected(code) = progress else {
+            return Err(over());
         };
         let inner = Arc::clone(&self.inner);
+        let app_id = self.app_id.clone();
         run(async move {
-            let code = tokio::time::timeout(SIGN_IN_TIMEOUT, login.wait_for_code())
-                .await
-                .map_err(|_| PochetteError::Failed {
-                    message: "The sign-in took too long. Try again.".to_owned(),
-                })??;
-            let session = qobuz::auth::exchange_code(&inner.http, &app_id, &code).await?;
+            let mut tries = 1;
+            let session = loop {
+                match qobuz::auth::exchange_code(&inner.http, &app_id, &code).await {
+                    // Qobuz wasn't reached, so the code is still good.
+                    Err(qobuz::Error::Http(err)) if err.is_connect() && tries < EXCHANGE_TRIES => {
+                        tracing::info!("cannot reach Qobuz yet: {err}");
+                        tries += 1;
+                        tokio::time::sleep(Duration::from_secs(1)).await;
+                    }
+                    result => break result?,
+                }
+            };
             inner
                 .sign_in(Client::new(inner.http.clone(), session))
                 .await

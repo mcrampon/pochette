@@ -60,6 +60,8 @@ pub struct BrowserLogin {
     v4: TcpListener,
     /// Browsers may resolve `localhost` to `::1`, so listen there too when IPv6 is available.
     v6: Option<TcpListener>,
+    /// Where to send the browser once Qobuz redirected to us, instead of showing a page.
+    return_to: Option<String>,
 }
 
 impl BrowserLogin {
@@ -74,7 +76,20 @@ impl BrowserLogin {
             .append_pair("ext_app_id", app_id)
             .append_pair("redirect_url", &format!("http://localhost:{port}"));
 
-        Ok(Self { url, v4, v6 })
+        Ok(Self {
+            url,
+            v4,
+            v6,
+            return_to: None,
+        })
+    }
+
+    /// Once Qobuz redirected to us, send the browser on to `url`, such as a link that brings
+    /// the app back, instead of showing a page that says to go back to it.
+    #[must_use]
+    pub fn return_to(mut self, url: &str) -> Self {
+        self.return_to = Some(url.to_owned());
+        self
     }
 
     /// The Qobuz sign-in page to open in the browser.
@@ -97,7 +112,7 @@ impl BrowserLogin {
                 },
                 None => self.v4.accept().await?,
             };
-            match handle_connection(stream, peer).await {
+            match handle_connection(stream, peer, self.return_to.as_deref()).await {
                 Ok(Some(code)) => return Ok(code),
                 // A request without the code, such as the browser asking for a favicon.
                 Ok(None) => {}
@@ -119,24 +134,30 @@ enum Redirect {
     Other,
 }
 
-async fn handle_connection(mut stream: TcpStream, peer: SocketAddr) -> Result<Option<String>> {
+async fn handle_connection(
+    mut stream: TcpStream,
+    peer: SocketAddr,
+    return_to: Option<&str>,
+) -> Result<Option<String>> {
     let target = read_request_target(&mut stream).await?;
     tracing::debug!("loopback request from {peer}");
 
-    match parse_redirect(target.as_deref().unwrap_or_default()) {
-        Redirect::Code(code) => {
-            respond(&mut stream, "200 OK", &page(SUCCESS_TITLE, SUCCESS_TEXT)).await?;
-            Ok(Some(code))
-        }
-        Redirect::Error(reason) => {
-            respond(&mut stream, "200 OK", &page(FAILURE_TITLE, FAILURE_TEXT)).await?;
-            Err(Error::Login(reason))
-        }
+    let (result, title, text) = match parse_redirect(target.as_deref().unwrap_or_default()) {
+        Redirect::Code(code) => (Ok(Some(code)), SUCCESS_TITLE, SUCCESS_TEXT),
+        Redirect::Error(reason) => (Err(Error::Login(reason)), FAILURE_TITLE, FAILURE_TEXT),
         Redirect::Other => {
-            respond(&mut stream, "404 Not Found", "").await?;
-            Ok(None)
+            respond(&mut stream, "404 Not Found", None, "").await?;
+            return Ok(None);
         }
-    }
+    };
+    // The page stays for browsers that don't follow the redirect.
+    let status = if return_to.is_some() {
+        "303 See Other"
+    } else {
+        "200 OK"
+    };
+    respond(&mut stream, status, return_to, &page(title, text)).await?;
+    result
 }
 
 /// Read the request head and return its target, such as `/?code_autorisation=…`.
@@ -181,9 +202,18 @@ fn parse_redirect(target: &str) -> Redirect {
     error.map_or(Redirect::Other, Redirect::Error)
 }
 
-async fn respond(stream: &mut TcpStream, status: &str, body: &str) -> std::io::Result<()> {
+async fn respond(
+    stream: &mut TcpStream,
+    status: &str,
+    location: Option<&str>,
+    body: &str,
+) -> std::io::Result<()> {
+    let location = location
+        .map(|url| format!("Location: {url}\r\n"))
+        .unwrap_or_default();
     let response = format!(
         "HTTP/1.1 {status}\r\n\
+         {location}\
          Content-Type: text/html; charset=utf-8\r\n\
          Content-Length: {}\r\n\
          Cache-Control: no-store\r\n\
@@ -321,6 +351,29 @@ mod tests {
         assert!(response.starts_with("HTTP/1.1 200"));
         assert!(response.contains(SUCCESS_TITLE));
 
+        assert_eq!(waiting.await.unwrap().unwrap(), "xyz");
+    }
+
+    #[tokio::test]
+    async fn sends_the_browser_back_to_the_app() {
+        let login = BrowserLogin::start("123")
+            .await
+            .unwrap()
+            .return_to("app://signed-in");
+        let port = login.v4.local_addr().unwrap().port();
+        let waiting = tokio::spawn(login.wait_for_code());
+
+        let mut browser = TcpStream::connect((Ipv4Addr::LOCALHOST, port))
+            .await
+            .unwrap();
+        browser
+            .write_all(b"GET /?code_autorisation=xyz HTTP/1.1\r\nHost: localhost\r\n\r\n")
+            .await
+            .unwrap();
+        let mut response = String::new();
+        browser.read_to_string(&mut response).await.unwrap();
+        assert!(response.starts_with("HTTP/1.1 303"));
+        assert!(response.contains("\r\nLocation: app://signed-in\r\n"));
         assert_eq!(waiting.await.unwrap().unwrap(), "xyz");
     }
 }

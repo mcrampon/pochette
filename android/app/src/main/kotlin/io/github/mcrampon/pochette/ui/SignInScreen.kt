@@ -72,7 +72,7 @@ fun StartingScreen(error: String?, onRetry: () -> Unit) {
         if (error == null) {
             CircularProgressIndicator()
         } else {
-            Text("Can't reach Qobuz", style = MaterialTheme.typography.titleLarge)
+            Text("No Connection", style = MaterialTheme.typography.titleLarge)
             Text(error, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
             Button(onClick = onRetry) { Text("Try Again") }
         }

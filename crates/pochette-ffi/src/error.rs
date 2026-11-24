@@ -34,19 +34,23 @@ fn with_causes(err: &dyn std::error::Error) -> String {
 
 impl From<qobuz::Error> for PochetteError {
     fn from(err: qobuz::Error) -> Self {
-        let message = with_causes(&err);
         match err {
-            qobuz::Error::Unauthorized { .. } => Self::SignedOut { message },
-            qobuz::Error::Http(_) => Self::Network { message },
-            _ => Self::Qobuz { message },
+            qobuz::Error::Http(err) => err.into(),
+            qobuz::Error::Unauthorized { .. } => Self::SignedOut {
+                message: with_causes(&err),
+            },
+            _ => Self::Qobuz {
+                message: with_causes(&err),
+            },
         }
     }
 }
 
 impl From<reqwest::Error> for PochetteError {
     fn from(err: reqwest::Error) -> Self {
+        // Without the URL: it may hold a code or a token, and says little to the user.
         Self::Network {
-            message: with_causes(&err),
+            message: format!("Can't reach Qobuz: {}", with_causes(&err.without_url())),
         }
     }
 }
