@@ -1,6 +1,11 @@
 package io.github.mcrampon.pochette.ui
 
+import android.os.SystemClock
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -70,10 +75,14 @@ import io.github.mcrampon.pochette.core.LyricLine
 import io.github.mcrampon.pochette.core.Lyrics
 import io.github.mcrampon.pochette.core.PochetteException
 import io.github.mcrampon.pochette.core.Quality
-import io.github.mcrampon.pochette.core.currentLine
+import androidx.compose.runtime.withFrameMillis
+import io.github.mcrampon.pochette.core.lyricsLeadMs
 import io.github.mcrampon.pochette.core.trackDuration
 import io.github.mcrampon.pochette.playback.NowPlaying
 import kotlinx.coroutines.delay
+
+/** How long the lyrics stop following the song once the user scrolled them. */
+private const val FOLLOW_PAUSE_MS = 4000L
 
 /** What can be asked of Now Playing. */
 class NowPlayingActions(
@@ -117,100 +126,115 @@ fun NowPlayingScreen(now: NowPlaying, actions: NowPlayingActions) {
         },
         contentWindowInsets = WindowInsets(0),
     ) { padding ->
-        LazyColumn(
-            Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 32.dp),
-        ) {
-            item {
-                Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(12.dp))) {
-                    if (showLyrics) {
-                        LyricsView(now, actions, position)
-                    } else {
-                        Cover(now.cover, Modifier.fillMaxSize(), corner = 12)
-                    }
-                    FilledTonalIconButton(
-                        onClick = { showLyrics = !showLyrics },
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
-                    ) {
-                        Icon(
-                            painterResource(if (showLyrics) R.drawable.ic_image else R.drawable.ic_lyrics),
-                            contentDescription = if (showLyrics) "Show the Cover" else "Show the Lyrics",
-                        )
-                    }
-                }
-                Spacer(Modifier.height(20.dp))
-                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(now.title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
-                    Text(
-                        now.album,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable(onClick = actions.openAlbum),
-                    )
-                    Text(
-                        now.artist,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                    now.quality?.let {
-                        Surface(
-                            onClick = { choosingQuality = true },
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            shape = RoundedCornerShape(6.dp),
-                            modifier = Modifier.padding(top = 10.dp),
-                        ) {
-                            Text(it, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
-                        }
-                    }
-                }
-                Progress(now, position, onSeek = {
-                    position = it
-                    actions.seekTo(it)
-                })
-                Controls(now, actions)
-                now.error?.let {
-                    Text(
-                        it,
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    )
-                }
-                Text("Tracks", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 24.dp, bottom = 4.dp))
+        BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+            val artwork = @Composable { modifier: Modifier ->
+                Artwork(now, actions, showLyrics, onToggle = { showLyrics = !showLyrics }, modifier)
             }
-            itemsIndexed(now.queue, key = { index, queued -> "$index/${queued.mediaId}" }) { index, queued ->
-                val current = index == now.index
-                val color = if (current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { actions.skipTo(index) }
-                        .padding(vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Box(Modifier.width(28.dp)) {
-                        if (current) {
-                            Icon(painterResource(R.drawable.ic_graphic_eq), contentDescription = "Playing", tint = color, modifier = Modifier.size(18.dp))
-                        } else {
-                            Text("${index + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                        }
+            val details = @Composable {
+                Details(now, actions, position, onSeek = { position = it }, onQuality = { choosingQuality = true })
+            }
+            if (maxWidth > maxHeight) {
+                // Landscape: the cover as tall as the screen, beside the rest.
+                Row(Modifier.fillMaxSize().padding(start = 24.dp, end = 8.dp, bottom = 16.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    artwork(Modifier.fillMaxHeight())
+                    LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(end = 16.dp, bottom = 16.dp)) {
+                        item { details() }
+                        queue(now, actions.skipTo)
                     }
-                    Text(queued.title, color = color, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    Text(
-                        trackDuration((queued.durationMs / 1000).toUInt()),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                }
+            } else {
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 32.dp)) {
+                    item {
+                        artwork(Modifier.fillMaxWidth())
+                        Spacer(Modifier.height(20.dp))
+                        details()
+                    }
+                    queue(now, actions.skipTo)
                 }
             }
         }
     }
     if (choosingQuality) {
         QualityDialog(actions.quality(), onChoose = actions.setQuality, onDismiss = { choosingQuality = false })
+    }
+}
+
+/** The cover, or the lyrics in its place, square, and the button that swaps them. */
+@Composable
+private fun Artwork(now: NowPlaying, actions: NowPlayingActions, showLyrics: Boolean, onToggle: () -> Unit, modifier: Modifier) {
+    Box(modifier.aspectRatio(1f).clip(RoundedCornerShape(12.dp))) {
+        if (showLyrics) {
+            LyricsView(now, actions)
+        } else {
+            Cover(now.cover, Modifier.fillMaxSize(), corner = 12)
+        }
+        FilledTonalIconButton(onClick = onToggle, modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp)) {
+            Icon(
+                painterResource(if (showLyrics) R.drawable.ic_image else R.drawable.ic_lyrics),
+                contentDescription = if (showLyrics) "Show the Cover" else "Show the Lyrics",
+            )
+        }
+    }
+}
+
+/** The track, its album and artist, the stream's quality, where it is, and the controls. */
+@Composable
+private fun Details(now: NowPlaying, actions: NowPlayingActions, position: Long, onSeek: (Long) -> Unit, onQuality: () -> Unit) {
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(now.title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+        Text(
+            now.album,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.primary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable(onClick = actions.openAlbum),
+        )
+        Text(now.artist, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        now.quality?.let {
+            Surface(
+                onClick = onQuality,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier.padding(top = 10.dp),
+            ) {
+                Text(it, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+            }
+        }
+    }
+    Progress(now, position, onSeek = {
+        onSeek(it)
+        actions.seekTo(it)
+    })
+    Controls(now, actions)
+    now.error?.let {
+        Text(it, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+    }
+    Text("Tracks", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 24.dp, bottom = 4.dp))
+}
+
+private fun LazyListScope.queue(now: NowPlaying, onSkip: (Int) -> Unit) {
+    itemsIndexed(now.queue, key = { index, queued -> "$index/${queued.mediaId}" }) { index, queued ->
+        val current = index == now.index
+        val color = if (current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { onSkip(index) }
+                .padding(vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(Modifier.width(28.dp)) {
+                if (current) {
+                    Icon(painterResource(R.drawable.ic_graphic_eq), contentDescription = "Playing", tint = color, modifier = Modifier.size(18.dp))
+                } else {
+                    Text("${index + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+            Text(queued.title, color = color, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Text(trackDuration((queued.durationMs / 1000).toUInt()), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 
@@ -275,7 +299,7 @@ private sealed interface LyricsLoad {
 
 /** The lyrics over the cover, blurred and darkened: the line sung stands out, and follows the song. */
 @Composable
-private fun LyricsView(now: NowPlaying, actions: NowPlayingActions, position: Long) {
+private fun LyricsView(now: NowPlaying, actions: NowPlayingActions) {
     val load by produceState<LyricsLoad>(LyricsLoad.Pending, now.trackId) {
         value =
             try {
@@ -293,7 +317,7 @@ private fun LyricsView(now: NowPlaying, actions: NowPlayingActions, position: Lo
             is LyricsLoad.Failed -> Message("Can't load the lyrics: ${current.error}")
             is LyricsLoad.Done ->
                 when (val lyrics = current.lyrics) {
-                    is Lyrics.Synced -> Synced(lyrics.lines, position, actions.seekTo)
+                    is Lyrics.Synced -> Synced(lyrics.lines, actions)
                     is Lyrics.Plain ->
                         Text(
                             lyrics.text,
@@ -309,13 +333,32 @@ private fun LyricsView(now: NowPlaying, actions: NowPlayingActions, position: Lo
 }
 
 @Composable
-private fun Synced(lines: List<LyricLine>, position: Long, onSeek: (Long) -> Unit) {
-    val current = currentLine(lines, position.coerceAtLeast(0).toULong())?.toInt()
+private fun Synced(lines: List<LyricLine>, actions: NowPlayingActions) {
+    var current by remember(lines) { mutableStateOf<Int?>(null) }
+    // Checked at each frame: timers woke up to 0.15 s late on a phone.
+    LaunchedEffect(lines) {
+        val lead = lyricsLeadMs().toLong()
+        val times = lines.map { it.atMs.toLong() }
+        while (true) {
+            withFrameMillis {}
+            val position = actions.position().coerceAtLeast(0)
+            val line = lastStarted(times, position + lead)
+            if (line != current) current = line
+        }
+    }
     val list = rememberLazyListState()
+    // The user scrolled the lyrics: they stop following the song for a moment, as on desktop.
+    var scrolledAt by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(list) {
+        list.interactionSource.interactions.collect {
+            if (it is DragInteraction) scrolledAt = SystemClock.uptimeMillis()
+        }
+    }
     val padding = 120.dp
     val paddingPx = with(LocalDensity.current) { padding.roundToPx() }
     // The line sung, a third of the way down: scrolled to, it would be under the padding.
     LaunchedEffect(current) {
+        if (SystemClock.uptimeMillis() - scrolledAt < FOLLOW_PAUSE_MS) return@LaunchedEffect
         list.animateScrollToItem((current ?: 0).coerceAtLeast(0), scrollOffset = paddingPx - list.layoutInfo.viewportSize.height / 3)
     }
     LazyColumn(
@@ -345,11 +388,28 @@ private fun Synced(lines: List<LyricLine>, position: Long, onSeek: (Long) -> Uni
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(4.dp))
-                        .clickable { onSeek(line.atMs.toLong()) }
+                        .clickable {
+                            scrolledAt = 0
+                            actions.seekTo(line.atMs.toLong())
+                        }
                         .padding(vertical = 6.dp),
             )
         }
     }
+}
+
+/**
+ * The last of `times` at `position` or before, as the core's `current_line`, which is too
+ * costly to call through the bindings at each frame.
+ */
+private fun lastStarted(times: List<Long>, position: Long): Int? {
+    var low = 0
+    var high = times.size
+    while (low < high) {
+        val middle = (low + high) / 2
+        if (times[middle] <= position) low = middle + 1 else high = middle
+    }
+    return (low - 1).takeIf { it >= 0 }
 }
 
 @Composable

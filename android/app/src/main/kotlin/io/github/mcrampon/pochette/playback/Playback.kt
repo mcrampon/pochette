@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.media3.common.C
@@ -43,6 +44,9 @@ data class NowPlaying(
     /** The stream's: "24-bit / 96 kHz", once it plays. */
     val quality: String?,
 )
+
+/** How far the position goes on past what the player last told, in case it stalled. */
+private const val MAX_AHEAD_MS = 300L
 
 /** The key of the stream's quality, in the session's extras. */
 const val QUALITY_EXTRA = "quality"
@@ -85,8 +89,25 @@ class Playback(context: Context) {
         )
     }
 
-    /** Where the track playing is, in milliseconds: ask it again as it plays. */
-    val positionMs: Long get() = controller?.currentPosition ?: 0
+    /** The last position the player told, and when it was first seen. */
+    private var reported = -1L
+    private var reportedAt = 0L
+
+    /**
+     * Where the track playing is, in milliseconds: ask it again as it plays. The player tells
+     * its position every quarter of a second: in between, it goes on with the clock, so the
+     * lyrics light up on time.
+     */
+    val positionMs: Long get() {
+        val told = PlaybackService.position?.invoke() ?: controller?.currentPosition ?: 0
+        val now = SystemClock.elapsedRealtime()
+        if (told != reported) {
+            reported = told
+            reportedAt = now
+        }
+        if (controller?.isPlaying != true) return told
+        return told + (now - reportedAt).coerceAtMost(MAX_AHEAD_MS)
+    }
 
     /** Play `album`'s tracks that can be played, from the track `from`, else the first. */
     fun play(album: AlbumPage, from: ULong? = null) {

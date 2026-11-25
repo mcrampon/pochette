@@ -43,6 +43,24 @@ pub struct Song {
     pub duration: u32,
 }
 
+impl Song {
+    /// `track` of `album`, as LRCLIB knows songs: titles without their version ("Remastered
+    /// 2011"), the track's performer if it has one, Qobuz's length.
+    #[must_use]
+    pub fn of(album: &qobuz::models::Album, track: &qobuz::models::Track) -> Self {
+        let artist = track
+            .performer
+            .as_ref()
+            .map_or(&album.artist.name, |performer| &performer.name);
+        Self {
+            title: track.title.clone(),
+            artist: artist.clone(),
+            album: album.title.clone(),
+            duration: track.duration,
+        }
+    }
+}
+
 /// The lyrics of `song`: those of exactly that song if LRCLIB has it, or else of the closest
 /// match of the same length.
 pub async fn find(http: &reqwest::Client, song: &Song) -> reqwest::Result<Lyrics> {
@@ -163,6 +181,9 @@ fn parse_time(time: &str) -> Option<Duration> {
     (seconds.is_finite() && seconds >= 0.0)
         .then(|| Duration::from_secs(minutes * 60) + Duration::from_secs_f64(seconds))
 }
+
+/// How early a line lights up, as the eye reads a little ahead of the voice.
+pub const LEAD: Duration = Duration::from_millis(150);
 
 /// Which of `lines` is sung at `position`: the last one started, if any is.
 #[must_use]

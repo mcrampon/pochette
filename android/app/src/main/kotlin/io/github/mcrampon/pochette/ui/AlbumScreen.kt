@@ -40,6 +40,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -161,7 +163,9 @@ private fun Header(card: AlbumCard?, page: AlbumPage?, ours: Boolean, now: NowPl
     val plays = remember(now?.trackId, page) { actions.plays() }
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Cover(card?.coverLarge ?: card?.cover, Modifier.widthIn(max = 360.dp).fillMaxWidth(), corner = 12)
+            // Not taller than most of the window, as in landscape.
+            val most = with(LocalDensity.current) { (LocalWindowInfo.current.containerSize.height * 0.6f).toDp() }
+            Cover(card?.coverLarge ?: card?.cover, Modifier.widthIn(max = minOf(360.dp, most)).fillMaxWidth(), corner = 12)
         }
         Spacer(Modifier.height(16.dp))
         val kicker = listOfNotNull(page?.kind ?: "Album", card?.year).joinToString(" · ").uppercase()

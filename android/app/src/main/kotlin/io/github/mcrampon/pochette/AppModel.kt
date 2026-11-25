@@ -161,9 +161,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     /** The lyrics of the track playing, from LRCLIB the first time. */
     suspend fun lyrics(now: NowPlaying): Lyrics {
         val trackId = now.trackId ?: return Lyrics.Missing
-        return lyrics[trackId] ?: core
-            .lyrics(now.title, now.artist, now.album, (now.durationMs / 1000).toUInt())
-            .also { lyrics[trackId] = it }
+        return lyrics[trackId] ?: core.lyrics(now.albumId, trackId).also { lyrics[trackId] = it }
     }
 
     /** An album the library knows, to show before its page loads. */
@@ -187,6 +185,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
 
 
 

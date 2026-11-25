@@ -121,7 +121,8 @@ pub struct LyricLine {
     pub text: String,
 }
 
-/// The line of `lines` sung at `position_ms`, if one is.
+/// The line of `lines` to light at `position_ms`, if one is: a little before it's sung, as on
+/// desktop, as the eye reads ahead of the voice. See [`lyrics_lead_ms`].
 #[uniffi::export]
 #[must_use]
 pub fn current_line(lines: Vec<LyricLine>, position_ms: u64) -> Option<u32> {
@@ -132,8 +133,15 @@ pub fn current_line(lines: Vec<LyricLine>, position_ms: u64) -> Option<u32> {
             text: line.text,
         })
         .collect();
-    lyrics::current_line(&lines, Duration::from_millis(position_ms))
+    lyrics::current_line(&lines, Duration::from_millis(position_ms) + lyrics::LEAD)
         .and_then(|index| u32::try_from(index).ok())
+}
+
+/// How long before it's sung a line lights up, in milliseconds.
+#[uniffi::export]
+#[must_use]
+pub fn lyrics_lead_ms() -> u64 {
+    u64::try_from(lyrics::LEAD.as_millis()).unwrap_or(0)
 }
 
 #[uniffi::export]
@@ -187,22 +195,24 @@ impl Pochette {
         }))
     }
 
-    /// The song's lyrics, from LRCLIB: `duration` in seconds.
-    pub async fn lyrics(
-        &self,
-        title: String,
-        artist: String,
-        album: String,
-        duration: u32,
-    ) -> Result<Lyrics> {
+    /// The lyrics of a track of the album, from LRCLIB, looked up as on desktop.
+    pub async fn lyrics(&self, album_id: String, track_id: u64) -> Result<Lyrics> {
         let inner = Arc::clone(&self.inner);
         run(async move {
-            let song = lyrics::Song {
-                title,
-                artist,
-                album,
-                duration,
+            let known = lock(&inner.albums).get(&album_id).cloned();
+            let album = match known {
+                Some(album) => album,
+                None => inner.client()?.album(&album_id).await?,
             };
+            let track = album
+                .tracks
+                .iter()
+                .flat_map(|page| &page.items)
+                .find(|track| track.id == track_id)
+                .ok_or_else(|| PochetteError::Failed {
+                    message: format!("Track {track_id} isn't on album {album_id}"),
+                })?;
+            let song = lyrics::Song::of(&album, track);
             Ok(match lyrics::find(&inner.http, &song).await? {
                 lyrics::Lyrics::Synced(lines) => Lyrics::Synced {
                     lines: lines

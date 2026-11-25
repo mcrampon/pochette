@@ -216,6 +216,8 @@ fn works_offline() {
         },
     ];
     assert_eq!(current_line(lines.clone(), 500), None);
+    // Lit a little before it's sung.
+    assert_eq!(current_line(lines.clone(), 900), Some(0));
     assert_eq!(current_line(lines, 6000), Some(1));
 
     pochette.observe(None);

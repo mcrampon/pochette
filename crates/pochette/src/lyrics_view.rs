@@ -23,8 +23,6 @@ use crate::{
 /// How often the line sung is checked.
 const TICK: Duration = Duration::from_millis(100);
 
-/// How early a line lights up, as the eye reads a little ahead of the voice.
-const LEAD: Duration = Duration::from_millis(150);
 
 /// How long following the song waits after the user scrolls the lyrics themselves.
 const FOLLOW_PAUSE: Duration = Duration::from_secs(4);
@@ -174,7 +172,7 @@ impl Component for LyricsView {
             LyricsViewMsg::Seek(at) => {
                 self.player.seek(at);
                 self.paused_until = None;
-                self.light(lyrics::current_line(&self.lines, at + LEAD), true);
+                self.light(lyrics::current_line(&self.lines, at + lyrics::LEAD), true);
             }
             LyricsViewMsg::Scrolled => {
                 self.paused_until = Some(Instant::now() + FOLLOW_PAUSE);
@@ -220,18 +218,7 @@ impl LyricsView {
 
     /// The track playing, as LRCLIB looks songs up.
     fn song(&self) -> Option<Song> {
-        let track = self.status.track()?;
-        let album = self.status.album.as_ref()?;
-        let artist = track
-            .performer
-            .as_ref()
-            .map_or(&album.artist.name, |performer| &performer.name);
-        Some(Song {
-            title: track.title.clone(),
-            artist: artist.clone(),
-            album: album.title.clone(),
-            duration: track.duration,
-        })
+        Some(Song::of(self.status.album.as_ref()?, self.status.track()?))
     }
 
     /// Fill the view with what's shown.
@@ -293,7 +280,7 @@ impl LyricsView {
             return;
         }
         let position = self.player.position().unwrap_or_default();
-        let current = lyrics::current_line(&self.lines, position + LEAD);
+        let current = lyrics::current_line(&self.lines, position + lyrics::LEAD);
         self.light(current, recenter);
     }
 
