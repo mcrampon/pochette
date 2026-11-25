@@ -55,6 +55,8 @@ pub struct AlbumCard {
     pub hires: Option<String>,
     pub explicit: bool,
     pub streamable: bool,
+    /// What the press gave it: "4F de Télérama", "Pitchfork: Best New Music".
+    pub awards: Vec<String>,
 }
 
 impl From<&Album> for AlbumCard {
@@ -76,6 +78,11 @@ impl From<&Album> for AlbumCard {
                 .flatten(),
             explicit: album.parental_warning,
             streamable: album.streamable,
+            awards: album
+                .awards
+                .iter()
+                .map(|award| award.name.clone())
+                .collect(),
         }
     }
 }
@@ -98,7 +105,6 @@ pub struct AlbumPage {
     /// Qobuz's review, as text.
     pub description: Option<String>,
     pub copyright: Option<String>,
-    pub awards: Vec<String>,
     /// More than one disc: the tracks say which they're on.
     pub discs: u32,
     pub tracks: Vec<TrackRow>,
@@ -134,11 +140,6 @@ impl AlbumPage {
                 .map(format::html_to_text)
                 .filter(|text| !text.trim().is_empty()),
             copyright: album.copyright.clone(),
-            awards: album
-                .awards
-                .iter()
-                .map(|award| award.name.clone())
-                .collect(),
             discs,
             tracks,
             plays: plays.into(),

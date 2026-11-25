@@ -70,26 +70,6 @@ fun AlbumsScreen(library: Library, onRefresh: () -> Unit, onSignOut: () -> Unit,
     }
 }
 
-@Composable
-private fun AlbumTile(album: AlbumCard, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick)) {
-        Cover(album.coverLarge ?: album.cover, Modifier.fillMaxWidth())
-        Text(
-            album.title,
-            style = MaterialTheme.typography.titleSmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-        Text(
-            album.artist,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
 
 /** An album's cover, square, with a placeholder while it loads. */
 @Composable

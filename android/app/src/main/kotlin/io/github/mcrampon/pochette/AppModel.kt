@@ -1,18 +1,24 @@
 package io.github.mcrampon.pochette
 
 import android.app.Application
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.mcrampon.pochette.core.Account
-import androidx.compose.runtime.mutableStateListOf
 import io.github.mcrampon.pochette.core.AlbumCard
 import io.github.mcrampon.pochette.core.AlbumPage
-import io.github.mcrampon.pochette.core.Lyrics
-import io.github.mcrampon.pochette.playback.NowPlaying
-import io.github.mcrampon.pochette.core.Plays
+import io.github.mcrampon.pochette.core.ArtistCard
+import io.github.mcrampon.pochette.core.ArtistPage
+import io.github.mcrampon.pochette.core.Discover
+import io.github.mcrampon.pochette.core.Genre
 import io.github.mcrampon.pochette.core.LibraryView
+import io.github.mcrampon.pochette.core.Lyrics
+import io.github.mcrampon.pochette.core.Plays
 import io.github.mcrampon.pochette.core.PochetteException
 import io.github.mcrampon.pochette.core.Sort
+import io.github.mcrampon.pochette.playback.NowPlaying
 import io.github.mcrampon.pochette.playback.Playback
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -35,25 +41,6 @@ sealed interface Stage {
     data class SignedIn(val account: Account) : Stage
 }
 
-/** A screen of the signed-in app, in the back stack. */
-sealed interface Screen {
-    /** Tells apart the same screen opened twice, so each keeps its scroll. */
-    val key: String
-
-    data object Albums : Screen {
-        override val key = "albums"
-    }
-
-    data object NowPlaying : Screen {
-        override val key = "now"
-    }
-
-    /** `preview`, when known, shows while the page loads. */
-    data class Album(val id: String, val preview: AlbumCard? = null) : Screen {
-        override val key = "album/$id"
-    }
-}
-
 /** The user's albums, as the library shows them. */
 data class Library(
     val albums: List<AlbumCard> = emptyList(),
@@ -61,11 +48,27 @@ data class Library(
     val error: String? = null,
 )
 
+/** Something loaded from Qobuz, as a screen shows it. */
+sealed interface Load<out T> {
+    data object Pending : Load<Nothing>
+
+    data class Done<T>(val value: T) : Load<T>
+
+    data class Failed(val error: String) : Load<Nothing>
+}
+
+/** Search results: the artists, and the albums a page at a time. */
+data class Found(val query: String, val artists: Load<List<ArtistCard>>, val albums: Paged)
+
+/** How many artists a search shows, as on desktop. */
+private const val ARTISTS_FOUND = 12u
+
 /** What the screens show, and what they ask of the core. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class AppModel(app: Application) : AndroidViewModel(app) {
     private val core = (app as PochetteApp).core
     private val sessions = SessionStore(app)
+    val settings = Settings(app)
 
     private val _stage = MutableStateFlow<Stage>(Stage.Starting)
     val stage: StateFlow<Stage> = _stage.asStateFlow()
@@ -79,16 +82,26 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     private val _notice = MutableStateFlow<String?>(null)
     val notice: StateFlow<String?> = _notice.asStateFlow()
 
-    /** What's open, the last on top. */
-    val screens = mutableStateListOf<Screen>(Screen.Albums)
+    val navigation = Navigation()
 
     /** Album pages already loaded, as going back to one is common. */
     private val pages = HashMap<String, AlbumPage>()
+    private val artists = HashMap<ULong, ArtistPage>()
 
     /** Lyrics already found, by track. */
     private val lyrics = HashMap<ULong, Lyrics>()
 
-    val settings = Settings(app)
+    /** Long lists, by the key of their screen: they stay as scrolled while it's open. */
+    private val lists = HashMap<String, Paged>()
+
+    /** Discover, for the genres picked. */
+    var discover by mutableStateOf<Load<Discover>>(Load.Pending)
+        private set
+    private var genres: List<Genre>? = null
+
+    var found by mutableStateOf<Found?>(null)
+        private set
+    private var searching: Job? = null
 
     private var view = LibraryView("", emptyList(), emptyList(), Sort.DATE_ADDED, false)
     private var signingIn: Job? = null
@@ -142,21 +155,12 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         _stage.value = Stage.SignedOut()
     }
 
-    fun open(screen: Screen) {
-        if (screens.last().key != screen.key) screens.add(screen)
-    }
+    fun open(screen: Screen) = navigation.open(screen)
 
-    /** Close the screen on top: its key, to forget its state. */
-    fun back(): String? = if (screens.size > 1) screens.removeAt(screens.lastIndex).key else null
+    /** The album's page, from Qobuz the first time. */
+    suspend fun album(id: String): AlbumPage = pages[id] ?: ask { core.album(id) }.also { pages[id] = it }
 
-    /** The album's page, from Qobuz the first time. Signs out if Qobuz no longer takes the session. */
-    suspend fun album(id: String): AlbumPage =
-        pages[id] ?: try {
-            core.album(id).also { pages[id] = it }
-        } catch (expired: PochetteException.SignedOut) {
-            signOut()
-            throw expired
-        }
+    suspend fun artist(id: ULong): ArtistPage = artists[id] ?: ask { core.artist(id) }.also { artists[id] = it }
 
     /** The lyrics of the track playing, from LRCLIB the first time. */
     suspend fun lyrics(now: NowPlaying): Lyrics {
@@ -186,7 +190,71 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** The albums of a screen's long list, loading the first page the first time. */
+    fun list(screen: Screen): Paged =
+        lists.getOrPut(screen.key) {
+            val fetch: suspend (UInt) -> io.github.mcrampon.pochette.core.AlbumList =
+                when (screen) {
+                    is Screen.Section -> { offset -> core.discoverSection(screen.section, screen.genres, offset, PAGE_SIZE) }
+                    is Screen.Releases -> { offset -> core.artistReleases(screen.artistId, screen.kind, offset, PAGE_SIZE) }
+                    else -> error("${screen.key} has no list")
+                }
+            Paged(viewModelScope) { offset -> ask { fetch(offset) } }.also { it.more() }
+        }
 
+    /** Load Discover again, for the genres picked: after picking others, or failing. */
+    fun loadDiscover() {
+        discover = Load.Pending
+        val picked = settings.discoverGenres
+        viewModelScope.launch {
+            discover =
+                try {
+                    Load.Done(ask { core.discover(picked) })
+                } catch (err: PochetteException) {
+                    Load.Failed(err.message.orEmpty())
+                }
+        }
+    }
+
+    /** The genres Discover can show, from Qobuz the first time. */
+    suspend fun genres(): List<Genre> = genres ?: ask { core.genres() }.also { genres = it }
+
+    fun pickGenres(picked: List<ULong>) {
+        settings.discoverGenres = picked
+        loadDiscover()
+    }
+
+    /** Search Qobuz for `query`: artists, and albums a page at a time. */
+    fun search(query: String) {
+        val trimmed = query.trim()
+        if (trimmed == found?.query) return
+        searching?.cancel()
+        if (trimmed.isEmpty()) {
+            found = null
+            return
+        }
+        val albums = Paged(viewModelScope) { offset -> ask { core.searchAlbums(trimmed, offset, PAGE_SIZE) } }
+        found = Found(trimmed, Load.Pending, albums)
+        albums.more()
+        searching =
+            viewModelScope.launch {
+                val artists =
+                    try {
+                        Load.Done(ask { core.searchArtists(trimmed, ARTISTS_FOUND) })
+                    } catch (err: PochetteException) {
+                        Load.Failed(err.message.orEmpty())
+                    }
+                found = found?.takeIf { it.query == trimmed }?.copy(artists = artists)
+            }
+    }
+
+    /** Close the screen on top, forgetting what it loaded. Returns the key of its state. */
+    fun back(): String? {
+        val closing = navigation.top
+        val key = navigation.back() ?: return null
+        if (navigation.screens.none { it.key == closing.key }) lists.remove(closing.key)
+        return key
+    }
 
 
     fun noticeShown() {
@@ -201,7 +269,11 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         playback.stop()
         core.signOut()
         pages.clear()
-        screens.removeRange(1, screens.size)
+        artists.clear()
+        lists.clear()
+        discover = Load.Pending
+        found = null
+        navigation.reset()
         sessions.clear()
         _library.value = Library()
         _stage.value = Stage.SignedOut()
@@ -214,10 +286,9 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val error =
                 try {
-                    core.refreshLibrary()
+                    ask { core.refreshLibrary() }
                     null
                 } catch (expired: PochetteException.SignedOut) {
-                    signOut()
                     return@launch
                 } catch (err: PochetteException) {
                     err.message
@@ -225,6 +296,15 @@ class AppModel(app: Application) : AndroidViewModel(app) {
             _library.value = Library(albums = albums(), error = error)
         }
     }
+
+    /** Ask Qobuz, signing out if it no longer takes the session. */
+    private suspend fun <T> ask(call: suspend () -> T): T =
+        try {
+            call()
+        } catch (expired: PochetteException.SignedOut) {
+            if (_stage.value is Stage.SignedIn) signOut()
+            throw expired
+        }
 
     private suspend fun signedIn(account: Account) {
         core.session()?.let(sessions::save)

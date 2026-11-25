@@ -40,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
@@ -66,6 +67,7 @@ class AlbumActions(
     val setFavorite: (AlbumCard, Boolean, failed: () -> Unit) -> Unit,
     val play: (AlbumPage, from: ULong?) -> Unit,
     val playPause: () -> Unit,
+    val openArtist: (id: ULong, name: String) -> Unit,
     val back: () -> Unit,
 )
 
@@ -171,7 +173,16 @@ private fun Header(card: AlbumCard?, page: AlbumPage?, ours: Boolean, now: NowPl
         val kicker = listOfNotNull(page?.kind ?: "Album", card?.year).joinToString(" · ").uppercase()
         Text(kicker, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
         Text(card?.title.orEmpty(), style = MaterialTheme.typography.headlineSmall)
-        Text(card?.artist.orEmpty(), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // A link to the artist's page.
+        Text(
+            card?.artist.orEmpty(),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable(enabled = card != null) { card?.let { actions.openArtist(it.artistId, it.artist) } },
+        )
         Spacer(Modifier.height(4.dp))
         val details = listOfNotNull(card?.genre, page?.label).joinToString(" · ")
         if (details.isNotEmpty()) Dim(details)
@@ -227,7 +238,7 @@ private fun LazyListScope.tracks(page: AlbumPage, playing: ULong?, onPlay: (ULon
             val number = track.disc
             disc = number
             work = null
-            item(key = "disc/$number") { Heading("Disc $number") }
+            item(key = "disc/$number") { DiscHeading("Disc $number") }
         }
         val trackWork = track.work
         if (trackWork != null && trackWork != work) {
@@ -305,6 +316,6 @@ private fun LazyListScope.about(page: AlbumPage) {
 }
 
 @Composable
-private fun Heading(text: String) {
+private fun DiscHeading(text: String) {
     Text(text, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp))
 }
