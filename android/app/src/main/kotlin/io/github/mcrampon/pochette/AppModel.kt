@@ -7,6 +7,8 @@ import io.github.mcrampon.pochette.core.Account
 import androidx.compose.runtime.mutableStateListOf
 import io.github.mcrampon.pochette.core.AlbumCard
 import io.github.mcrampon.pochette.core.AlbumPage
+import io.github.mcrampon.pochette.core.Lyrics
+import io.github.mcrampon.pochette.playback.NowPlaying
 import io.github.mcrampon.pochette.core.Plays
 import io.github.mcrampon.pochette.core.LibraryView
 import io.github.mcrampon.pochette.core.PochetteException
@@ -40,6 +42,10 @@ sealed interface Screen {
 
     data object Albums : Screen {
         override val key = "albums"
+    }
+
+    data object NowPlaying : Screen {
+        override val key = "now"
     }
 
     /** `preview`, when known, shows while the page loads. */
@@ -78,6 +84,11 @@ class AppModel(app: Application) : AndroidViewModel(app) {
 
     /** Album pages already loaded, as going back to one is common. */
     private val pages = HashMap<String, AlbumPage>()
+
+    /** Lyrics already found, by track. */
+    private val lyrics = HashMap<ULong, Lyrics>()
+
+    val settings = Settings(app)
 
     private var view = LibraryView("", emptyList(), emptyList(), Sort.DATE_ADDED, false)
     private var signingIn: Job? = null
@@ -147,6 +158,14 @@ class AppModel(app: Application) : AndroidViewModel(app) {
             throw expired
         }
 
+    /** The lyrics of the track playing, from LRCLIB the first time. */
+    suspend fun lyrics(now: NowPlaying): Lyrics {
+        val trackId = now.trackId ?: return Lyrics.Missing
+        return lyrics[trackId] ?: core
+            .lyrics(now.title, now.artist, now.album, (now.durationMs / 1000).toUInt())
+            .also { lyrics[trackId] = it }
+    }
+
     /** An album the library knows, to show before its page loads. */
     fun card(id: String): AlbumCard? = _library.value.albums.find { it.id == id }
 
@@ -168,6 +187,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
 
 
     fun noticeShown() {

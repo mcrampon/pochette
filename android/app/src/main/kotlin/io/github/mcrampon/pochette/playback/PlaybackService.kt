@@ -2,6 +2,8 @@ package io.github.mcrampon.pochette.playback
 
 import android.app.PendingIntent
 import android.content.Intent
+import android.content.SharedPreferences
+import android.os.Bundle
 import android.os.SystemClock
 import android.util.Log
 import androidx.media3.common.AudioAttributes
@@ -35,11 +37,16 @@ class PlaybackService : MediaSessionService() {
     private var session: MediaSession? = null
     private lateinit var heard: Heard
 
+    /** Held here: preferences only keep a weak reference to their listeners. */
+    private lateinit var qualityChanged: SharedPreferences.OnSharedPreferenceChangeListener
+
     override fun onCreate() {
         super.onCreate()
         val core = (application as PochetteApp).core
         val settings = Settings(this)
         val streams = Streams(core) { settings.quality }
+        // The next tracks stream in the new quality, not in the one they were fetched in.
+        qualityChanged = settings.onQualityChanged(streams::forgetAll)
         val player =
             ExoPlayer
                 // Hi-res FLAC decoded to floats, not cut down to 16 bits.
@@ -60,7 +67,10 @@ class PlaybackService : MediaSessionService() {
                 .setWakeMode(C.WAKE_MODE_NETWORK)
                 .build()
         player.addListener(Recovery(player, streams))
-        heard = Heard(core, player, streams)
+        heard =
+            Heard(core, player, streams) { stream ->
+                session?.sessionExtras = Bundle().apply { putString(QUALITY_EXTRA, stream.quality) }
+            }
         session =
             MediaSession
                 .Builder(this, player)

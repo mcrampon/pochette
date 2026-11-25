@@ -42,6 +42,9 @@ class Streams(private val core: Pochette, private val quality: () -> Quality) : 
     /** The stream a track was last opened from, if it was. */
     fun of(trackId: ULong): Stream? = fetched[trackId]?.stream
 
+    /** Ask again where every track streams from, as when the quality changed. */
+    fun forgetAll() = fetched.clear()
+
     /** Ask again where the track streams from, next time it's opened. */
     fun forget(trackId: ULong) {
         fetched.remove(trackId)

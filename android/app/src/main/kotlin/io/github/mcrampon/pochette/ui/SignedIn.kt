@@ -44,10 +44,11 @@ fun SignedIn(model: AppModel) {
     Scaffold(
         bottomBar = {
             val playing = now
-            if (playing != null) {
+            // Not under Now Playing, which shows the same.
+            if (playing != null && model.screens.last() != Screen.NowPlaying) {
                 MiniPlayer(
                     playing,
-                    onClick = { model.open(Screen.Album(playing.albumId, model.card(playing.albumId))) },
+                    onClick = { model.open(Screen.NowPlaying) },
                     onPlayPause = model.playback::playPause,
                     onNext = model.playback::next,
                 )
@@ -71,6 +72,30 @@ fun SignedIn(model: AppModel) {
                             onSignOut = model::signOut,
                             onOpen = { model.open(Screen.Album(it.id, it)) },
                         )
+                    }
+                    Screen.NowPlaying -> {
+                        val playing = now
+                        if (playing == null) {
+                            // Stopped: nothing to show.
+                            LaunchedEffect(Unit) { back() }
+                        } else {
+                            NowPlayingScreen(
+                                playing,
+                                NowPlayingActions(
+                                    position = { model.playback.positionMs },
+                                    playPause = model.playback::playPause,
+                                    previous = model.playback::previous,
+                                    next = model.playback::next,
+                                    seekTo = model.playback::seekTo,
+                                    skipTo = model.playback::skipTo,
+                                    lyrics = model::lyrics,
+                                    quality = { model.settings.quality },
+                                    setQuality = { model.settings.quality = it },
+                                    openAlbum = { model.open(Screen.Album(playing.albumId, model.card(playing.albumId))) },
+                                    back = { back() },
+                                ),
+                            )
+                        }
                     }
                     is Screen.Album ->
                         AlbumScreen(

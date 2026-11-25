@@ -3,8 +3,10 @@ package io.github.mcrampon.pochette.playback
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
+import android.os.Bundle
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
@@ -18,18 +20,32 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+/** A track in the queue. */
+data class Queued(val mediaId: String, val title: String, val artist: String, val durationMs: Long)
+
 /** What's playing, as the screens show it. */
 data class NowPlaying(
     val albumId: String,
     val trackId: ULong?,
     val title: String,
     val artist: String,
+    val album: String,
+    val albumArtist: String,
     val cover: Uri?,
     val playing: Boolean,
     val hasNext: Boolean,
     /** Why it stopped, if it broke. */
     val error: String?,
+    val queue: List<Queued>,
+    /** Of the track playing, in the queue. */
+    val index: Int,
+    val durationMs: Long,
+    /** The stream's: "24-bit / 96 kHz", once it plays. */
+    val quality: String?,
 )
+
+/** The key of the stream's quality, in the session's extras. */
+const val QUALITY_EXTRA = "quality"
 
 /** The screens' remote for the playback service. */
 @UnstableApi
@@ -40,7 +56,11 @@ class Playback(context: Context) {
     private val connecting =
         MediaController
             .Builder(context, SessionToken(context, ComponentName(context, PlaybackService::class.java)))
-            .buildAsync()
+            .setListener(
+                object : MediaController.Listener {
+                    override fun onExtrasChanged(controller: MediaController, extras: Bundle) = publish(controller)
+                },
+            ).buildAsync()
     private var controller: MediaController? = null
 
     /** What was asked before the service answered. */
@@ -64,6 +84,9 @@ class Playback(context: Context) {
             ContextCompat.getMainExecutor(context),
         )
     }
+
+    /** Where the track playing is, in milliseconds: ask it again as it plays. */
+    val positionMs: Long get() = controller?.currentPosition ?: 0
 
     /** Play `album`'s tracks that can be played, from the track `from`, else the first. */
     fun play(album: AlbumPage, from: ULong? = null) {
@@ -98,10 +121,22 @@ class Playback(context: Context) {
         }
     }
 
-
     fun playPause() = withController { Util.handlePlayPauseButtonAction(it) }
 
     fun next() = withController { it.seekToNextMediaItem() }
+
+    /** The start of the track, or the one before when already there. */
+    fun previous() = withController { it.seekToPrevious() }
+
+    fun seekTo(positionMs: Long) = withController { it.seekTo(positionMs) }
+
+    /** Play the queue's track at `index`. */
+    fun skipTo(index: Int) =
+        withController {
+            it.seekTo(index, 0)
+            if (it.playbackState == Player.STATE_IDLE) it.prepare()
+            it.play()
+        }
 
     fun stop() =
         withController {
@@ -117,17 +152,35 @@ class Playback(context: Context) {
 
     private fun publish(player: Player) {
         val item = player.currentMediaItem
+        val queue =
+            (0 until player.mediaItemCount).map { index ->
+                val queued = player.getMediaItemAt(index)
+                Queued(
+                    mediaId = queued.mediaId,
+                    title = queued.mediaMetadata.title?.toString().orEmpty(),
+                    artist = queued.mediaMetadata.artist?.toString().orEmpty(),
+                    durationMs = queued.mediaMetadata.durationMs ?: 0,
+                )
+            }
         _now.value =
             item?.let {
+                val metadata = it.mediaMetadata
                 NowPlaying(
                     albumId = albumIdOf(it.mediaId),
                     trackId = trackIdOf(it.mediaId),
-                    title = it.mediaMetadata.title?.toString().orEmpty(),
-                    artist = it.mediaMetadata.artist?.toString().orEmpty(),
-                    cover = it.mediaMetadata.artworkUri,
+                    title = metadata.title?.toString().orEmpty(),
+                    artist = metadata.artist?.toString().orEmpty(),
+                    album = metadata.albumTitle?.toString().orEmpty(),
+                    albumArtist = metadata.albumArtist?.toString().orEmpty(),
+                    cover = metadata.artworkUri,
                     playing = !Util.shouldShowPlayButton(player),
                     hasNext = player.hasNextMediaItem(),
                     error = player.playerError?.let(::describe),
+                    queue = queue,
+                    index = player.currentMediaItemIndex,
+                    // The stream's, once known: Qobuz's may be a little off.
+                    durationMs = player.duration.takeIf { d -> d != C.TIME_UNSET } ?: metadata.durationMs ?: 0,
+                    quality = (player as? MediaController)?.sessionExtras?.getString(QUALITY_EXTRA),
                 )
             }
     }

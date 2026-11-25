@@ -8,6 +8,7 @@ import androidx.media3.common.util.UnstableApi
 import io.github.mcrampon.pochette.core.Listening
 import io.github.mcrampon.pochette.core.Pochette
 import io.github.mcrampon.pochette.core.PochetteException
+import io.github.mcrampon.pochette.core.Stream
 
 private const val TAG = "Pochette"
 
@@ -16,7 +17,13 @@ private const val TAG = "Pochette"
  * played, and the play history gets the track once the player leaves it.
  */
 @UnstableApi
-class Heard(private val core: Pochette, private val player: Player, private val streams: Streams) : Player.Listener {
+class Heard(
+    private val core: Pochette,
+    private val player: Player,
+    private val streams: Streams,
+    /** A track started playing from `stream`. */
+    private val started: (Stream) -> Unit,
+) : Player.Listener {
     /** The track the player is on, at `index` of the queue. */
     private class Current(val index: Int, val mediaId: String) {
         /** Once it started playing: none if the core refused it. */
@@ -113,6 +120,7 @@ class Heard(private val core: Pochette, private val player: Player, private val 
         val trackId = trackIdOf(track.mediaId) ?: return false
         val stream = streams.of(trackId) ?: return false
         track.started = true
+        started(stream)
         track.listening =
             try {
                 core.startListening(albumIdOf(track.mediaId), stream)
