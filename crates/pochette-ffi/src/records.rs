@@ -116,7 +116,10 @@ impl AlbumPage {
         let discs = tracks.iter().map(|track| track.disc).max().unwrap_or(1);
         Self {
             card: AlbumCard::from(album),
-            kind: album.release_type.as_deref().map(capitalized),
+            kind: album
+                .release_type
+                .as_deref()
+                .map(|kind| format::release_type(kind).to_owned()),
             label: album.label.as_ref().map(|label| label.name.clone()),
             released: album
                 .release_date_original
@@ -141,14 +144,6 @@ impl AlbumPage {
             plays: plays.into(),
         }
     }
-}
-
-fn capitalized(word: &str) -> String {
-    let mut chars = word.chars();
-    chars
-        .next()
-        .map(|first| first.to_uppercase().chain(chars).collect())
-        .unwrap_or_default()
 }
 
 /// A track, on its album's page.

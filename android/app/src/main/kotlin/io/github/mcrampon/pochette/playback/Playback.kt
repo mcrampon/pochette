@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.asStateFlow
 
 /** What's playing, as the screens show it. */
 data class NowPlaying(
+    val albumId: String,
+    val trackId: ULong?,
     val title: String,
     val artist: String,
     val cover: Uri?,
@@ -63,8 +65,8 @@ class Playback(context: Context) {
         )
     }
 
-    /** Play `album`'s tracks that can be played, from the one at `from`. */
-    fun play(album: AlbumPage, from: Int = 0) {
+    /** Play `album`'s tracks that can be played, from the track `from`, else the first. */
+    fun play(album: AlbumPage, from: ULong? = null) {
         val cover = (album.card.coverLarge ?: album.card.cover)?.toUri()
         val items =
             album.tracks.filter { it.streamable }.map { track ->
@@ -88,8 +90,9 @@ class Playback(context: Context) {
                     ).build()
             }
         if (items.isEmpty()) return
+        val start = from?.let { mediaId(album.card.id, it) }?.let { id -> items.indexOfFirst { it.mediaId == id } } ?: 0
         withController {
-            it.setMediaItems(items, from.coerceIn(items.indices), 0)
+            it.setMediaItems(items, start.coerceAtLeast(0), 0)
             it.prepare()
             it.play()
         }
@@ -117,6 +120,8 @@ class Playback(context: Context) {
         _now.value =
             item?.let {
                 NowPlaying(
+                    albumId = albumIdOf(it.mediaId),
+                    trackId = trackIdOf(it.mediaId),
                     title = it.mediaMetadata.title?.toString().orEmpty(),
                     artist = it.mediaMetadata.artist?.toString().orEmpty(),
                     cover = it.mediaMetadata.artworkUri,

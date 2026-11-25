@@ -572,7 +572,7 @@ impl AlbumPage {
             let kind = album
                 .release_type
                 .as_deref()
-                .map_or("Album", release_type_name);
+                .map_or("Album", format::release_type);
             match album.year() {
                 Some(year) => format!("{kind} · {year}").to_uppercase(),
                 None => kind.to_uppercase(),
@@ -635,17 +635,6 @@ impl AlbumPage {
 }
 
 /// How a release type reads: "epk" is "EP".
-fn release_type_name(release_type: &str) -> &str {
-    match release_type {
-        "single" => "Single",
-        "epk" | "ep" => "EP",
-        "live" => "Live",
-        "compilation" => "Compilation",
-        "boxset" | "box-set" => "Box Set",
-        _ => "Album",
-    }
-}
-
 /// List the tracks, under a heading per disc when there are several, and per work when
 /// tracks are movements of a larger piece. Activating a track plays the album from it.
 ///

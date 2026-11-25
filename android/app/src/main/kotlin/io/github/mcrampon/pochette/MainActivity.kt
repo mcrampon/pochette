@@ -17,13 +17,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import io.github.mcrampon.pochette.ui.AlbumsScreen
+import io.github.mcrampon.pochette.ui.SignedIn
 import io.github.mcrampon.pochette.ui.PochetteTheme
 import io.github.mcrampon.pochette.ui.SignInScreen
 import io.github.mcrampon.pochette.ui.StartingScreen
 import kotlinx.coroutines.launch
 
-@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class MainActivity : ComponentActivity() {
     private val model: AppModel by viewModels()
 
@@ -49,22 +48,7 @@ class MainActivity : ComponentActivity() {
                                 onSignIn = { model.signIn(::openSignInPage) },
                                 onCancel = model::cancelSignIn,
                             )
-                        is Stage.SignedIn -> {
-                            val library by model.library.collectAsStateWithLifecycle()
-                            val now by model.playback.now.collectAsStateWithLifecycle()
-                            val notice by model.notice.collectAsStateWithLifecycle()
-                            AlbumsScreen(
-                                library,
-                                now,
-                                notice,
-                                onRefresh = model::refresh,
-                                onSignOut = model::signOut,
-                                onPlay = model::play,
-                                onPlayPause = model.playback::playPause,
-                                onNext = model.playback::next,
-                                onNoticeShown = model::noticeShown,
-                            )
-                        }
+                        is Stage.SignedIn -> SignedIn(model)
                     }
                 }
             }

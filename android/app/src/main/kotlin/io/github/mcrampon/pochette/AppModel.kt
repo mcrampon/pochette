@@ -4,7 +4,10 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.mcrampon.pochette.core.Account
+import androidx.compose.runtime.mutableStateListOf
 import io.github.mcrampon.pochette.core.AlbumCard
+import io.github.mcrampon.pochette.core.AlbumPage
+import io.github.mcrampon.pochette.core.Plays
 import io.github.mcrampon.pochette.core.LibraryView
 import io.github.mcrampon.pochette.core.PochetteException
 import io.github.mcrampon.pochette.core.Sort
@@ -28,6 +31,21 @@ sealed interface Stage {
     data class Unreachable(val error: String) : Stage
 
     data class SignedIn(val account: Account) : Stage
+}
+
+/** A screen of the signed-in app, in the back stack. */
+sealed interface Screen {
+    /** Tells apart the same screen opened twice, so each keeps its scroll. */
+    val key: String
+
+    data object Albums : Screen {
+        override val key = "albums"
+    }
+
+    /** `preview`, when known, shows while the page loads. */
+    data class Album(val id: String, val preview: AlbumCard? = null) : Screen {
+        override val key = "album/$id"
+    }
 }
 
 /** The user's albums, as the library shows them. */
@@ -54,6 +72,12 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     /** Something that went wrong, to show once. */
     private val _notice = MutableStateFlow<String?>(null)
     val notice: StateFlow<String?> = _notice.asStateFlow()
+
+    /** What's open, the last on top. */
+    val screens = mutableStateListOf<Screen>(Screen.Albums)
+
+    /** Album pages already loaded, as going back to one is common. */
+    private val pages = HashMap<String, AlbumPage>()
 
     private var view = LibraryView("", emptyList(), emptyList(), Sort.DATE_ADDED, false)
     private var signingIn: Job? = null
@@ -107,18 +131,44 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         _stage.value = Stage.SignedOut()
     }
 
-    /** Play `album` from its first track. */
-    fun play(album: AlbumCard) {
+    fun open(screen: Screen) {
+        if (screens.last().key != screen.key) screens.add(screen)
+    }
+
+    /** Close the screen on top: its key, to forget its state. */
+    fun back(): String? = if (screens.size > 1) screens.removeAt(screens.lastIndex).key else null
+
+    /** The album's page, from Qobuz the first time. Signs out if Qobuz no longer takes the session. */
+    suspend fun album(id: String): AlbumPage =
+        pages[id] ?: try {
+            core.album(id).also { pages[id] = it }
+        } catch (expired: PochetteException.SignedOut) {
+            signOut()
+            throw expired
+        }
+
+    /** An album the library knows, to show before its page loads. */
+    fun card(id: String): AlbumCard? = _library.value.albums.find { it.id == id }
+
+    /** How often the album was played, on every device: it changes as tracks are heard. */
+    fun plays(id: String): Plays = core.albumPlays(id)
+
+    fun isFavorite(id: String): Boolean = core.isFavorite(id)
+
+    /** Add the album to the favorites, or take it out: `failed` if Qobuz refused. */
+    fun setFavorite(album: AlbumCard, favorite: Boolean, failed: () -> Unit) {
         viewModelScope.launch {
             try {
-                playback.play(core.album(album.id))
-            } catch (expired: PochetteException.SignedOut) {
-                signOut()
+                core.setFavorite(album.id, favorite)
+                _library.value = _library.value.copy(albums = albums())
             } catch (err: PochetteException) {
-                _notice.value = "Can't play “${album.title}”: ${err.message}"
+                failed()
+                val change = if (favorite) "add “${album.title}” to" else "take “${album.title}” out of"
+                _notice.value = "Can't $change your favorites: ${err.message}"
             }
         }
     }
+
 
     fun noticeShown() {
         _notice.value = null
@@ -131,6 +181,8 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     fun signOut() {
         playback.stop()
         core.signOut()
+        pages.clear()
+        screens.removeRange(1, screens.size)
         sessions.clear()
         _library.value = Library()
         _stage.value = Stage.SignedOut()

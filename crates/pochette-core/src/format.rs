@@ -151,6 +151,19 @@ fn decode_entity(entity: &str) -> Option<char> {
     })
 }
 
+/// What kind of release Qobuz's `release_type` is: "Album", "EP", "Single"…
+#[must_use]
+pub fn release_type(release_type: &str) -> &'static str {
+    match release_type {
+        "single" => "Single",
+        "epk" | "ep" => "EP",
+        "live" => "Live",
+        "compilation" => "Compilation",
+        "boxset" | "box-set" => "Box Set",
+        _ => "Album",
+    }
+}
+
 /// A release date from Qobuz's `YYYY-MM-DD`: "13 Nov 2026". Whatever doesn't parse stays as is.
 #[must_use]
 pub fn release_date(date: &str) -> String {
