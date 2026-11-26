@@ -4,7 +4,7 @@
 //! closed, if the user wants it to, started with their session. Devices find each other
 //! with mDNS, pair once by checking that both show the same code, then send each other the
 //! end of the logs of plays the other lacks, over connections only they can read. The app
-//! starts the service and talks to it over D-Bus, from the Devices window.
+//! starts the service and talks to it over D-Bus, from the Devices section of the settings.
 
 pub mod autostart;
 pub mod client;

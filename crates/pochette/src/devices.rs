@@ -1,14 +1,14 @@
-//! The Devices window, from the main menu: the devices this one syncs its plays with,
-//! pairing others, and whether to keep syncing while Pochette is closed.
+//! The Devices section of the settings: the devices this one syncs its plays with, pairing
+//! others, and whether to keep syncing while Pochette is closed.
 //!
-//! While it's open, this device is ready to pair, and the service tells it what's going on
-//! every second.
+//! While the settings show, this device is ready to pair, and the service tells it what's
+//! going on every second. A pairing going on takes the section's place until it's over.
 
 use std::time::Duration;
 
 use relm4::{
-    Component, ComponentParts, ComponentSender, RelmWidgetExt,
-    gtk::{self, glib, prelude::*},
+    Component, ComponentParts, ComponentSender,
+    gtk::{self, prelude::*},
 };
 
 use crate::{
@@ -31,7 +31,7 @@ pub struct Devices {
     notice: Option<String>,
     background: bool,
     open: bool,
-    /// Counts the times the window opened, so the polls of a previous time stop.
+    /// Counts the times the settings showed, so the polls of a previous time stop.
     session: u32,
     peers: gtk::Box,
     nearby: gtk::Box,
@@ -71,226 +71,215 @@ impl Component for Devices {
     type CommandOutput = DevicesCommand;
 
     view! {
-        gtk::Window {
-            set_title: Some("Devices"),
-            set_modal: true,
-            set_hide_on_close: true,
-            set_default_width: 480,
-            connect_close_request[sender] => move |_| {
-                sender.input(DevicesMsg::Closed);
-                glib::Propagation::Proceed
-            },
+        gtk::Stack {
+            set_transition_type: gtk::StackTransitionType::Crossfade,
+            // As big as the page shown: the pages' wrapping text doesn't size well together.
+            set_hhomogeneous: false,
+            set_vhomogeneous: false,
 
-            #[name = "pages"]
-            gtk::Stack {
-                set_transition_type: gtk::StackTransitionType::Crossfade,
-                // As big as the page shown: the pages' wrapping text doesn't size well together.
-                set_hhomogeneous: false,
-                set_vhomogeneous: false,
+            add_named[Some("devices")] = &gtk::Box {
+                set_orientation: gtk::Orientation::Vertical,
+                set_spacing: 18,
 
-                add_named[Some("devices")] = &gtk::Box {
+                gtk::Label {
+                    set_label: "Paired devices share what you play with each other, for the \
+                                stats and play counts, whenever they're on the same network.",
+                    set_wrap: true,
+                    set_max_width_chars: 50,
+                    set_xalign: 0.0,
+                    add_css_class: "dim-label",
+                },
+
+                gtk::Label {
+                    #[watch]
+                    set_label: model.problem().unwrap_or_default(),
+                    #[watch]
+                    set_visible: model.problem().is_some(),
+                    set_wrap: true,
+                    set_max_width_chars: 50,
+                    set_xalign: 0.0,
+                    add_css_class: "error",
+                },
+
+                gtk::Label {
+                    #[watch]
+                    set_label: model.notice.as_deref().unwrap_or_default(),
+                    #[watch]
+                    set_visible: model.notice.is_some(),
+                    set_wrap: true,
+                    set_max_width_chars: 50,
+                    set_xalign: 0.0,
+                },
+
+                gtk::Box {
                     set_orientation: gtk::Orientation::Vertical,
-                    set_spacing: 18,
-                    set_margin_all: 24,
+                    set_spacing: 8,
+                    #[watch]
+                    set_visible: !model.status.peers.is_empty(),
 
                     gtk::Label {
-                        set_label: "Paired devices share what you play with each other, for the \
-                                    stats and play counts, whenever they're on the same network.",
-                        set_wrap: true,
-                        set_max_width_chars: 50,
+                        set_label: "Paired Devices",
                         set_xalign: 0.0,
-                        add_css_class: "dim-label",
+                        add_css_class: "heading",
                     },
-
-                    gtk::Label {
-                        #[watch]
-                        set_label: model.problem().unwrap_or_default(),
-                        #[watch]
-                        set_visible: model.problem().is_some(),
-                        set_wrap: true,
-                        set_max_width_chars: 50,
-                        set_xalign: 0.0,
-                        add_css_class: "error",
-                    },
-
-                    gtk::Label {
-                        #[watch]
-                        set_label: model.notice.as_deref().unwrap_or_default(),
-                        #[watch]
-                        set_visible: model.notice.is_some(),
-                        set_wrap: true,
-                        set_max_width_chars: 50,
-                        set_xalign: 0.0,
-                    },
-
-                    gtk::Box {
+                    #[local_ref]
+                    peers -> gtk::Box {
                         set_orientation: gtk::Orientation::Vertical,
-                        set_spacing: 8,
-                        #[watch]
-                        set_visible: !model.status.peers.is_empty(),
-
-                        gtk::Label {
-                            set_label: "Paired Devices",
-                            set_xalign: 0.0,
-                            add_css_class: "pochette-subheading",
-                        },
-                        #[local_ref]
-                        peers -> gtk::Box {
-                            set_orientation: gtk::Orientation::Vertical,
-                            set_spacing: 6,
-                        },
-                        gtk::CheckButton {
-                            set_label: Some("Keep syncing while Pochette is closed"),
-                            set_margin_top: 6,
-                            #[watch]
-                            #[block_signal(background_toggled)]
-                            set_active: model.background,
-                            connect_toggled[sender] => move |check| {
-                                sender.input(DevicesMsg::SetBackground(check.is_active()));
-                            } @background_toggled,
-                        },
+                        set_spacing: 6,
                     },
-
-                    gtk::Box {
-                        set_orientation: gtk::Orientation::Vertical,
-                        set_spacing: 8,
-
-                        gtk::Label {
-                            set_label: "Pair a Device",
-                            set_xalign: 0.0,
-                            add_css_class: "pochette-subheading",
-                        },
-                        gtk::Label {
-                            set_label: "Open Devices in Pochette on the other device as well, \
-                                        and it shows up here.",
-                            set_wrap: true,
-                            set_max_width_chars: 50,
-                            set_xalign: 0.0,
-                            add_css_class: "dim-label",
-                        },
-                        #[local_ref]
-                        nearby -> gtk::Box {
-                            set_orientation: gtk::Orientation::Vertical,
-                            set_spacing: 6,
-                        },
-                        gtk::Box {
-                            set_spacing: 12,
-                            add_css_class: "pochette-card",
-                            #[watch]
-                            set_visible: model.status.nearby.is_empty(),
-
-                            gtk::Spinner {
-                                #[watch]
-                                set_spinning: model.open && model.status.nearby.is_empty(),
-                            },
-                            gtk::Label {
-                                set_label: "Looking for devices on this network…",
-                                set_xalign: 0.0,
-                                add_css_class: "dim-label",
-                            },
-                        },
-                        gtk::Expander {
-                            set_label: Some("Pair by Address"),
-                            set_margin_top: 6,
-
-                            gtk::Box {
-                                set_orientation: gtk::Orientation::Vertical,
-                                set_spacing: 8,
-                                set_margin_top: 8,
-
-                                gtk::Box {
-                                    set_spacing: 6,
-
-                                    #[local_ref]
-                                    address -> gtk::Entry {
-                                        set_hexpand: true,
-                                        set_placeholder_text: Some("Its address, such as 192.168.1.20"),
-                                        connect_activate => DevicesMsg::PairAddress,
-                                    },
-                                    gtk::Button {
-                                        set_label: "Pair",
-                                        connect_clicked => DevicesMsg::PairAddress,
-                                    },
-                                },
-                                gtk::Label {
-                                    set_label: &format!(
-                                        "If the devices can't find each other, the network or a \
-                                         firewall may be in the way. Pochette needs TCP port {} to \
-                                         sync, and UDP port 5353 to find devices.",
-                                        sync::PORT,
-                                    ),
-                                    set_wrap: true,
-                                    set_max_width_chars: 50,
-                                    set_xalign: 0.0,
-                                    add_css_class: "dim-label",
-                                    add_css_class: "pochette-caption",
-                                },
-                            },
-                        },
+                    gtk::CheckButton {
+                        set_label: Some("Keep syncing while Pochette is closed"),
+                        set_margin_top: 6,
+                        #[watch]
+                        #[block_signal(background_toggled)]
+                        set_active: model.background,
+                        connect_toggled[sender] => move |check| {
+                            sender.input(DevicesMsg::SetBackground(check.is_active()));
+                        } @background_toggled,
                     },
                 },
 
-                add_named[Some("pairing")] = &gtk::Box {
+                gtk::Box {
                     set_orientation: gtk::Orientation::Vertical,
-                    set_spacing: 18,
-                    set_margin_all: 32,
-                    set_valign: gtk::Align::Center,
+                    set_spacing: 8,
 
                     gtk::Label {
-                        #[watch]
-                        set_label: &format!("Pair With {}", model.pairing_name()),
-                        add_css_class: "pochette-heading",
-                        set_wrap: true,
-                        set_justify: gtk::Justification::Center,
+                        set_label: "Pair a Device",
+                        set_xalign: 0.0,
+                        add_css_class: "heading",
                     },
                     gtk::Label {
-                        #[watch]
-                        set_label: &model.pairing_hint(),
-                        #[watch]
-                        set_visible: !model.pairing_hint().is_empty(),
+                        set_label: "Open Settings in Pochette on the other device as well, \
+                                    and it shows up here.",
                         set_wrap: true,
-                        set_max_width_chars: 40,
-                        set_justify: gtk::Justification::Center,
+                        set_max_width_chars: 50,
+                        set_xalign: 0.0,
                         add_css_class: "dim-label",
                     },
-                    gtk::Label {
-                        #[watch]
-                        set_label: model.pairing_code(),
-                        #[watch]
-                        set_visible: model.pairing_stage() == Some(&Stage::Confirm),
-                        add_css_class: "pochette-title",
-                        add_css_class: "pochette-numeric",
-                    },
-                    gtk::Spinner {
-                        #[watch]
-                        set_visible: model.pairing_stage() != Some(&Stage::Confirm),
-                        #[watch]
-                        set_spinning: model.pairing_stage().is_some_and(|stage| stage != &Stage::Confirm),
-                        set_size_request: (32, 32),
-                        set_halign: gtk::Align::Center,
+                    #[local_ref]
+                    nearby -> gtk::Box {
+                        set_orientation: gtk::Orientation::Vertical,
+                        set_spacing: 6,
                     },
                     gtk::Box {
                         set_spacing: 12,
-                        set_halign: gtk::Align::Center,
+                        add_css_class: "pochette-card",
                         #[watch]
-                        set_visible: model.pairing_stage() == Some(&Stage::Confirm),
+                        set_visible: model.status.nearby.is_empty(),
 
-                        gtk::Button {
-                            set_label: "Cancel",
-                            connect_clicked => DevicesMsg::Answer(false),
+                        gtk::Spinner {
+                            #[watch]
+                            set_spinning: model.open && model.status.nearby.is_empty(),
                         },
-                        gtk::Button {
-                            set_label: "Pair",
-                            add_css_class: "suggested-action",
-                            connect_clicked => DevicesMsg::Answer(true),
+                        gtk::Label {
+                            set_label: "Looking for devices on this network…",
+                            set_xalign: 0.0,
+                            add_css_class: "dim-label",
+                        },
+                    },
+                    gtk::Expander {
+                        set_label: Some("Pair by Address"),
+                        set_margin_top: 6,
+
+                        gtk::Box {
+                            set_orientation: gtk::Orientation::Vertical,
+                            set_spacing: 8,
+                            set_margin_top: 8,
+
+                            gtk::Box {
+                                set_spacing: 6,
+
+                                #[local_ref]
+                                address -> gtk::Entry {
+                                    set_hexpand: true,
+                                    set_placeholder_text: Some("Its address, such as 192.168.1.20"),
+                                    connect_activate => DevicesMsg::PairAddress,
+                                },
+                                gtk::Button {
+                                    set_label: "Pair",
+                                    connect_clicked => DevicesMsg::PairAddress,
+                                },
+                            },
+                            gtk::Label {
+                                set_label: &format!(
+                                    "If the devices can't find each other, the network or a \
+                                     firewall may be in the way. Pochette needs TCP port {} to \
+                                     sync, and UDP port 5353 to find devices.",
+                                    sync::PORT,
+                                ),
+                                set_wrap: true,
+                                set_max_width_chars: 50,
+                                set_xalign: 0.0,
+                                add_css_class: "dim-label",
+                                add_css_class: "pochette-caption",
+                            },
                         },
                     },
                 },
-
-                // Once the pages are there.
-                #[watch]
-                set_visible_child_name: if model.pairing_stage().is_some() { "pairing" } else { "devices" },
             },
+
+            // A pairing going on: connecting, the code to check on both devices, then waiting
+            // for the other's answer.
+            add_named[Some("pairing")] = &gtk::Box {
+                add_css_class: "pochette-card",
+                set_orientation: gtk::Orientation::Vertical,
+                set_spacing: 18,
+                set_valign: gtk::Align::Center,
+
+                gtk::Label {
+                    #[watch]
+                    set_label: &format!("Pair With {}", model.pairing_name()),
+                    add_css_class: "pochette-heading",
+                    set_wrap: true,
+                    set_justify: gtk::Justification::Center,
+                },
+                gtk::Label {
+                    #[watch]
+                    set_label: &model.pairing_hint(),
+                    #[watch]
+                    set_visible: !model.pairing_hint().is_empty(),
+                    set_wrap: true,
+                    set_max_width_chars: 40,
+                    set_justify: gtk::Justification::Center,
+                    add_css_class: "dim-label",
+                },
+                gtk::Label {
+                    #[watch]
+                    set_label: model.pairing_code(),
+                    #[watch]
+                    set_visible: model.pairing_stage() == Some(&Stage::Confirm),
+                    add_css_class: "pochette-title",
+                    add_css_class: "pochette-numeric",
+                },
+                gtk::Spinner {
+                    #[watch]
+                    set_visible: model.pairing_stage() != Some(&Stage::Confirm),
+                    #[watch]
+                    set_spinning: model.pairing_stage().is_some_and(|stage| stage != &Stage::Confirm),
+                    set_size_request: (32, 32),
+                    set_halign: gtk::Align::Center,
+                },
+                gtk::Box {
+                    set_spacing: 12,
+                    set_halign: gtk::Align::Center,
+                    #[watch]
+                    set_visible: model.pairing_stage() == Some(&Stage::Confirm),
+
+                    gtk::Button {
+                        set_label: "Cancel",
+                        connect_clicked => DevicesMsg::Answer(false),
+                    },
+                    gtk::Button {
+                        set_label: "Pair",
+                        add_css_class: "suggested-action",
+                        connect_clicked => DevicesMsg::Answer(true),
+                    },
+                },
+            },
+
+            // Once the pages are there.
+            #[watch]
+            set_visible_child_name: if model.pairing_stage().is_some() { "pairing" } else { "devices" },
         }
     }
 
@@ -314,10 +303,9 @@ impl Component for Devices {
         ComponentParts { model, widgets }
     }
 
-    fn update(&mut self, msg: DevicesMsg, sender: ComponentSender<Self>, root: &Self::Root) {
+    fn update(&mut self, msg: DevicesMsg, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
             DevicesMsg::Open => {
-                root.present();
                 if self.open {
                     return;
                 }
@@ -341,6 +329,9 @@ impl Component for Devices {
                 });
             }
             DevicesMsg::Closed => {
+                if !self.open {
+                    return;
+                }
                 self.open = false;
                 // A pairing left unanswered is declined.
                 if self.pairing_stage() == Some(&Stage::Confirm) {

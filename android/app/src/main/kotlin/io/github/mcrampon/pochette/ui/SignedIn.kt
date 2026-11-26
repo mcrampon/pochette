@@ -108,7 +108,7 @@ private fun Screen(model: AppModel, screen: Screen, now: NowPlaying?, back: () -
                     genres = model::libraryGenres,
                     decades = model::libraryDecades,
                     playRandom = model::playRandom,
-                    devices = { model.open(Screen.Devices) },
+                    settings = { model.open(Screen.Settings) },
                     signOut = model::signOut,
                     open = openAlbum,
                 ),
@@ -190,11 +190,11 @@ private fun Screen(model: AppModel, screen: Screen, now: NowPlaying?, back: () -
                     back = back,
                 ),
             )
-        Screen.Devices -> {
+        Screen.Settings -> {
             val status by model.sync.status.collectAsStateWithLifecycle()
-            DevicesScreen(
+            SettingsScreen(
                 status,
-                DevicesActions(
+                SettingsActions(
                     setPairable = model::setPairable,
                     pair = model::pair,
                     answer = model::answerPairing,

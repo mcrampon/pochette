@@ -87,14 +87,14 @@ the artists just as it would in Qobuz's own apps.
 
 ## Syncing devices
 
-Devices, in the main menu, pairs this computer with your others: open it on both, on the same
-network, pick the other one, and check that both show the same code. From then on, they send
-each other the plays the other lacks whenever they're on the same network, over an encrypted
-connection only they can open ([Noise](https://noiseprotocol.org), with each computer's own
-key).
+The Devices section of Settings, in the main menu, pairs this computer with your others: open
+it on both, on the same network, pick the other one, and check that both show the same code.
+From then on, they send each other the plays the other lacks whenever they're on the same
+network, over an encrypted connection only they can open
+([Noise](https://noiseprotocol.org), with each computer's own key).
 
 A small service, `pochette --sync`, does it, with no window. It runs while Pochette is open,
-and, unless you turn it off in Devices, while it's closed: it then starts with your session,
+and, unless you turn it off in Settings, while it's closed: it then starts with your session,
 from an [XDG autostart](https://specifications.freedesktop.org/autostart-spec/latest/) entry
 in `$XDG_CONFIG_HOME/autostart`. Desktops that don't read those, as some tiling window managers,
 need `pochette --sync` added to their own startup.
@@ -107,7 +107,7 @@ Computers find each other with mDNS, and sync over TCP. A firewall must let thro
 Some networks keep their devices apart, as many public and guest Wi-Fi networks do: there,
 computers can't sync.
 
-On Android, Devices is in the Albums tab's menu, and pairs the same way. The phone syncs while
+On Android, Settings is in the Albums tab's menu, and pairs the same way. The phone syncs while
 the app is open or playing, and, unless you turn it off, every 15 minutes or so on Wi-Fi with
 the app closed, as often as Android lets it.
 
@@ -124,7 +124,7 @@ computer writes its own file, so syncing that folder by other means, as with Syn
 up their plays too. Each computer's key and the computers it's paired with are kept in
 `$XDG_STATE_HOME/pochette`.
 
-While paired, or while Devices is open, Pochette announces itself on the local network, with
+While paired, or while Settings is open, Pochette announces itself on the local network, with
 the computer's name, for the others to find it.
 
 On Android, the plays are kept in the app's own storage, and go with Android's backup of the

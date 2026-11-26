@@ -68,7 +68,7 @@ class AlbumsActions(
     val genres: () -> List<String>,
     val decades: () -> List<UShort>,
     val playRandom: () -> Unit,
-    val devices: () -> Unit,
+    val settings: () -> Unit,
     val signOut: () -> Unit,
     val open: (AlbumCard) -> Unit,
 )
@@ -140,16 +140,16 @@ fun AlbumsScreen(library: Library, view: LibraryView, actions: AlbumsActions) {
     }
 }
 
-/** What's not about the albums: the devices, signing out. */
+/** What's not about the albums: the settings, signing out. */
 @Composable
 private fun Menu(actions: AlbumsActions) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }) { Icon(painterResource(R.drawable.ic_more_vert), contentDescription = "More") }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(text = { Text("Devices") }, onClick = {
+            DropdownMenuItem(text = { Text("Settings") }, onClick = {
                 open = false
-                actions.devices()
+                actions.settings()
             })
             DropdownMenuItem(text = { Text("Sign Out") }, onClick = {
                 open = false

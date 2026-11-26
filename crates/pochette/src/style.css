@@ -396,7 +396,7 @@ entry:focus-within {
   background-color: alpha(currentColor, 0.05);
 }
 
-/* A device, in the Devices window. */
+/* A device, in the settings. */
 .pochette-device {
   padding: 10px 14px;
 }

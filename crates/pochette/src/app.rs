@@ -13,7 +13,6 @@ use tokio::task::JoinHandle;
 use crate::{
     account::{self, Account},
     albums::{AlbumsMsg, AlbumsOutput, AlbumsPage},
-    devices::{Devices, DevicesMsg},
     discover::{DiscoverMsg, DiscoverOutput, DiscoverPage},
     favorites::Favorites,
     icon_label::{HeaderFit, IconLabel},
@@ -26,13 +25,14 @@ use crate::{
     search_view::{SearchView, SearchViewMsg, SearchViewOutput},
     session_store::SessionStore,
     settings::Settings,
+    settings_page::{SettingsMsg, SettingsPage},
     split_view::SplitView,
     stats_view::{StatsView, StatsViewMsg, StatsViewOutput},
 };
 
 relm4::new_action_group!(WindowActions, "win");
 relm4::new_stateless_action!(StatsAction, WindowActions, "stats");
-relm4::new_stateless_action!(DevicesAction, WindowActions, "devices");
+relm4::new_stateless_action!(SettingsAction, WindowActions, "settings");
 relm4::new_stateless_action!(SignOutAction, WindowActions, "sign-out");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,13 +63,13 @@ pub struct App {
     search_view: Controller<SearchView>,
     /// The listening stats, beside the tabs too.
     stats: Controller<StatsView>,
-    /// The devices the plays sync with, in a window of its own.
-    devices: Controller<Devices>,
+    /// The settings, beside the tabs too.
+    settings: Controller<SettingsPage>,
     /// The tabs and the search results.
     library: Option<gtk::Stack>,
     /// The tab to go back to when the search results close.
     last_tab: String,
-    /// What the library shows: a tab, the search results or the stats.
+    /// What the library shows: a tab, the search results, the stats or the settings.
     shown: String,
     player: Player,
     /// The albums in the user's library, which hearts add and remove.
@@ -105,6 +105,8 @@ pub enum Msg {
     SearchClosed,
     /// Show the listening stats, from the main menu, rather than what's open over them.
     ShowStats,
+    /// Show the settings, from the main menu.
+    ShowSettings,
     /// The tab shown was clicked: back to it, from what's open over it.
     TabClickedAgain,
     /// Open the page of an album in the library, as from Now Playing.
@@ -332,6 +334,7 @@ impl Component for App {
                         // Without a title, so without a button: the search bar shows it.
                         add_named: (model.search_view.widget(), Some("search")),
                         add_named: (model.stats.widget(), Some("stats")),
+                        add_named: (model.settings.widget(), Some("settings")),
                         // The library first: Discover is for when there's time to explore.
                         set_visible_child_name: "albums",
                         connect_visible_child_notify => Msg::LibraryShown,
@@ -345,7 +348,7 @@ impl Component for App {
     menu! {
         main_menu: {
             "Listening Stats" => StatsAction,
-            "Devices" => DevicesAction,
+            "Settings" => SettingsAction,
             "Sign Out" => SignOutAction,
         }
     }
@@ -401,7 +404,7 @@ impl Component for App {
                 .forward(sender.input_sender(), |output| match output {
                     StatsViewOutput::SessionExpired => Msg::SessionExpired,
                 }),
-            devices: Devices::builder().transient_for(&root).launch(()).detach(),
+            settings: SettingsPage::builder().launch(()).detach(),
             library: None,
             last_tab: "albums".to_owned(),
             shown: "albums".to_owned(),
@@ -432,10 +435,11 @@ impl Component for App {
         actions.add_action(RelmAction::<StatsAction>::new_stateless(move |_| {
             input.emit(Msg::ShowStats);
         }));
-        let devices = model.devices.sender().clone();
-        actions.add_action(RelmAction::<DevicesAction>::new_stateless(move |_| {
-            devices.emit(DevicesMsg::Open);
+        let input = sender.input_sender().clone();
+        actions.add_action(RelmAction::<SettingsAction>::new_stateless(move |_| {
+            input.emit(Msg::ShowSettings);
         }));
+        relm4::main_application().set_accels_for_action("win.settings", &["<Control>comma"]);
         let input = sender.input_sender().clone();
         actions.add_action(RelmAction::<SignOutAction>::new_stateless(move |_| {
             input.emit(Msg::SignOut);
@@ -548,6 +552,7 @@ impl Component for App {
             Msg::Search(query) => self.search(query),
             Msg::SearchClosed => self.show(&self.last_tab.clone()),
             Msg::ShowStats => self.show_stats(),
+            Msg::ShowSettings => self.show("settings"),
             Msg::TabClickedAgain => self.home(),
             Msg::LibraryShown => self.library_shown(),
             Msg::OpenAlbum(album) => self.open_album(*album),
@@ -621,6 +626,11 @@ impl App {
             Some("search") => self.search_view.emit(SearchViewMsg::OpenPage(destination)),
             Some("discover") => self.discover.emit(DiscoverMsg::OpenPage(destination)),
             Some("stats") => self.stats.emit(StatsViewMsg::OpenPage(destination)),
+            // The settings have no pages over them: the album opens in Albums.
+            Some("settings") => {
+                self.show("albums");
+                self.albums.emit(AlbumsMsg::OpenPage(destination));
+            }
             _ => self.albums.emit(AlbumsMsg::OpenPage(destination)),
         }
         // Over the library, the pane would hide the page.
@@ -670,6 +680,12 @@ impl App {
             StatsViewMsg::Show
         } else {
             StatsViewMsg::Hidden
+        });
+        // Ready to pair while the settings show.
+        self.settings.emit(if shown.as_deref() == Some("settings") {
+            SettingsMsg::Show
+        } else {
+            SettingsMsg::Hidden
         });
         // The tab left starts over from its own page when it shows again.
         let shown = shown.map(|name| name.to_string()).unwrap_or_default();

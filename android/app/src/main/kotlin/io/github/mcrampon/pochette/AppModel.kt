@@ -175,7 +175,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     /** Stop syncing with a device. */
     fun forget(id: String) = core.forget(id)
 
-    /** Be ready to pair, as while the devices show. */
+    /** Be ready to pair, as while the settings show. */
     fun setPairable(pairable: Boolean) = core.setPairable(pairable)
 
     var syncInBackground: Boolean

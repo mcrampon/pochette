@@ -58,8 +58,8 @@ private const val CLOCK_MS = 30_000L
 /** A sync error shows once the last sync is this old, in seconds: a device that's just off for a moment isn't news. */
 private const val STALE_SECONDS = 15 * 60
 
-/** What can be asked of the devices. */
-class DevicesActions(
+/** What can be asked of the settings: the devices. */
+class SettingsActions(
     val setPairable: (Boolean) -> Unit,
     val pair: (String) -> Unit,
     val answer: (Boolean) -> Unit,
@@ -70,10 +70,13 @@ class DevicesActions(
     val back: () -> Unit,
 )
 
-/** The devices the plays sync with, and pairing more: on the same network, the code checked on both. */
+/**
+ * The settings: the devices the plays sync with, and pairing more: on the same network, the code checked on
+ * both.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DevicesScreen(status: SyncStatus, actions: DevicesActions) {
+fun SettingsScreen(status: SyncStatus, actions: SettingsActions) {
     // Found by the others, and ready to pair, while it shows.
     DisposableEffect(Unit) {
         actions.setPairable(true)
@@ -111,7 +114,7 @@ fun DevicesScreen(status: SyncStatus, actions: DevicesActions) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Devices") },
+                title = { Text("Settings") },
                 navigationIcon = {
                     IconButton(onClick = actions.back) {
                         Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = "Back")
@@ -122,6 +125,7 @@ fun DevicesScreen(status: SyncStatus, actions: DevicesActions) {
         contentWindowInsets = WindowInsets(0),
     ) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(bottom = 24.dp)) {
+            item(key = "devices") { Section("Devices") }
             item(key = "about") {
                 Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Dim(
@@ -151,7 +155,7 @@ fun DevicesScreen(status: SyncStatus, actions: DevicesActions) {
             item(key = "pair") {
                 Column {
                     Heading("Pair a Device")
-                    Dim("Open Devices in Pochette on the other device as well, and it shows up here.", Modifier.padding(horizontal = 16.dp))
+                    Dim("Open Settings in Pochette on the other device as well, and it shows up here.", Modifier.padding(horizontal = 16.dp))
                 }
             }
             items(status.nearby, key = { "nearby/${it.id}" }) { device ->
@@ -176,6 +180,16 @@ fun DevicesScreen(status: SyncStatus, actions: DevicesActions) {
         }
     }
     if (pairing != null && pairing.stage.ongoing) PairingDialog(pairing, actions.answer)
+}
+
+/** A section of the settings, over its own headings. */
+@Composable
+private fun Section(title: String) {
+    Text(
+        title,
+        style = MaterialTheme.typography.titleLarge,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp),
+    )
 }
 
 private val PairingStage.ongoing

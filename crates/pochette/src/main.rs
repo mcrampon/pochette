@@ -30,6 +30,7 @@ mod search_page;
 mod search_view;
 mod session_store;
 mod settings;
+mod settings_page;
 mod sort_picker;
 mod split_view;
 mod stats_view;
