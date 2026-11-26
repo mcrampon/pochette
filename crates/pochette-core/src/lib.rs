@@ -1,6 +1,6 @@
 //! What Pochette's apps share, on the desktop and on Android: the play history and the
 //! stats worked out from it, searching and sorting the saved albums, syncing the plays
-//! between devices, lyrics, and how values read. No UI here.
+//! between devices, lyrics, where the listening was, and how values read. No UI here.
 //!
 //! Each app calls [`init`] first, with where it keeps things and what the device is called.
 
@@ -9,6 +9,7 @@ pub mod history;
 pub mod library;
 pub mod listening;
 pub mod lyrics;
+pub mod resume;
 pub mod sync;
 pub mod time;
 

@@ -111,9 +111,36 @@ class Playback(context: Context) {
 
     /** Play `album`'s tracks that can be played, from the track `from`, else the first. */
     fun play(album: AlbumPage, from: ULong? = null) {
+        val items = items(album)
+        if (items.isEmpty()) return
+        val start = from?.let { mediaId(album.card.id, it) }?.let { id -> items.indexOfFirst { it.mediaId == id } } ?: 0
+        withController {
+            it.setMediaItems(items, start.coerceAtLeast(0), 0)
+            it.prepare()
+            it.play()
+        }
+    }
+
+    /**
+     * Get `album` ready to play from `positionMs` in the track `trackId`, paused, as it was when
+     * the app last went, unless the player has a queue already: the service may have outlived the
+     * screens. Nothing streams until it plays.
+     */
+    fun cue(album: AlbumPage, trackId: ULong, positionMs: Long) {
+        val items = items(album)
+        if (items.isEmpty()) return
+        val index = items.indexOfFirst { it.mediaId == mediaId(album.card.id, trackId) }
+        withController {
+            if (it.mediaItemCount > 0) return@withController
+            // The track may have left the album since: then from its start.
+            if (index >= 0) it.setMediaItems(items, index, positionMs) else it.setMediaItems(items, 0, 0)
+        }
+    }
+
+    /** `album`'s tracks that can be played, for the queue. */
+    private fun items(album: AlbumPage): List<MediaItem> {
         val cover = (album.card.coverLarge ?: album.card.cover)?.toUri()
-        val items =
-            album.tracks.filter { it.streamable }.map { track ->
+        return album.tracks.filter { it.streamable }.map { track ->
                 MediaItem
                     .Builder()
                     .setMediaId(mediaId(album.card.id, track.id))
@@ -132,13 +159,6 @@ class Playback(context: Context) {
                             .setIsBrowsable(false)
                             .build(),
                     ).build()
-            }
-        if (items.isEmpty()) return
-        val start = from?.let { mediaId(album.card.id, it) }?.let { id -> items.indexOfFirst { it.mediaId == id } } ?: 0
-        withController {
-            it.setMediaItems(items, start.coerceAtLeast(0), 0)
-            it.prepare()
-            it.play()
         }
     }
 

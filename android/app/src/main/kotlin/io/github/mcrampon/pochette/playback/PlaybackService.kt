@@ -39,6 +39,7 @@ private const val RECOVER_EVERY_MS = 30_000L
 class PlaybackService : MediaSessionService() {
     private var session: MediaSession? = null
     private lateinit var heard: Heard
+    private lateinit var remembering: Remembering
     private lateinit var onTheNetwork: OnTheNetwork
 
     /** Held here: preferences only keep a weak reference to their listeners. */
@@ -82,6 +83,7 @@ class PlaybackService : MediaSessionService() {
             Heard(core, player, streams) { stream ->
                 session?.sessionExtras = Bundle().apply { putString(QUALITY_EXTRA, stream.quality) }
             }
+        remembering = Remembering(core, player)
         session =
             MediaSession
                 .Builder(this, player)
@@ -110,6 +112,7 @@ class PlaybackService : MediaSessionService() {
     override fun onDestroy() {
         position = null
         session?.run {
+            remembering.release()
             heard.release()
             player.release()
             release()

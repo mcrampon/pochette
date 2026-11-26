@@ -22,6 +22,8 @@ and is not affiliated with Qobuz.
 
 - **Albums**: your saved albums, to search, filter by genre and decade, sort, or play at random
 - **Discover**: Qobuz's new releases, press awards and ideal discography, by genre
+- **Takes up where you left off**: reopened, Pochette has the album you were playing ready,
+  paused where you were in the track
 - **Listening stats**: your top albums, artists and genres, and how much you listened, by
   month or year
 - **Devices**: your plays synced between your computers and your phone on the same network,

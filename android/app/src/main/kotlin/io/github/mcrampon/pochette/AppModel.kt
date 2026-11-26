@@ -1,6 +1,7 @@
 package io.github.mcrampon.pochette
 
 import android.app.Application
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -413,7 +414,23 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     private suspend fun signedIn(account: Account) {
         core.session()?.let(sessions::save)
         _stage.value = Stage.SignedIn(account)
+        takeUpListening()
         refresh()
+    }
+
+    /** Get the album that was playing when the app last went ready to play again, paused where it was. */
+    private fun takeUpListening() {
+        val point = core.resumePoint() ?: return
+        viewModelScope.launch {
+            val page =
+                try {
+                    album(point.albumId)
+                } catch (err: PochetteException) {
+                    Log.w("Pochette", "Can't load album ${point.albumId} to take up the listening: ${err.message}")
+                    return@launch
+                }
+            playback.cue(page, point.trackId, point.positionMs.toLong())
+        }
     }
 
     /** Show the albums the view picks. */

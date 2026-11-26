@@ -3,6 +3,9 @@
 //!
 //! The player runs as a task that takes [`Command`]s and publishes its [`Status`], so any
 //! part of the UI can drive it and follow it.
+//!
+//! It saves where the listening is as it goes, for the app to take it up again when it opens
+//! ([`Player::cue`]).
 
 use std::{
     sync::{Arc, Mutex},
@@ -11,7 +14,7 @@ use std::{
 
 use futures_util::StreamExt;
 use gstreamer::{self as gst, prelude::*};
-use pochette_core::listening;
+use pochette_core::{listening, resume};
 use qobuz::{
     Client, FileUrl, Quality,
     models::{Album, Track},
@@ -35,6 +38,10 @@ const FRESH_FOR: Duration = Duration::from_mins(30);
 /// address expired since, starts again from a new address, unless it already did this
 /// recently: then what breaks it isn't the address.
 const RECOVER_EVERY: Duration = Duration::from_secs(30);
+
+/// How often where the listening is gets saved while playing, besides as a track starts, on
+/// pause and seek, and on quitting: what a crash loses at most.
+const SAVE_EVERY: Duration = Duration::from_secs(10);
 
 /// What the player is doing.
 #[derive(Debug, Clone, Default)]
@@ -89,8 +96,14 @@ pub struct Player {
     status: watch::Receiver<Status>,
     /// To read the position and set the volume, which needs no help from the actor.
     playbin: gst::Element,
+    /// Where the track cued is: see [`Player::cue`].
+    cued: Cued,
     heard: broadcast::Sender<Heard>,
 }
+
+/// Where the track waiting to be played is, while there's one: put there by [`Player::cue`],
+/// not streamed until played.
+type Cued = Arc<Mutex<Option<Duration>>>;
 
 /// A track heard, and its album, as the play history keeps them.
 pub type Heard = (AlbumRecord, Listen);
@@ -110,6 +123,14 @@ enum Command {
         /// Where to start; the first track when `None`.
         track_id: Option<u64>,
     },
+    /// Ready to play `album` from `position` in `track_id`, paused, unless something's
+    /// playing already.
+    Cue {
+        client: Client,
+        album: Box<Album>,
+        track_id: u64,
+        position: Duration,
+    },
     TogglePause,
     Next,
     /// Back to the start of the track, or to the previous track near its start.
@@ -122,7 +143,8 @@ enum Command {
     /// Play through this sink, or the system's default output when `None`: the track
     /// playing too.
     SetOutput(Option<gst::Element>),
-    /// Stop, and answer once the last listening is reported.
+    /// Stop, and answer once the last listening is reported: as the app quits, which keeps
+    /// where the listening was. Stopped otherwise, there's nothing to take up.
     Stop(Option<oneshot::Sender<()>>),
 }
 
@@ -135,12 +157,14 @@ impl Player {
         let (commands, receiver) = mpsc::unbounded_channel();
         let (status_sender, status) = watch::channel(Status::default());
         let (heard, _) = broadcast::channel(16);
-        let actor = Actor::new(playbin.clone(), status_sender, heard.clone());
+        let cued = Cued::default();
+        let actor = Actor::new(playbin.clone(), status_sender, cued.clone(), heard.clone());
         relm4::spawn(actor.run(receiver));
         Ok(Self {
             commands,
             status,
             playbin,
+            cued,
             heard,
         })
     }
@@ -151,6 +175,17 @@ impl Player {
             client,
             album: Box::new(album),
             track_id,
+        });
+    }
+
+    /// Get `album` ready to play from `position` in `track_id`, paused, as it was when the
+    /// app last quit, unless something's playing already. Nothing streams until it plays.
+    pub fn cue(&self, client: Client, album: Album, track_id: u64, position: Duration) {
+        self.send(Command::Cue {
+            client,
+            album: Box::new(album),
+            track_id,
+            position,
         });
     }
 
@@ -188,7 +223,7 @@ impl Player {
 
     /// Where playback is in the current track.
     pub fn position(&self) -> Option<Duration> {
-        position(&self.playbin)
+        cued(&self.cued).or_else(|| position(&self.playbin))
     }
 
     /// The volume, from 0 to 1, on the cubic scale people hear, as sliders show it.
@@ -206,6 +241,7 @@ impl Player {
     }
 
     /// Stop, and wait for Qobuz to hear about the listening so far, as before quitting.
+    /// Where the listening was is kept, to take it up next time.
     pub async fn shut_down(&self) {
         let (done, wait) = oneshot::channel();
         self.send(Command::Stop(Some(done)));
@@ -274,6 +310,8 @@ struct Actor {
     prefetch: Option<JoinHandle<()>>,
     /// Whether the user wants sound: buffering pauses the stream, but not the user.
     wants_playing: bool,
+    /// Where the track cued is, until it plays.
+    cued: Cued,
     /// When the stream playing last broke off and started again.
     recovered_at: Option<Instant>,
     /// What broke the stream that started again: what it still says comes too late.
@@ -302,6 +340,7 @@ impl Actor {
     fn new(
         playbin: gst::Element,
         status: watch::Sender<Status>,
+        cued: Cued,
         heard: broadcast::Sender<Heard>,
     ) -> Self {
         let upcoming: Arc<Mutex<Option<Upcoming>>> = Arc::default();
@@ -341,6 +380,7 @@ impl Actor {
             switched,
             prefetch: None,
             wants_playing: false,
+            cued,
             recovered_at: None,
             broken_source: None,
             report: None,
@@ -354,6 +394,8 @@ impl Actor {
 
     async fn run(mut self, mut commands: mpsc::UnboundedReceiver<Command>) {
         let mut messages = self.playbin.bus().expect("playbin has a bus").stream();
+        let mut saving = tokio::time::interval(SAVE_EVERY);
+        saving.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             tokio::select! {
                 command = commands.recv() => match command {
@@ -361,6 +403,11 @@ impl Actor {
                     None => break,
                 },
                 Some(message) = messages.next() => self.handle_message(&message).await,
+                _ = saving.tick() => {
+                    if self.status.borrow().state == State::Playing {
+                        self.remember(self.position());
+                    }
+                }
             }
         }
         self.stop().await;
@@ -370,26 +417,39 @@ impl Actor {
         match command {
             Command::PlayAlbum {
                 client,
-                mut album,
+                album,
                 track_id,
             } => {
                 self.stop().await;
-                self.queue = album
-                    .tracks
-                    .take()
-                    .map(|page| page.items)
-                    .unwrap_or_default()
-                    .into_iter()
-                    .filter(|track| track.streamable)
-                    .collect();
-                let start = track_id
-                    .and_then(|id| self.queue.iter().position(|track| track.id == id))
-                    .unwrap_or(0);
-                self.client = Some(client);
-                self.album = Some(Arc::new(*album));
+                let start = self.load(client, *album, track_id).unwrap_or(0);
                 self.play(start).await;
             }
-            Command::TogglePause => self.toggle_pause(),
+            Command::Cue {
+                client,
+                album,
+                track_id,
+                position,
+            } => {
+                if self.status.borrow().state != State::Stopped {
+                    return;
+                }
+                self.stop().await;
+                // The track may have left the album since: then from its start.
+                let (index, position) = match self.load(client, *album, Some(track_id)) {
+                    Some(index) => (index, position),
+                    None => (0, Duration::ZERO),
+                };
+                if self.queue.is_empty() {
+                    return;
+                }
+                self.current = Some(index);
+                set_cued(&self.cued, Some(position));
+                self.publish(State::Paused, None);
+            }
+            Command::TogglePause => match cued(&self.cued) {
+                Some(position) => self.play_cued(position).await,
+                None => self.toggle_pause(),
+            },
             Command::Next => {
                 let next = self.current.map(|index| index + 1);
                 if let Some(next) = next.filter(|&next| next < self.queue.len()) {
@@ -412,6 +472,11 @@ impl Actor {
             Command::SetQuality(quality) => self.set_quality(quality).await,
             Command::SetOutput(sink) => self.set_output(sink).await,
             Command::Stop(done) => {
+                if done.is_some() {
+                    self.remember(self.position());
+                } else {
+                    resume::forget();
+                }
                 self.stop().await;
                 self.album = None;
                 self.queue = Arc::default();
@@ -423,8 +488,37 @@ impl Actor {
         }
     }
 
+    /// Take `album`'s tracks that can be streamed as the queue. The index of `track_id`
+    /// in it, if it's there.
+    fn load(&mut self, client: Client, mut album: Album, track_id: Option<u64>) -> Option<usize> {
+        self.queue = album
+            .tracks
+            .take()
+            .map(|page| page.items)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|track| track.streamable)
+            .collect();
+        self.client = Some(client);
+        self.album = Some(Arc::new(album));
+        let track_id = track_id?;
+        self.queue.iter().position(|track| track.id == track_id)
+    }
+
+    /// Play the track cued, from `position`.
+    async fn play_cued(&mut self, position: Duration) {
+        let Some(index) = self.current else {
+            return;
+        };
+        self.play(index).await;
+        if !position.is_zero() {
+            self.resume_at = Some(position);
+        }
+    }
+
     /// Start playing the track at `index` in the queue.
     async fn play(&mut self, index: usize) {
+        set_cued(&self.cued, None);
         let (Some(client), Some(track)) = (self.client.clone(), self.queue.get(index)) else {
             self.publish(State::Stopped, None);
             return;
@@ -478,6 +572,11 @@ impl Actor {
     /// changed what it plays through: its stream, or its output. Without a track, only
     /// `change`.
     async fn restart_track(&mut self, change: impl FnOnce(&gst::Element)) {
+        // Cued, it isn't streaming yet: it will in the new way when played.
+        if cued(&self.cued).is_some() {
+            change(&self.playbin);
+            return;
+        }
         let state = self.status.borrow().state;
         let Some(index) = self.current.filter(|_| state != State::Stopped) else {
             change(&self.playbin);
@@ -503,6 +602,11 @@ impl Actor {
 
     fn seek(&mut self, position: Duration) {
         if self.current.is_none() {
+            return;
+        }
+        self.remember(position);
+        if cued(&self.cued).is_some() {
+            set_cued(&self.cued, Some(position));
             return;
         }
         let from = self.position();
@@ -566,6 +670,7 @@ impl Actor {
                 if let Some(report) = &mut self.report {
                     report.stretch_ended(position);
                 }
+                self.remember(position);
                 self.publish(State::Paused, None);
             }
             State::Paused => {
@@ -600,6 +705,7 @@ impl Actor {
         self.starting = None;
         self.current = None;
         self.wants_playing = false;
+        set_cued(&self.cued, None);
     }
 
     async fn handle_message(&mut self, message: &gst::Message) {
@@ -629,6 +735,8 @@ impl Actor {
                 if let Some(next) = next.filter(|&next| next < self.queue.len()) {
                     self.play(next).await;
                 } else {
+                    // Played to its end: nothing to take up.
+                    resume::forget();
                     self.end_listening();
                     let _ = self.playbin.set_state(gst::State::Null);
                     self.current = None;
@@ -730,6 +838,7 @@ impl Actor {
             State::Paused
         };
         self.publish(state, None);
+        self.remember(self.resume_at.unwrap_or_default());
         self.prefetch_next(started.index + 1);
     }
 
@@ -804,8 +913,38 @@ impl Actor {
     }
 
     fn position(&self) -> Duration {
-        position(&self.playbin).unwrap_or_default()
+        cued(&self.cued)
+            .or_else(|| position(&self.playbin))
+            .unwrap_or_default()
     }
+
+    /// Save that the listening is at `position` in the current track, to take it up when
+    /// the app opens again.
+    fn remember(&self, position: Duration) {
+        let (Some(album), Some(track)) = (
+            &self.album,
+            self.current.and_then(|index| self.queue.get(index)),
+        ) else {
+            return;
+        };
+        resume::save(&resume::ResumePoint {
+            album_id: album.id.clone(),
+            track_id: track.id,
+            position_ms: u64::try_from(position.as_millis()).unwrap_or(u64::MAX),
+        });
+    }
+}
+
+fn cued(cued: &Cued) -> Option<Duration> {
+    *cued
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+fn set_cued(cued: &Cued, position: Option<Duration>) {
+    *cued
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = position;
 }
 
 fn position(playbin: &gst::Element) -> Option<Duration> {

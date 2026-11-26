@@ -1,6 +1,7 @@
 //! What the player needs: where tracks stream from, and what to do with what's heard, as
 //! on desktop: tell Qobuz, which is what pays the artists, and keep it in the play history.
-//! ExoPlayer plays; the app tells a [`Listening`] when it starts and stops.
+//! ExoPlayer plays; the app tells a [`Listening`] when it starts and stops, and saves where
+//! it is, to take it up again ([`ResumePoint`]).
 
 use std::{
     sync::{Arc, Mutex},
@@ -10,7 +11,7 @@ use std::{
 use pochette_core::{
     format,
     listening::{self, Report},
-    lyrics,
+    lyrics, resume,
 };
 use qobuz::{
     FileUrl,
@@ -319,5 +320,42 @@ impl Listening {
 fn send(report: &mut Report) {
     for sending in report.take_sending() {
         runtime().spawn(sending);
+    }
+}
+
+/// Where the listening was, to take it up again when the app opens.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct ResumePoint {
+    pub album_id: String,
+    pub track_id: u64,
+    /// How far into the track.
+    pub position_ms: u64,
+}
+
+#[uniffi::export]
+impl Pochette {
+    /// Where the listening was when the app last saved it, if it's to be taken up.
+    #[must_use]
+    pub fn resume_point(&self) -> Option<ResumePoint> {
+        resume::load().map(|point| ResumePoint {
+            album_id: point.album_id,
+            track_id: point.track_id,
+            position_ms: point.position_ms,
+        })
+    }
+
+    /// Save where the listening is: as a track starts, on pause and seek, from time to time
+    /// while playing, and as the player goes.
+    pub fn save_resume_point(&self, point: ResumePoint) {
+        resume::save(&resume::ResumePoint {
+            album_id: point.album_id,
+            track_id: point.track_id,
+            position_ms: point.position_ms,
+        });
+    }
+
+    /// Nothing to take up: the album was played to its end, or stopped.
+    pub fn forget_resume_point(&self) {
+        resume::forget();
     }
 }

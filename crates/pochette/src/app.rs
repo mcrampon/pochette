@@ -1,6 +1,6 @@
 //! The main window.
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use qobuz::models::Album;
 use relm4::{
@@ -718,8 +718,32 @@ impl App {
             .emit(SearchViewMsg::SetClient(Some(account.client.clone())));
         self.stats
             .emit(StatsViewMsg::SetClient(Some(account.client.clone())));
+        self.take_up_listening(account.client.clone());
         self.account = Some(account);
         self.screen = Screen::SignedIn;
+    }
+
+    /// Get the album that was playing when the app last quit ready to play again, paused
+    /// where it was.
+    fn take_up_listening(&self, client: qobuz::Client) {
+        let Some(point) = pochette_core::resume::load() else {
+            return;
+        };
+        let player = self.player.clone();
+        relm4::spawn(async move {
+            match client.album(&point.album_id).await {
+                Ok(album) => player.cue(
+                    client,
+                    album,
+                    point.track_id,
+                    Duration::from_millis(point.position_ms),
+                ),
+                Err(err) => tracing::warn!(
+                    "cannot load album {} to take up the listening: {err}",
+                    point.album_id
+                ),
+            }
+        });
     }
 
     /// Back to the sign-in screen, forgetting the session.
