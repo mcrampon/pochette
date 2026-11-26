@@ -23,7 +23,6 @@ use crate::{
 /// How often the line sung is checked.
 const TICK: Duration = Duration::from_millis(100);
 
-
 /// How long following the song waits after the user scrolls the lyrics themselves.
 const FOLLOW_PAUSE: Duration = Duration::from_secs(4);
 

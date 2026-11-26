@@ -117,7 +117,8 @@ fn log_to_logcat() {
 }
 
 fn http_client(app_version: &str) -> Result<reqwest::Client> {
-    let builder = reqwest::Client::builder().user_agent(format!("Pochette/{app_version} (Android)"));
+    let builder =
+        reqwest::Client::builder().user_agent(format!("Pochette/{app_version} (Android)"));
     #[cfg(target_os = "android")]
     let builder = builder.tls_certs_only(
         webpki_root_certs::TLS_SERVER_ROOT_CERTS

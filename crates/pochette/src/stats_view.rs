@@ -18,8 +18,8 @@ use crate::{
     history::{Period, Summary},
     navigation::{Destination, Navigator, NavigatorMsg},
     playback::CoverActions,
-    tile_grid::TileGrid,
     player::Player,
+    tile_grid::TileGrid,
 };
 
 /// How many artists and genres the stats rank.

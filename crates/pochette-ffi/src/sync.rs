@@ -150,7 +150,8 @@ impl Pochette {
 
     /// Be ready to pair, or not, as while the app shows its devices.
     pub fn set_pairable(&self, pairable: bool) {
-        self.inner.with_engine(|engine| engine.set_pairable(pairable));
+        self.inner
+            .with_engine(|engine| engine.set_pairable(pairable));
     }
 
     /// Pair with a device nearby, by its id, or at an address: "192.168.1.20".
@@ -160,7 +161,8 @@ impl Pochette {
 
     /// Whether the user saw the same code on both devices.
     pub fn answer_pairing(&self, accept: bool) {
-        self.inner.with_engine(|engine| engine.answer_pairing(accept));
+        self.inner
+            .with_engine(|engine| engine.answer_pairing(accept));
     }
 
     /// Forget how the last pairing went.
