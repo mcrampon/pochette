@@ -15,9 +15,11 @@ import io.github.mcrampon.pochette.core.Discover
 import io.github.mcrampon.pochette.core.Genre
 import io.github.mcrampon.pochette.core.LibraryView
 import io.github.mcrampon.pochette.core.Lyrics
+import io.github.mcrampon.pochette.core.Period
 import io.github.mcrampon.pochette.core.Plays
 import io.github.mcrampon.pochette.core.PochetteException
 import io.github.mcrampon.pochette.core.Sort
+import io.github.mcrampon.pochette.core.Stats
 import io.github.mcrampon.pochette.playback.NowPlaying
 import io.github.mcrampon.pochette.playback.Playback
 import kotlinx.coroutines.Dispatchers
@@ -59,6 +61,9 @@ sealed interface Load<out T> {
 
 /** Search results: the artists, and the albums a page at a time. */
 data class Found(val query: String, val artists: Load<List<ArtistCard>>, val albums: Paged)
+
+/** The stats of `period`, and the periods with plays to pick from: the years, latest first, and the months of the year shown. */
+data class StatsPage(val period: Period, val years: List<Int>, val months: List<Int>, val stats: Stats)
 
 /** How many artists a search shows, as on desktop. */
 private const val ARTISTS_FOUND = 12u
@@ -102,6 +107,9 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     var found by mutableStateOf<Found?>(null)
         private set
     private var searching: Job? = null
+
+    /** The stats period picked, none for the latest year. */
+    var statsPeriod by mutableStateOf<Period?>(null)
 
     private var view = LibraryView("", emptyList(), emptyList(), Sort.DATE_ADDED, false)
     private var signingIn: Job? = null
@@ -257,6 +265,35 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     }
 
 
+    /**
+     * The stats of the period picked, with the plays the logs hold now; none before anything was played. A period
+     * that no longer has plays, as syncing may remove some, gives way to its year or the latest year.
+     */
+    suspend fun stats(): StatsPage? =
+        withContext(Dispatchers.IO) {
+            val years = core.statsYears()
+            val latest = years.firstOrNull() ?: return@withContext null
+            val period =
+                when (val picked = statsPeriod) {
+                    null -> Period.Year(latest)
+                    Period.All -> picked
+                    is Period.Year -> if (picked.year in years) picked else Period.Year(latest)
+                    is Period.Month ->
+                        when {
+                            picked.year !in years -> Period.Year(latest)
+                            picked.month !in core.statsMonths(picked.year) -> Period.Year(picked.year)
+                            else -> picked
+                        }
+                }
+            val months =
+                when (period) {
+                    Period.All -> emptyList()
+                    is Period.Year -> core.statsMonths(period.year)
+                    is Period.Month -> core.statsMonths(period.year)
+                }
+            StatsPage(period, years, months, core.stats(period))
+        }
+
     fun noticeShown() {
         _notice.value = null
     }
@@ -273,6 +310,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         lists.clear()
         discover = Load.Pending
         found = null
+        statsPeriod = null
         navigation.reset()
         sessions.clear()
         _library.value = Library()

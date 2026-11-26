@@ -24,6 +24,10 @@ sealed interface Screen {
         override val key = "search"
     }
 
+    data object Stats : Screen {
+        override val key = "stats"
+    }
+
     data object NowPlaying : Screen {
         override val key = "now"
     }
@@ -53,6 +57,7 @@ enum class Tab(val label: String, val root: Screen, val icon: Int) {
     Albums("Albums", Screen.Albums, R.drawable.ic_album),
     Discover("Discover", Screen.Discover, R.drawable.ic_explore),
     Search("Search", Screen.Search, R.drawable.ic_search),
+    Stats("Stats", Screen.Stats, R.drawable.ic_bar_chart),
 }
 
 /** The tab shown, and each tab's stack, the last screen on top. */

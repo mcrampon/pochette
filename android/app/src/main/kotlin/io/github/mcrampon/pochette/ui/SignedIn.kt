@@ -112,6 +112,18 @@ private fun Screen(model: AppModel, screen: Screen, now: NowPlaying?, back: () -
                 ),
             )
         Screen.Search -> SearchScreen(model.found, onSearch = model::search, onOpenAlbum = openAlbum, onOpenArtist = openArtist)
+        Screen.Stats ->
+            StatsScreen(
+                model.statsPeriod,
+                // A play is recorded as its album changes track, or stops.
+                playing = now?.trackId,
+                StatsActions(
+                    load = model::stats,
+                    pick = { model.statsPeriod = it },
+                    openAlbum = openAlbum,
+                    openArtist = { model.open(Screen.Artist(it.id, it.name)) },
+                ),
+            )
         Screen.NowPlaying -> {
             val playing = now
             if (playing == null) {
