@@ -314,14 +314,15 @@ pub fn album_row(
     };
     container.set_margin_start(24);
     container.set_margin_end(24);
-    let mut tiles = Vec::new();
-    for (index, album) in albums.iter().enumerate() {
-        let (item, widgets) = tile_sized(layout == RowLayout::Grid);
-        widgets.show(album, caption(album).as_deref(), covers, actions);
-        let open = open.clone();
-        row_tile(&item, move || open(index)).set_parent(&container);
-        tiles.push(widgets);
-    }
+    let tiles = append_tiles(
+        &container,
+        albums,
+        0,
+        caption,
+        (covers, actions),
+        layout == RowLayout::Grid,
+        &open,
+    );
 
     let header = row_header(title);
     if let Some((see_all, more_beyond)) = see_all {
@@ -345,6 +346,41 @@ pub fn album_row(
     row.append(&header);
     row.append(&container);
     (row, tiles)
+}
+
+/// A grid for all the albums of a list, in as many rows as they take, its tiles as a row's
+/// grid's: fill it with [`append_tiles`].
+pub fn unbounded_grid() -> TileGrid {
+    let grid = TileGrid::unbounded(
+        MIN_COVER_SIZE + ROW_TILE_PADDING,
+        MAX_COVER_SIZE + ROW_TILE_PADDING,
+    );
+    grid.set_margin_start(24);
+    grid.set_margin_end(24);
+    grid
+}
+
+/// Add tiles for `albums` to `container`, a row's or a [`TileGrid`]: the first is the
+/// `first`th of the row, which clicking it gives `open`. Tiles in a grid grow and shrink
+/// with it (`fluid`). Returns them, to let go of their covers.
+pub fn append_tiles(
+    container: &impl IsA<gtk::Widget>,
+    albums: &[Rc<Album>],
+    first: usize,
+    caption: impl Fn(&Album) -> Option<String>,
+    (covers, actions): (&VisibleCovers, &CoverActions),
+    fluid: bool,
+    open: &Rc<impl Fn(usize) + 'static>,
+) -> Vec<AlbumWidgets> {
+    let mut tiles = Vec::new();
+    for (index, album) in albums.iter().enumerate() {
+        let (item, widgets) = tile_sized(fluid);
+        widgets.show(album, caption(album).as_deref(), covers, actions);
+        let open = Rc::clone(open);
+        row_tile(&item, move || open(first + index)).set_parent(container);
+        tiles.push(widgets);
+    }
+    tiles
 }
 
 /// The header of a row, lined up with its tiles' covers: its title, then maybe buttons.

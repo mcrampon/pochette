@@ -18,12 +18,17 @@ use crate::{
     history::{Period, Summary},
     navigation::{Destination, Navigator, NavigatorMsg},
     playback::CoverActions,
+    tile_grid::TileGrid,
     player::Player,
 };
 
-/// How many albums, artists and genres the stats rank.
-const TOP_ALBUMS: usize = 12;
+/// How many artists and genres the stats rank.
 const TOP: usize = 10;
+/// How many of the albums played are added at a time, as the end of the page comes near:
+/// rows of two to six come out even.
+const ALBUMS_PAGE: usize = 60;
+/// How near: within this many screens.
+const LOAD_AHEAD: f64 = 1.5;
 /// The height of the timeline's tallest bar.
 const CHART_HEIGHT: i32 = 140;
 /// Under this many bars, they're this wide rather than as wide as the page lets them.
@@ -48,9 +53,15 @@ pub struct StatsView {
     months: Vec<i32>,
     year_picker: ChoicePicker,
     month_picker: ChoicePicker,
-    /// The top albums, and their tiles.
-    albums: Vec<Rc<Album>>,
+    /// The albums played, the most first, with what their tiles say under them.
+    albums: Vec<(Rc<Album>, String)>,
+    /// The tiles of the first of them, in `album_grid`.
     tiles: Vec<AlbumWidgets>,
+    album_grid: Option<TileGrid>,
+    /// The period whose albums show: for the plays changing, the same tiles show again.
+    albums_period: Option<Period>,
+    /// The page's, to add albums as its end comes near.
+    adjustment: gtk::Adjustment,
     /// Whether the stats show, and so follow the plays.
     shown: bool,
 }
@@ -77,6 +88,8 @@ pub enum StatsViewMsg {
     PlaysChanged,
     /// Open the top album at this position.
     OpenTopAlbum(usize),
+    /// Add albums, if the end of the page is near.
+    MoreAlbums,
     OpenArtist(u64, String),
 }
 
@@ -131,7 +144,7 @@ impl Component for StatsView {
             glib::ControlFlow::Continue
         });
 
-        let model = Self {
+        let mut model = Self {
             nav: Navigator::new(player, actions.clone(), {
                 let input = sender.input_sender().clone();
                 move |msg| input.emit(StatsViewMsg::Nav(msg))
@@ -146,6 +159,9 @@ impl Component for StatsView {
             month_picker,
             albums: Vec::new(),
             tiles: Vec::new(),
+            album_grid: None,
+            albums_period: None,
+            adjustment: gtk::Adjustment::default(),
             shown: false,
         };
         let nav_stack = model.nav.widget();
@@ -153,6 +169,17 @@ impl Component for StatsView {
         let content = &model.content;
         let widgets = view_output!();
         model.covers.attach(&widgets.scroller);
+        // More albums as the end of the page comes near, or while the page doesn't fill the
+        // window.
+        model.adjustment = widgets.scroller.vadjustment();
+        let input = sender.input_sender().clone();
+        model
+            .adjustment
+            .connect_value_changed(move |_| input.emit(StatsViewMsg::MoreAlbums));
+        let input = sender.input_sender().clone();
+        model
+            .adjustment
+            .connect_changed(move |_| input.emit(StatsViewMsg::MoreAlbums));
         ComponentParts { model, widgets }
     }
 
@@ -196,8 +223,9 @@ impl Component for StatsView {
                     self.fill(&sender);
                 }
             }
+            StatsViewMsg::MoreAlbums => self.more_albums(&sender),
             StatsViewMsg::OpenTopAlbum(index) => {
-                if let Some(album) = self.albums.get(index) {
+                if let Some((album, _)) = self.albums.get(index) {
                     self.nav
                         .open(Destination::Album(Box::new((**album).clone())));
                 }
@@ -276,9 +304,18 @@ impl StatsView {
 
     /// Show the stats of the period picked.
     fn fill(&mut self, sender: &ComponentSender<Self>) {
+        // As many albums as showed, when it's the same period again with new plays.
+        let keep = if self.albums_period.is_some() && self.albums_period == self.period {
+            self.tiles.len().max(ALBUMS_PAGE)
+        } else {
+            ALBUMS_PAGE
+        };
+        self.albums_period = self.period;
         for tile in self.tiles.drain(..) {
             tile.hide(&self.covers);
         }
+        self.album_grid = None;
+        self.albums.clear();
         for picker in [&self.year_picker, &self.month_picker] {
             picker.widget().unparent();
         }
@@ -308,41 +345,6 @@ impl StatsView {
         self.content.append(&numbers(&summary));
         self.content.append(&timeline(&summary, period, sender));
 
-        self.albums = summary
-            .albums
-            .iter()
-            .take(TOP_ALBUMS)
-            .filter_map(|(album, _, _)| album.to_album().map(Rc::new))
-            .collect();
-        let captions: Vec<String> = summary
-            .albums
-            .iter()
-            .map(|(_, plays, time)| {
-                format!(
-                    "{} \u{b7} {}",
-                    format::play_count(*plays),
-                    format::listening_time(*time)
-                )
-            })
-            .collect();
-        if !self.albums.is_empty() {
-            let open = sender.clone();
-            let (row, tiles) = album_tile::album_row(
-                "Top Albums",
-                &self.albums,
-                |album| {
-                    let index = self.albums.iter().position(|a| a.id == album.id)?;
-                    captions.get(index).cloned()
-                },
-                (&self.covers, &self.actions),
-                album_tile::RowLayout::Grid,
-                move |index| open.input(StatsViewMsg::OpenTopAlbum(index)),
-                None,
-            );
-            self.tiles = tiles;
-            self.content.append(&row);
-        }
-
         // Each line as high as its own cards, which share its width.
         let cards = gtk::FlowBox::builder()
             .selection_mode(gtk::SelectionMode::None)
@@ -360,7 +362,77 @@ impl StatsView {
             cards.append(&top_genres(&summary));
         }
         self.content.append(&cards);
+
+        // Every album played, the most first, below the rest: added as the page scrolls.
+        self.albums = summary
+            .albums
+            .iter()
+            .filter_map(|(album, plays, time)| {
+                let caption = format!(
+                    "{} \u{b7} {}",
+                    format::play_count(*plays),
+                    format::listening_time(*time)
+                );
+                Some((Rc::new(album.to_album()?), caption))
+            })
+            .collect();
+        if !self.albums.is_empty() {
+            let row = gtk::Box::new(gtk::Orientation::Vertical, 6);
+            row.append(&album_tile::row_header("Top Albums"));
+            let grid = album_tile::unbounded_grid();
+            row.append(&grid);
+            self.content.append(&row);
+            self.album_grid = Some(grid);
+            self.add_albums(keep, sender);
+        }
         self.covers.refresh();
+    }
+
+    /// Add albums if the end of the page is near and some are left.
+    fn more_albums(&mut self, sender: &ComponentSender<Self>) {
+        let adjustment = &self.adjustment;
+        let page = adjustment.page_size();
+        let near = adjustment.upper() - (adjustment.value() + page) < LOAD_AHEAD * page;
+        if near && self.tiles.len() < self.albums.len() {
+            self.add_albums(ALBUMS_PAGE, sender);
+            self.covers.refresh();
+        }
+    }
+
+    /// Add the next `count` albums to the grid.
+    fn add_albums(&mut self, count: usize, sender: &ComponentSender<Self>) {
+        let Some(grid) = &self.album_grid else {
+            return;
+        };
+        let first = self.tiles.len();
+        let next: Vec<Rc<Album>> = self
+            .albums
+            .iter()
+            .skip(first)
+            .take(count)
+            .map(|(album, _)| Rc::clone(album))
+            .collect();
+        let captions: Vec<&str> = self
+            .albums
+            .iter()
+            .skip(first)
+            .take(count)
+            .map(|(_, caption)| caption.as_str())
+            .collect();
+        let open = sender.clone();
+        let tiles = album_tile::append_tiles(
+            grid,
+            &next,
+            first,
+            |album| {
+                let index = next.iter().position(|a| a.id == album.id)?;
+                captions.get(index).map(|caption| (*caption).to_owned())
+            },
+            (&self.covers, &self.actions),
+            true,
+            &Rc::new(move |index| open.input(StatsViewMsg::OpenTopAlbum(index))),
+        );
+        self.tiles.extend(tiles);
     }
 }
 

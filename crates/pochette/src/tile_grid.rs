@@ -1,7 +1,8 @@
 //! Tiles in rows of equal columns, that grow and shrink with the width, as in the Discover
 //! tab: two rows of six on a wide screen; then, as the tiles would get narrower than a
 //! minimum, two rows of five, three of four, four of three and six of two. The tiles that
-//! don't fit are hidden, and are in "See All".
+//! don't fit are hidden, and are in "See All". Or, as the stats' top albums, as many rows
+//! as the tiles take.
 
 use relm4::gtk::{self, glib, subclass::prelude::*};
 
@@ -22,6 +23,13 @@ impl TileGrid {
     pub fn new(min_tile_width: i32, max_tile_width: i32) -> Self {
         let grid: Self = glib::Object::new();
         grid.imp().tile_widths.set((min_tile_width, max_tile_width));
+        grid
+    }
+
+    /// As [`TileGrid::new`], showing every tile, in as many rows as they take.
+    pub fn unbounded(min_tile_width: i32, max_tile_width: i32) -> Self {
+        let grid = Self::new(min_tile_width, max_tile_width);
+        grid.imp().unbounded.set(true);
         grid
     }
 
@@ -66,6 +74,8 @@ mod imp {
         /// The narrowest and widest a tile gets.
         pub tile_widths: Cell<(i32, i32)>,
         pub on_overflow: RefCell<Option<OverflowHandler>>,
+        /// Every tile shows, in as many rows as they take.
+        pub unbounded: Cell<bool>,
         /// Whether some tiles were hidden at the last allocation.
         overflowing: Cell<Option<bool>>,
     }
@@ -153,7 +163,11 @@ mod imp {
         /// How many tiles show in `layout`, and how tall its rows are: as the tallest of
         /// those tiles.
         fn rows(&self, layout: Layout) -> (i32, i32) {
-            let shown = self.tile_count().min(layout.columns * layout.rows);
+            let shown = if self.unbounded.get() {
+                self.tile_count()
+            } else {
+                self.tile_count().min(layout.columns * layout.rows)
+            };
             let height = children(&self.obj())
                 .take(usize::try_from(shown).unwrap_or(0))
                 .zip((0..layout.columns).cycle())
