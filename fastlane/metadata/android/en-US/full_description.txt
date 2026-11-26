@@ -1,0 +1,16 @@
+<p>Pochette is a player for <a href="https://www.qobuz.com">Qobuz</a>, built around albums: your library of whole albums, played from the first track to the last. It's also a desktop app for Linux, and the two share your listening.</p>
+
+<ul>
+<li><b>Albums</b>: your saved albums, to search, filter by genre and decade, sort, or play at random</li>
+<li><b>Discover</b>: Qobuz's new releases, press awards and ideal discography, by genre</li>
+<li><b>Search</b> for albums and artists, and browse artists' releases</li>
+<li><b>Listening stats</b>: your top albums, artists and genres, and how much you listened, by day, month or year</li>
+<li><b>Devices</b>: your plays synced with your computers running Pochette on the same network, from time to time even while the app is closed</li>
+<li><b>Lyrics</b> that follow the song, looked up on <a href="https://lrclib.net">LRCLIB</a> while you show them</li>
+<li><b>Hi-Res</b> streaming, up to what your subscription allows, without gaps between tracks</li>
+<li>Controls in the notification and on the lock screen, and Material You colors</li>
+</ul>
+
+<p>Requires a paid Qobuz subscription. Pochette uses the Qobuz API but is not certified by Qobuz and is not affiliated with Qobuz. It signs in on Qobuz's own page, in your browser, and talks to Qobuz the way its web player does: Qobuz could change that at any time, which would break Pochette until it's updated.</p>
+
+<p><b>Privacy</b>: Pochette talks to Qobuz and to nobody else, except for lyrics: while you show them, it sends the title, artist, album and length of the track playing to LRCLIB. What you play stays on your devices: only those you pair get it, over your local network, encrypted.</p>

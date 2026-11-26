@@ -1,6 +1,6 @@
 # Pochette
 
-A native Linux player for [Qobuz](https://www.qobuz.com), built around albums: your library of whole albums, played from the first track to the last.
+A native Linux player for [Qobuz](https://www.qobuz.com), built around albums: your library of whole albums, played from the first track to the last. An Android app comes with it, and shares your plays with your computers.
 
 Requires a paid Qobuz subscription. Pochette uses the Qobuz API but is not certified by Qobuz
 and is not affiliated with Qobuz.
@@ -18,8 +18,8 @@ and is not affiliated with Qobuz.
 - **Discover**: Qobuz's new releases, press awards and ideal discography, by genre
 - **Listening stats**: your top albums, artists and genres, and how much you listened, by
   month or year
-- **Devices**: your plays synced between your computers on the same network, even while
-  Pochette is closed
+- **Devices**: your plays synced between your computers and your phone on the same network,
+  even while Pochette is closed
 - **Lyrics** that follow the song, looked up on [LRCLIB](https://lrclib.net) while you show them
 - **Hi-Res** streaming, up to what your subscription allows
 - **Media keys** and desktop media controls, through MPRIS
@@ -49,6 +49,12 @@ sudo make install    # into /usr/local; set PREFIX and DESTDIR to change it
 ```
 
 Streaming over HTTPS also needs GLib's TLS support at runtime (`glib-networking`).
+
+### Android
+
+Android 10 or later. Download the APK of the latest `android-v…` release on
+[GitHub](https://github.com/mcrampon/pochette/releases) and open it on your phone. The Android
+app has its own version numbers, apart from the desktop's.
 
 ## Signing in
 
@@ -82,6 +88,10 @@ Computers find each other with mDNS, and sync over TCP. A firewall must let thro
 Some networks keep their devices apart, as many public and guest Wi-Fi networks do: there,
 computers can't sync.
 
+On Android, Devices is in the Albums tab's menu, and pairs the same way. The phone syncs while
+the app is open or playing, and, unless you turn it off, every 15 minutes or so on Wi-Fi with
+the app closed, as often as Android lets it.
+
 ## Privacy
 
 Pochette talks to Qobuz, and to nobody else, except for lyrics: while you show them, it sends
@@ -97,11 +107,21 @@ up their plays too. Each computer's key and the computers it's paired with are k
 While paired, or while Devices is open, Pochette announces itself on the local network, with
 the computer's name, for the others to find it.
 
+On Android, the plays are kept in the app's own storage, and go with Android's backup of the
+app's data, if you have it on. The Qobuz session, encrypted with a key kept in the phone's
+keystore, and the phone's sync key stay on the phone.
+
 ## Layout
 
 - `crates/qobuz`: Qobuz API client, with no UI code (app id discovery, browser sign-in, API calls)
-- `crates/pochette`: the application (GTK 4 + Relm4)
+- `crates/pochette-core`: what both apps share: the play history and stats, the library's
+  sorting and filters, lyrics, and syncing
+- `crates/pochette`: the desktop application (GTK 4 + Relm4)
+- `crates/pochette-ffi`: the core as the Android app calls it, through
+  [UniFFI](https://mozilla.github.io/uniffi-rs/)
+- `android`: the Android app (Kotlin, Jetpack Compose, Media3)
 - `data`: the desktop file, icons, AppStream metainfo and screenshots
+- `fastlane`: the Android app's store listing, as F-Droid reads it
 
 ## Development
 
@@ -110,6 +130,32 @@ nix develop          # or any Rust ≥ 1.95 toolchain with the libraries above
 cargo run
 cargo test           # add `-- --include-ignored` to also check against the live services
 ```
+
+### Android
+
+The Android app builds the core for each ABI with [cargo-ndk](https://github.com/bbqsrc/cargo-ndk)
+and generates its Kotlin bindings, as part of the Gradle build. `nix develop .#android` has the
+SDK, the NDK, Gradle and the Rust targets; elsewhere, you need those, with the versions in
+`android/app/build.gradle.kts`, and `cargo-ndk`.
+
+```sh
+nix develop .#android
+gradle -p android :app:assembleDebug                         # or ./gradlew in android/
+gradle -p android :app:assembleDebug -Ppochette.abis=x86_64  # just the emulator's ABI
+gradle -p android :app:testDebugUnitTest :app:lintDebug
+```
+
+To release version X.Y.Z of the Android app: set `pochette.version` in
+`android/gradle.properties`, write `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`
+(1.2.3 is 10203), commit, and tag `android-vX.Y.Z`. The release build is signed when
+`pochette.signing`, in `~/.gradle/gradle.properties`, names a properties file with `storeFile`,
+`storePassword`, `keyAlias` and `keyPassword`; else it's unsigned, as F-Droid wants it.
+
+```sh
+gradle -p android :app:assembleRelease   # android/app/build/outputs/apk/release
+```
+
+The same sources give the same APK, wherever they're built with the same tools.
 
 ## License
 

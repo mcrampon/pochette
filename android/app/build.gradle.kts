@@ -90,6 +90,10 @@ android {
 
 /** Runs Cargo in the repository: it knows itself what to build again. */
 abstract class Cargo : DefaultTask() {
+    /** Cargo itself: the one on the PATH, unless `pochette.cargo` says where, as F-Droid's build does. */
+    @get:Input
+    abstract val cargo: Property<String>
+
     @get:Input
     abstract val arguments: ListProperty<String>
 
@@ -123,9 +127,13 @@ abstract class Cargo : DefaultTask() {
         execOperations.exec {
             workingDir(workspace.get().asFile)
             rustFlags.orNull?.let { environment("RUSTFLAGS", it) }
-            commandLine(listOf("cargo") + arguments.get().map { if (it == OUT) out!! else it })
+            commandLine(listOf(cargo.get()) + arguments.get().map { if (it == OUT) out!! else it })
         }
     }
+}
+
+tasks.withType<Cargo>().configureEach {
+    cargo.set(findProperty("pochette.cargo") as String? ?: "cargo")
 }
 
 /** The core for Android, for each ABI: always optimized, a debug build is 140 MB. */
