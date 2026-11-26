@@ -1,6 +1,6 @@
 # Pochette
 
-A native Linux player for [Qobuz](https://www.qobuz.com), built around albums: your library of whole albums, played from the first track to the last. An Android app comes with it, and shares your plays with your computers.
+A [Qobuz](https://www.qobuz.com) player for Linux and Android, built around albums: your library of whole albums, played from the first track to the last. Your plays go from each of your devices to the others over your own network, so the stats cover all of your listening.
 
 Requires a paid Qobuz subscription. Pochette uses the Qobuz API but is not certified by Qobuz
 and is not affiliated with Qobuz.
@@ -10,6 +10,12 @@ and is not affiliated with Qobuz.
 <p align="center">
   <img src="data/screenshots/discover-light.png" alt="Discover, in light mode" width="49%">
   <img src="data/screenshots/playing-dark.png" alt="Playing an album, in dark mode" width="49%">
+</p>
+<p align="center">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" alt="Albums, on Android" width="24%">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" alt="An album, on Android" width="24%">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" alt="Discover, on Android" width="24%">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/4.png" alt="Listening stats, on Android" width="24%">
 </p>
 
 ## Features
@@ -22,10 +28,13 @@ and is not affiliated with Qobuz.
   even while Pochette is closed
 - **Lyrics** that follow the song, looked up on [LRCLIB](https://lrclib.net) while you show them
 - **Hi-Res** streaming, up to what your subscription allows
-- **Media keys** and desktop media controls, through MPRIS
+- **Plays reported to Qobuz**, as its own apps do, so the artists get paid for what you hear
+- **Media keys** and desktop media controls, through MPRIS; on Android, the system's media
+  controls, headphones and cars
 - Your desktop's **accent color**, light and dark modes
 
-Pochette is built with GTK 4 and Relm4.
+The desktop app is built with GTK 4 and Relm4, the Android app with Jetpack Compose and Media3.
+They share a core written in Rust: the play history, stats, library sorting and syncing.
 
 ## Install
 
@@ -59,12 +68,20 @@ app has its own version numbers, apart from the desktop's.
 ## Signing in
 
 Signing in happens in your default browser, on Qobuz's own page, so your saved password or
-SSO provider just works. Pochette catches the redirect on a loopback port and keeps the session
+SSO provider just works; on Android, the browser then brings you back to the app. On Linux,
+Pochette catches the redirect on a loopback port and keeps the session
 in your keyring through the Secret Service API (GNOME Keyring, KWallet, KeePassXC…), or in
 `$XDG_DATA_HOME/pochette/session.json` (readable only by you) when no keyring runs.
 
 Pochette talks to Qobuz the way its web player does, with the web player's own credentials.
 Qobuz could change that at any time, which would break Pochette until it's updated.
+
+## Paying the artists
+
+Qobuz pays artists and labels for their plays, from what its apps tell it was heard. Pochette
+tells it the same way, on Linux and Android: when a track starts, then each stretch of it you
+listened to, up to a pause, a seek or the next track. So what you play in Pochette counts for
+the artists just as it would in Qobuz's own apps.
 
 ## Syncing devices
 
@@ -94,9 +111,10 @@ the app closed, as often as Android lets it.
 
 ## Privacy
 
-Pochette talks to Qobuz, and to nobody else, except for lyrics: while you show them, it sends
-the title, artist, album and length of the track playing to [LRCLIB](https://lrclib.net) to
-find them. Covers are cached in `$XDG_CACHE_HOME/pochette`.
+Pochette talks to Qobuz, and to nobody else, except for lyrics. Qobuz hears what you play, as
+with its own apps: see [Paying the artists](#paying-the-artists). For lyrics, while you show
+them, Pochette sends the title, artist, album and length of the track playing to
+[LRCLIB](https://lrclib.net) to find them. Covers are cached in `$XDG_CACHE_HOME/pochette`.
 
 What you play is logged in `$XDG_DATA_HOME/pochette`, for the stats and to sort albums by
 plays. It stays on your computers: only those you pair get it, over your local network. Each
