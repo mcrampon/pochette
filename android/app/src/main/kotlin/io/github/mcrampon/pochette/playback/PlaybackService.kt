@@ -26,6 +26,7 @@ import io.github.mcrampon.pochette.MainActivity
 import io.github.mcrampon.pochette.PochetteApp
 import io.github.mcrampon.pochette.R
 import io.github.mcrampon.pochette.Settings
+import io.github.mcrampon.pochette.Sync
 
 /** Try a broken stream again at most this often, so a track that can't play doesn't loop. */
 private const val RECOVER_EVERY_MS = 30_000L
@@ -38,6 +39,7 @@ private const val RECOVER_EVERY_MS = 30_000L
 class PlaybackService : MediaSessionService() {
     private var session: MediaSession? = null
     private lateinit var heard: Heard
+    private lateinit var onTheNetwork: OnTheNetwork
 
     /** Held here: preferences only keep a weak reference to their listeners. */
     private lateinit var qualityChanged: SharedPreferences.OnSharedPreferenceChangeListener
@@ -73,6 +75,8 @@ class PlaybackService : MediaSessionService() {
                 .setWakeMode(C.WAKE_MODE_NETWORK)
                 .build()
         player.addListener(Recovery(player, streams))
+        onTheNetwork = OnTheNetwork((application as PochetteApp).sync)
+        player.addListener(onTheNetwork)
         position = player::getCurrentPosition
         heard =
             Heard(core, player, streams) { stream ->
@@ -111,6 +115,8 @@ class PlaybackService : MediaSessionService() {
             release()
         }
         session = null
+        // Released, the player may not say it stopped.
+        onTheNetwork.onIsPlayingChanged(false)
         super.onDestroy()
     }
 
@@ -134,6 +140,20 @@ class PlaybackService : MediaSessionService() {
      * A stream broke, as when its address expired during a long pause, or the network went
      * away: ask where it streams from again, and go on from the same place.
      */
+    /**
+     * Syncs what's heard as it's heard while it plays, the app closed or the screen off: Android lets a playing app
+     * on the network. Not while it's paused, when the service may linger.
+     */
+    private class OnTheNetwork(private val sync: Sync) : Player.Listener {
+        private var holding = false
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying == holding) return
+            holding = isPlaying
+            if (isPlaying) sync.hold() else sync.release()
+        }
+    }
+
     private class Recovery(private val player: Player, private val streams: Streams) : Player.Listener {
         private var recoveredAt = 0L
 

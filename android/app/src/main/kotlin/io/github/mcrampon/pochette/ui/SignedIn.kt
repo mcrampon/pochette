@@ -92,6 +92,8 @@ fun SignedIn(model: AppModel) {
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 private fun Screen(model: AppModel, screen: Screen, now: NowPlaying?, back: () -> Unit) {
+    // Changes as the plays do, here or as another device's arrive.
+    val plays by model.sync.plays.collectAsStateWithLifecycle()
     val openAlbum = { album: AlbumCard -> model.open(Screen.Album(album.id, album)) }
     val openArtist = { artist: ArtistCard -> model.open(Screen.Artist(artist.id, artist.name)) }
     when (screen) {
@@ -106,6 +108,7 @@ private fun Screen(model: AppModel, screen: Screen, now: NowPlaying?, back: () -
                     genres = model::libraryGenres,
                     decades = model::libraryDecades,
                     playRandom = model::playRandom,
+                    devices = { model.open(Screen.Devices) },
                     signOut = model::signOut,
                     open = openAlbum,
                 ),
@@ -127,8 +130,7 @@ private fun Screen(model: AppModel, screen: Screen, now: NowPlaying?, back: () -
         Screen.Stats ->
             StatsScreen(
                 model.statsPeriod,
-                // A play is recorded as its album changes track, or stops.
-                playing = now?.trackId,
+                plays = plays,
                 StatsActions(
                     load = model::stats,
                     pick = { model.statsPeriod = it },
@@ -165,6 +167,7 @@ private fun Screen(model: AppModel, screen: Screen, now: NowPlaying?, back: () -
                 screen.id,
                 screen.preview,
                 now,
+                plays,
                 AlbumActions(
                     load = { model.album(screen.id) },
                     plays = { model.plays(screen.id) },
@@ -187,6 +190,22 @@ private fun Screen(model: AppModel, screen: Screen, now: NowPlaying?, back: () -
                     back = back,
                 ),
             )
+        Screen.Devices -> {
+            val status by model.sync.status.collectAsStateWithLifecycle()
+            DevicesScreen(
+                status,
+                DevicesActions(
+                    setPairable = model::setPairable,
+                    pair = model::pair,
+                    answer = model::answerPairing,
+                    dismiss = model::dismissPairing,
+                    forget = model::forget,
+                    background = { model.syncInBackground },
+                    setBackground = { model.syncInBackground = it },
+                    back = back,
+                ),
+            )
+        }
         is Screen.Section -> ListScreen(title(screen.section), null, model.list(screen), openAlbum, back, caption(screen.section))
         is Screen.Releases -> ListScreen(kindTitle(screen.kind), screen.artistName, model.list(screen), openAlbum, back)
     }

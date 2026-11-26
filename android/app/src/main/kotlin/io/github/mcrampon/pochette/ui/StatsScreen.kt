@@ -87,12 +87,12 @@ class StatsActions(
 @Composable
 fun StatsScreen(
     period: Period?,
-    /** Changes as plays are recorded, to show them. */
-    playing: Any?,
+    /** Changes as the plays do, here or on another device. */
+    plays: Int,
     actions: StatsActions,
 ) {
     // The stats shown stay until the next ones are ready, so changing the period doesn't flash.
-    val load by produceState<Load<StatsPage?>>(Load.Pending, period, playing) { value = Load.Done(actions.load()) }
+    val load by produceState<Load<StatsPage?>>(Load.Pending, period, plays) { value = Load.Done(actions.load()) }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Stats") }) },

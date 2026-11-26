@@ -21,6 +21,11 @@ class Settings(context: Context) {
         get() = prefs.getString(DISCOVER_GENRES, null).orEmpty().split(',').mapNotNull { it.toULongOrNull() }
         set(value) = prefs.edit { putString(DISCOVER_GENRES, value.joinToString(",")) }
 
+    /** Whether to sync with the paired devices while the app is closed, from time to time. */
+    var syncInBackground: Boolean
+        get() = prefs.getBoolean(SYNC_IN_BACKGROUND, true)
+        set(value) = prefs.edit { putBoolean(SYNC_IN_BACKGROUND, value) }
+
     /** How the library sorts and which genres and decades it shows: the search isn't kept. */
     var libraryView: LibraryView
         get() =
@@ -47,6 +52,7 @@ class Settings(context: Context) {
     private companion object {
         const val QUALITY = "quality"
         const val DISCOVER_GENRES = "discover_genres"
+        const val SYNC_IN_BACKGROUND = "sync_in_background"
         const val LIBRARY_GENRES = "library_genres"
         const val LIBRARY_DECADES = "library_decades"
         const val LIBRARY_SORT = "library_sort"

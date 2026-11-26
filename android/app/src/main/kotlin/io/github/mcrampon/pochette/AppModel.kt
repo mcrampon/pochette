@@ -27,6 +27,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.random.Random
@@ -150,9 +151,38 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     private var filtering: Job? = null
     private var signingIn: Job? = null
 
+    val sync = (app as PochetteApp).sync
+
     init {
         resume()
+        // Sorted by plays, the albums move as plays come, here or from another device.
+        viewModelScope.launch {
+            sync.plays.drop(1).collect {
+                if (_stage.value is Stage.SignedIn && view.sort in listOf(Sort.LAST_PLAYED, Sort.PLAY_COUNT)) reshow()
+            }
+        }
     }
+
+    /** Pair with a device nearby, by its id, or at an address. */
+    fun pair(target: String) = core.pair(target)
+
+    /** Whether the user saw the same code on both devices. */
+    fun answerPairing(accept: Boolean) = core.answerPairing(accept)
+
+    fun dismissPairing() = core.dismissPairing()
+
+    /** Stop syncing with a device. */
+    fun forget(id: String) = core.forget(id)
+
+    /** Be ready to pair, as while the devices show. */
+    fun setPairable(pairable: Boolean) = core.setPairable(pairable)
+
+    var syncInBackground: Boolean
+        get() = settings.syncInBackground
+        set(value) {
+            settings.syncInBackground = value
+            SyncWorker.schedule(getApplication(), value)
+        }
 
     /** Sign in with the session kept from before, if there's one. */
     fun resume() {
@@ -329,6 +359,9 @@ class AppModel(app: Application) : AndroidViewModel(app) {
                 }
             StatsPage(period, years, months, core.stats(period))
         }
+
+
+
 
     fun noticeShown() {
         _notice.value = null

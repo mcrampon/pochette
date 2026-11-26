@@ -55,6 +55,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // On the network while the app is in front, to sync and find devices to pair.
+    override fun onStart() {
+        super.onStart()
+        (application as PochetteApp).sync.hold()
+    }
+
+    override fun onStop() {
+        (application as PochetteApp).sync.release()
+        super.onStop()
+    }
+
     private fun openSignInPage(url: String) {
         browserMissing = false
         try {

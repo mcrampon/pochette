@@ -142,6 +142,7 @@ dependencies {
     implementation(libs.coroutines.android)
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.session)
+    implementation(libs.work)
     // What the bindings call the core through: the Android build, with its native part.
     implementation(libs.jna) { artifact { type = "aar" } }
 

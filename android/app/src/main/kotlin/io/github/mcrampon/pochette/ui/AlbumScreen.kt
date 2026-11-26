@@ -82,7 +82,14 @@ private sealed interface Load {
 /** An album: what it is, its tracks to play from, and Qobuz's review. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AlbumScreen(id: String, preview: AlbumCard?, now: NowPlaying?, actions: AlbumActions) {
+fun AlbumScreen(
+    id: String,
+    preview: AlbumCard?,
+    now: NowPlaying?,
+    /** Changes as the plays do, here or on another device. */
+    playsVersion: Int,
+    actions: AlbumActions,
+) {
     var attempt by remember { mutableIntStateOf(0) }
     val load by produceState<Load>(Load.Pending, id, attempt) {
         value =
@@ -126,7 +133,7 @@ fun AlbumScreen(id: String, preview: AlbumCard?, now: NowPlaying?, actions: Albu
     ) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(bottom = 32.dp)) {
             item {
-                Header(card, page, ours, now, actions)
+                Header(card, page, ours, now, playsVersion, actions)
             }
             when (val current = load) {
                 Load.Pending ->
@@ -160,9 +167,8 @@ fun AlbumScreen(id: String, preview: AlbumCard?, now: NowPlaying?, actions: Albu
 }
 
 @Composable
-private fun Header(card: AlbumCard?, page: AlbumPage?, ours: Boolean, now: NowPlaying?, actions: AlbumActions) {
-    // Read again when a track ends, as it may have made a play.
-    val plays = remember(now?.trackId, page) { actions.plays() }
+private fun Header(card: AlbumCard?, page: AlbumPage?, ours: Boolean, now: NowPlaying?, playsVersion: Int, actions: AlbumActions) {
+    val plays = remember(playsVersion, page) { actions.plays() }
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             // Not taller than most of the window, as in landscape.

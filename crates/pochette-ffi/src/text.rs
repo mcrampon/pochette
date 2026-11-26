@@ -37,6 +37,14 @@ pub fn ago(at: i64) -> String {
     format::ago(at, pochette_core::time::now())
 }
 
+/// How long ago something happened, in Unix time, closer than [`ago`] while it's recent:
+/// "just now", "3 minutes ago".
+#[uniffi::export]
+#[must_use]
+pub fn since(at: i64) -> String {
+    format::since(at, pochette_core::time::now())
+}
+
 /// A month by its number, from 1: "January".
 #[uniffi::export]
 #[must_use]

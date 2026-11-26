@@ -150,44 +150,32 @@ impl Pochette {
 
     /// Be ready to pair, or not, as while the app shows its devices.
     pub fn set_pairable(&self, pairable: bool) {
-        if let Ok(engine) = &self.inner.engine {
-            engine.set_pairable(pairable);
-        }
+        self.inner.with_engine(|engine| engine.set_pairable(pairable));
     }
 
     /// Pair with a device nearby, by its id, or at an address: "192.168.1.20".
     pub fn pair(&self, target: String) {
-        if let Ok(engine) = &self.inner.engine {
-            engine.pair(target);
-        }
+        self.inner.with_engine(|engine| engine.pair(target));
     }
 
     /// Whether the user saw the same code on both devices.
     pub fn answer_pairing(&self, accept: bool) {
-        if let Ok(engine) = &self.inner.engine {
-            engine.answer_pairing(accept);
-        }
+        self.inner.with_engine(|engine| engine.answer_pairing(accept));
     }
 
     /// Forget how the last pairing went.
     pub fn dismiss_pairing(&self) {
-        if let Ok(engine) = &self.inner.engine {
-            engine.dismiss_pairing();
-        }
+        self.inner.with_engine(Engine::dismiss_pairing);
     }
 
     /// Stop syncing with a device.
     pub fn forget(&self, id: &str) {
-        if let Ok(engine) = &self.inner.engine {
-            engine.forget(id);
-        }
+        self.inner.with_engine(|engine| engine.forget(id));
     }
 
     /// Sync with every device now, as after a track was heard.
     pub fn sync_now(&self) {
-        if let Ok(engine) = &self.inner.engine {
-            engine.sync_now();
-        }
+        self.inner.with_engine(Engine::sync_now);
     }
 
     /// Sync with every paired device once, waiting up to `timeout_seconds`: for the
@@ -249,6 +237,15 @@ impl Pochette {
 }
 
 impl Inner {
+    /// Call the engine, if there's one, on the runtime: it starts tasks there, and Kotlin
+    /// calls from threads of its own.
+    fn with_engine(&self, call: impl FnOnce(&Engine)) {
+        if let Ok(engine) = &self.engine {
+            let _runtime = runtime().enter();
+            call(engine);
+        }
+    }
+
     /// The engine, on the network.
     async fn start_syncing(&self) -> Result<Engine> {
         let engine = self
@@ -290,4 +287,11 @@ impl Inner {
             observer.plays_changed();
         }
     }
+}
+
+/// The TCP port the devices sync on, unless something else took it.
+#[uniffi::export]
+#[must_use]
+pub fn sync_port() -> u16 {
+    core_sync::PORT
 }

@@ -202,6 +202,26 @@ fn works_offline() {
     assert_eq!(pochette.stats(Period::All).time, 410);
     assert_eq!(pochette.sync_status().name, "Test Phone");
 
+    // Kotlin calls the engine from its own threads, outside the runtime its tasks start on.
+    pochette.set_pairable(true);
+    pochette.pair("127.0.0.1:9".to_owned());
+    // The engine takes it up in a task of its own.
+    let mut pairing = None;
+    for _ in 0..40 {
+        pairing = pochette.sync_status().pairing;
+        if pairing.is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let pairing = pairing.expect("a pairing under way");
+    assert_eq!(pairing.name, "127.0.0.1:9");
+    pochette.answer_pairing(false);
+    pochette.dismiss_pairing();
+    pochette.forget("nobody");
+    pochette.sync_now();
+    pochette.set_pairable(false);
+
     pochette.sign_out();
     assert!(pochette.session().is_none() && pochette.library(LibraryView::default()).is_empty());
 

@@ -28,6 +28,10 @@ sealed interface Screen {
         override val key = "stats"
     }
 
+    data object Devices : Screen {
+        override val key = "devices"
+    }
+
     data object NowPlaying : Screen {
         override val key = "now"
     }

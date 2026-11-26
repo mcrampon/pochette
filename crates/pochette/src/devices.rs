@@ -507,10 +507,10 @@ impl Devices {
                     (_, Some(error)) if peer.last_sync.is_none_or(|at| now - at > 15 * 60) => {
                         peer.last_sync.map_or_else(
                             || error.clone(),
-                            |at| format!("Synced {}. {error}", since(at, now)),
+                            |at| format!("Synced {}. {error}", format::since(at, now)),
                         )
                     }
-                    (Some(at), _) => format!("Synced {}", since(at, now)),
+                    (Some(at), _) => format!("Synced {}", format::since(at, now)),
                     (None, _) => "Not synced yet".to_owned(),
                 }
             };
@@ -624,20 +624,4 @@ fn row(name: &str, detail: Option<&str>, button: &gtk::Button) -> gtk::Box {
     row.append(&text);
     row.append(button);
     row
-}
-
-/// How long ago `at` was, from `now`, closer than `format::ago` while it's recent.
-fn since(at: i64, now: i64) -> String {
-    match now - at {
-        ..60 => "just now".to_owned(),
-        seconds @ ..3600 => match seconds / 60 {
-            1 => "a minute ago".to_owned(),
-            minutes => format!("{minutes} minutes ago"),
-        },
-        seconds @ ..86_400 => match seconds / 3600 {
-            1 => "an hour ago".to_owned(),
-            hours => format!("{hours} hours ago"),
-        },
-        _ => format::ago(at, now),
-    }
 }

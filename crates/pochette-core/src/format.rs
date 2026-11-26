@@ -233,6 +233,24 @@ pub fn ago(at: i64, now: i64) -> String {
     }
 }
 
+/// How long ago `at` was, from `now`, closer than [`ago`] while it's recent: "just now",
+/// "3 minutes ago", "an hour ago", then as [`ago`] says.
+#[must_use]
+pub fn since(at: i64, now: i64) -> String {
+    match now - at {
+        ..60 => "just now".to_owned(),
+        seconds @ ..3600 => match seconds / 60 {
+            1 => "a minute ago".to_owned(),
+            minutes => format!("{minutes} minutes ago"),
+        },
+        seconds @ ..86_400 => match seconds / 3600 {
+            1 => "an hour ago".to_owned(),
+            hours => format!("{hours} hours ago"),
+        },
+        _ => ago(at, now),
+    }
+}
+
 /// A month by its number, from 1: "January".
 #[must_use]
 pub fn month(month: i32) -> &'static str {
@@ -296,6 +314,17 @@ mod tests {
         assert_eq!(ago(at(3, 2, 12), now), "in March");
         let last_year = time::local_unix(2025, 3, 2, 12).unwrap();
         assert_eq!(ago(last_year, now), "in March 2025");
+    }
+
+    #[test]
+    fn says_how_long_ago_closely_while_recent() {
+        let now = time::local_unix(2026, 11, 20, 9).unwrap();
+        assert_eq!(since(now - 20, now), "just now");
+        assert_eq!(since(now - 60, now), "a minute ago");
+        assert_eq!(since(now - 7 * 60, now), "7 minutes ago");
+        assert_eq!(since(now - 3600, now), "an hour ago");
+        assert_eq!(since(now - 5 * 3600, now), "5 hours ago");
+        assert_eq!(since(now - 3 * 86_400, now), "3 days ago");
     }
 
     #[test]

@@ -68,6 +68,7 @@ class AlbumsActions(
     val genres: () -> List<String>,
     val decades: () -> List<UShort>,
     val playRandom: () -> Unit,
+    val devices: () -> Unit,
     val signOut: () -> Unit,
     val open: (AlbumCard) -> Unit,
 )
@@ -90,7 +91,7 @@ fun AlbumsScreen(library: Library, view: LibraryView, actions: AlbumsActions) {
                             )
                         }
                     }
-                    TextButton(onClick = actions.signOut) { Text("Sign Out") }
+                    Menu(actions)
                 },
             )
         },
@@ -135,6 +136,25 @@ fun AlbumsScreen(library: Library, view: LibraryView, actions: AlbumsActions) {
                     }
                 }
             }
+        }
+    }
+}
+
+/** What's not about the albums: the devices, signing out. */
+@Composable
+private fun Menu(actions: AlbumsActions) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }) { Icon(painterResource(R.drawable.ic_more_vert), contentDescription = "More") }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(text = { Text("Devices") }, onClick = {
+                open = false
+                actions.devices()
+            })
+            DropdownMenuItem(text = { Text("Sign Out") }, onClick = {
+                open = false
+                actions.signOut()
+            })
         }
     }
 }
