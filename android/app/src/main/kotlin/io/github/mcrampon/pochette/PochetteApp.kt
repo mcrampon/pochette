@@ -29,6 +29,7 @@ class PochetteApp : Application() {
                     // Never restored to another phone, which would take this one's identity.
                     stateDir = noBackupFilesDir.resolve("sync").path,
                     deviceName = deviceName(),
+                    appVersion = packageManager.getPackageInfo(packageName, 0).versionName.orEmpty(),
                 ),
             )
         sync = Sync(this, core, scope)

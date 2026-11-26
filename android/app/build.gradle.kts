@@ -1,3 +1,4 @@
+import java.util.Properties
 import javax.inject.Inject
 
 plugins {
@@ -8,11 +9,8 @@ plugins {
 /** The repository, with the Rust workspace. */
 val repository: File = rootDir.parentFile
 
-/** The workspace's version, which the app shares with the desktop's. */
-val pochetteVersion: String =
-    Regex("""(?m)^version = "([^"]+)"""")
-        .find(repository.resolve("Cargo.toml").readText())!!
-        .groupValues[1]
+/** The app's version, in gradle.properties: its own, not the desktop's. */
+val pochetteVersion = property("pochette.version") as String
 
 /** The ABIs to build the core for: `-Ppochette.abis=x86_64` for the emulator alone. */
 val abis: List<String> =
@@ -30,10 +28,46 @@ android {
         applicationId = "io.github.mcrampon.pochette"
         minSdk = 29
         targetSdk = 36
+        // Only the core's ABIs: JNA has its own part for more.
+        ndk { abiFilters += abis }
         versionName = pochetteVersion
-        // 1.2.3 is 10203.
+        // 1.2.3 is 10203: each part up to 99.
         versionCode =
             pochetteVersion.split(".").map(String::toInt).fold(0) { code, part -> code * 100 + part }
+    }
+
+    signingConfigs {
+        // The release key, kept by whoever releases, out of the repository: a properties file
+        // (storeFile, storePassword, keyAlias, keyPassword) that `pochette.signing` names, as in
+        // ~/.gradle/gradle.properties. Without it the release is unsigned, as F-Droid builds it
+        // before signing it.
+        (findProperty("pochette.signing") as String?)?.let { path ->
+            val signing = Properties().apply { file(path).inputStream().use(::load) }
+            create("release") {
+                storeFile = file(signing.getProperty("storeFile"))
+                storePassword = signing.getProperty("storePassword")
+                keyAlias = signing.getProperty("keyAlias")
+                keyPassword = signing.getProperty("keyPassword")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.findByName("release")
+            // Smaller, and Compose runs faster once optimized: see proguard-rules.pro for what stays.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // The same APK from the same sources, wherever it's built: see reproducible builds.
+            vcsInfo.include = false
+        }
+    }
+
+    dependenciesInfo {
+        // Google's encrypted list of the dependencies, which F-Droid refuses.
+        includeInApk = false
+        includeInBundle = false
     }
 
     buildFeatures {
@@ -66,6 +100,10 @@ abstract class Cargo : DefaultTask() {
     @get:Optional
     abstract val outputDir: DirectoryProperty
 
+    @get:Input
+    @get:Optional
+    abstract val rustFlags: Property<String>
+
     @get:Inject
     abstract val execOperations: ExecOperations
 
@@ -84,6 +122,7 @@ abstract class Cargo : DefaultTask() {
         val out = outputDir.orNull?.asFile?.path
         execOperations.exec {
             workingDir(workspace.get().asFile)
+            rustFlags.orNull?.let { environment("RUSTFLAGS", it) }
             commandLine(listOf("cargo") + arguments.get().map { if (it == OUT) out!! else it })
         }
     }
@@ -95,14 +134,17 @@ val rustAndroid = tasks.register<Cargo>("rustAndroid") {
     outputDir.set(layout.buildDirectory.dir("rust/jniLibs"))
     arguments.set(
         listOf("ndk") + abis.flatMap { listOf("-t", it) } +
-            listOf("--platform", "29", "-o", Cargo.OUT, "build", "-p", "pochette-ffi", "--release"),
+            listOf("--platform", "29", "-o", Cargo.OUT, "build", "-p", "pochette-ffi", "--release", "--locked"),
     )
+    // The same library wherever it's built: no paths of this computer in it.
+    val cargoHome = System.getenv("CARGO_HOME") ?: "${System.getProperty("user.home")}/.cargo"
+    rustFlags.set("--remap-path-prefix=${repository.path}=/pochette --remap-path-prefix=$cargoHome=/cargo")
 }
 
 /** The core for this computer: the bindings are generated from it, and the tests load it. */
 val rustHost = tasks.register<Cargo>("rustHost") {
     workspace.set(repository)
-    arguments.set(listOf("build", "-p", "pochette-ffi"))
+    arguments.set(listOf("build", "-p", "pochette-ffi", "--locked"))
 }
 
 /** The Kotlin bindings to the core, which UniFFI generates from the library. */

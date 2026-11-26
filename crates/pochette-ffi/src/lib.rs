@@ -48,6 +48,8 @@ pub struct Config {
     pub state_dir: String,
     /// What the other devices call this one: "Pixel 9".
     pub device_name: String,
+    /// The app's version, which has its own: "1.0.0".
+    pub app_version: String,
 }
 
 /// Pochette, as the Android app sees it. Create one, for the whole app.
@@ -84,7 +86,7 @@ impl Pochette {
             file_name: pochette_core::file_name(&config.device_name),
             device_name: config.device_name,
         });
-        let http = http_client()?;
+        let http = http_client(&config.app_version)?;
         let engine = Engine::new();
         if let Err(err) = &engine {
             tracing::warn!("cannot sync: {err}");
@@ -114,16 +116,8 @@ fn log_to_logcat() {
         .try_init();
 }
 
-/// The app's version, as the desktop's: "1.2.3".
-#[uniffi::export]
-#[must_use]
-pub fn version() -> String {
-    env!("CARGO_PKG_VERSION").to_owned()
-}
-
-fn http_client() -> Result<reqwest::Client> {
-    let builder =
-        reqwest::Client::builder().user_agent(concat!("Pochette/", env!("CARGO_PKG_VERSION")));
+fn http_client(app_version: &str) -> Result<reqwest::Client> {
+    let builder = reqwest::Client::builder().user_agent(format!("Pochette/{app_version} (Android)"));
     #[cfg(target_os = "android")]
     let builder = builder.tls_certs_only(
         webpki_root_certs::TLS_SERVER_ROOT_CERTS

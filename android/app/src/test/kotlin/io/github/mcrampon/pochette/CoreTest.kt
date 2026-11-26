@@ -27,7 +27,7 @@ class CoreTest {
     fun startsSignedOut() {
         val dir = Files.createTempDirectory("pochette-test").toFile()
         try {
-            val core = Pochette(Config(dir.resolve("plays").path, dir.resolve("sync").path, "Test"))
+            val core = Pochette(Config(dir.resolve("plays").path, dir.resolve("sync").path, "Test", "1.0.0"))
             assertNull(core.account())
             assertNull(core.session())
             assertTrue(core.library(LibraryView("", emptyList(), emptyList(), Sort.DATE_ADDED, false)).isEmpty())

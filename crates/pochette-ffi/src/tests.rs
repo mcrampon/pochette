@@ -65,6 +65,7 @@ fn works_offline() {
         data_dir: dir.join("data").to_string_lossy().into_owned(),
         state_dir: dir.join("state").to_string_lossy().into_owned(),
         device_name: "Test Phone".to_owned(),
+        app_version: "1.0.0".to_owned(),
     })
     .unwrap();
 
