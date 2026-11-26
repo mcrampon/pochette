@@ -1,6 +1,6 @@
 # Pochette
 
-A [Qobuz](https://www.qobuz.com) player for Linux and Android, built around albums: your library of whole albums, played from the first track to the last. Your plays go from each of your devices to the others over your own network, so the stats cover all of your listening.
+A [Qobuz](https://www.qobuz.com) player for Linux and Android, built around albums: your library of whole albums, played from the first track to the last.
 
 Requires a paid Qobuz subscription. Pochette uses the Qobuz API but is not certified by Qobuz
 and is not affiliated with Qobuz.
