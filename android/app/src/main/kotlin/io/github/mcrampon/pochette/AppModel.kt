@@ -330,7 +330,6 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         return key
     }
 
-
     /**
      * The stats of the period picked, with the plays the logs hold now; none before anything was played. A period
      * that no longer has plays, as syncing may remove some, gives way to its year or the latest year.
@@ -359,9 +358,6 @@ class AppModel(app: Application) : AndroidViewModel(app) {
                 }
             StatsPage(period, years, months, core.stats(period))
         }
-
-
-
 
     fun noticeShown() {
         _notice.value = null
