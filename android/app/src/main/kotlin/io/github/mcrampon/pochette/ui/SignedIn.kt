@@ -97,7 +97,19 @@ private fun Screen(model: AppModel, screen: Screen, now: NowPlaying?, back: () -
     when (screen) {
         Screen.Albums -> {
             val library by model.library.collectAsStateWithLifecycle()
-            AlbumsScreen(library, onRefresh = model::refresh, onSignOut = model::signOut, onOpen = openAlbum)
+            AlbumsScreen(
+                library,
+                model.view,
+                AlbumsActions(
+                    refresh = model::refresh,
+                    show = model::show,
+                    genres = model::libraryGenres,
+                    decades = model::libraryDecades,
+                    playRandom = model::playRandom,
+                    signOut = model::signOut,
+                    open = openAlbum,
+                ),
+            )
         }
         Screen.Discover ->
             DiscoverScreen(

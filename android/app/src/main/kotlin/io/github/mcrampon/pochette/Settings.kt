@@ -3,7 +3,9 @@ package io.github.mcrampon.pochette
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import io.github.mcrampon.pochette.core.LibraryView
 import io.github.mcrampon.pochette.core.Quality
+import io.github.mcrampon.pochette.core.Sort
 
 /** What the user chose, kept on the phone. */
 class Settings(context: Context) {
@@ -19,6 +21,24 @@ class Settings(context: Context) {
         get() = prefs.getString(DISCOVER_GENRES, null).orEmpty().split(',').mapNotNull { it.toULongOrNull() }
         set(value) = prefs.edit { putString(DISCOVER_GENRES, value.joinToString(",")) }
 
+    /** How the library sorts and which genres and decades it shows: the search isn't kept. */
+    var libraryView: LibraryView
+        get() =
+            LibraryView(
+                query = "",
+                genres = prefs.getStringSet(LIBRARY_GENRES, null).orEmpty().sorted(),
+                decades = prefs.getString(LIBRARY_DECADES, null).orEmpty().split(',').mapNotNull { it.toUShortOrNull() },
+                sort = prefs.getString(LIBRARY_SORT, null)?.let { saved -> Sort.entries.find { it.name == saved } } ?: Sort.DATE_ADDED,
+                reversed = prefs.getBoolean(LIBRARY_REVERSED, false),
+            )
+        set(value) =
+            prefs.edit {
+                putStringSet(LIBRARY_GENRES, value.genres.toSet())
+                putString(LIBRARY_DECADES, value.decades.joinToString(","))
+                putString(LIBRARY_SORT, value.sort.name)
+                putBoolean(LIBRARY_REVERSED, value.reversed)
+            }
+
     /** Call `action` when the quality changes: keep what this returns for as long as it should be called. */
     fun onQualityChanged(action: () -> Unit): SharedPreferences.OnSharedPreferenceChangeListener =
         SharedPreferences.OnSharedPreferenceChangeListener { _, key -> if (key == QUALITY) action() }
@@ -27,5 +47,9 @@ class Settings(context: Context) {
     private companion object {
         const val QUALITY = "quality"
         const val DISCOVER_GENRES = "discover_genres"
+        const val LIBRARY_GENRES = "library_genres"
+        const val LIBRARY_DECADES = "library_decades"
+        const val LIBRARY_SORT = "library_sort"
+        const val LIBRARY_REVERSED = "library_reversed"
     }
 }

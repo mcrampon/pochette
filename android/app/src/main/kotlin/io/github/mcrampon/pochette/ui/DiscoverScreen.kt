@@ -2,24 +2,16 @@ package io.github.mcrampon.pochette.ui
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -29,11 +21,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.toMutableStateList
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import io.github.mcrampon.pochette.Load
 import io.github.mcrampon.pochette.R
@@ -116,63 +105,16 @@ fun title(section: Section) =
         Section.IDEAL_DISCOGRAPHY -> "Ideal Discography"
     }
 
-private sealed interface GenresLoad {
-    data object Pending : GenresLoad
-
-    data class Done(val genres: List<Genre>) : GenresLoad
-
-    data class Failed(val error: String) : GenresLoad
-}
-
 /** The genres to show, none for all. */
 @Composable
 private fun GenresDialog(actions: DiscoverActions, picked: List<ULong>, onDismiss: () -> Unit) {
-    val load by produceState<GenresLoad>(GenresLoad.Pending) {
+    val genres by produceState<Load<List<Pair<ULong, String>>>>(Load.Pending) {
         value =
             try {
-                GenresLoad.Done(actions.genres())
+                Load.Done(actions.genres().map { it.id to it.name })
             } catch (err: PochetteException) {
-                GenresLoad.Failed(err.message.orEmpty())
+                Load.Failed("Can't load the genres: ${err.message}")
             }
     }
-    val chosen = remember { picked.toMutableStateList() }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Genres") },
-        text = {
-            when (val current = load) {
-                GenresLoad.Pending -> Loading()
-                is GenresLoad.Failed -> Text("Can't load the genres: ${current.error}")
-                is GenresLoad.Done ->
-                    LazyColumn(Modifier.heightIn(max = 420.dp)) {
-                        items(current.genres, key = { it.id.toString() }) { genre ->
-                            val on = genre.id in chosen
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .toggleable(value = on, role = Role.Checkbox) {
-                                        if (it) chosen.add(genre.id) else chosen.remove(genre.id)
-                                    }.padding(vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Checkbox(checked = on, onCheckedChange = null)
-                                Text(genre.name, modifier = Modifier.padding(start = 12.dp))
-                            }
-                        }
-                    }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                actions.pick(chosen.toList())
-                onDismiss()
-            }) { Text("Show") }
-        },
-        dismissButton = {
-            TextButton(onClick = {
-                actions.pick(emptyList())
-                onDismiss()
-            }) { Text("All Genres") }
-        },
-    )
+    ChecklistDialog("Genres", genres, picked, all = "All Genres", onPick = actions.pick, onDismiss = onDismiss)
 }

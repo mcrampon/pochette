@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -20,8 +22,11 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -31,16 +36,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import io.github.mcrampon.pochette.Load
 import io.github.mcrampon.pochette.Paged
 import io.github.mcrampon.pochette.core.AlbumCard
 import io.github.mcrampon.pochette.core.ArtistCard
@@ -224,4 +232,56 @@ fun Failed(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) 
 @Composable
 fun Loading(modifier: Modifier = Modifier) {
     Box(modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+}
+
+/** Some of `options` to pick, by their names, none for all of them: "Show" picks those checked, `all` none. */
+@Composable
+fun <T> ChecklistDialog(
+    title: String,
+    options: Load<List<Pair<T, String>>>,
+    picked: List<T>,
+    all: String,
+    onPick: (List<T>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val chosen = remember { picked.toMutableStateList() }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            when (options) {
+                Load.Pending -> Loading()
+                is Load.Failed -> Text(options.error)
+                is Load.Done ->
+                    LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                        items(options.value, key = { it.second }) { (option, name) ->
+                            val on = option in chosen
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .toggleable(value = on, role = Role.Checkbox) {
+                                        if (it) chosen.add(option) else chosen.remove(option)
+                                    }.padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Checkbox(checked = on, onCheckedChange = null)
+                                Text(name, modifier = Modifier.padding(start = 12.dp))
+                            }
+                        }
+                    }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onPick(chosen.toList())
+                onDismiss()
+            }) { Text("Show") }
+        },
+        dismissButton = {
+            TextButton(onClick = {
+                onPick(emptyList())
+                onDismiss()
+            }) { Text(all) }
+        },
+    )
 }

@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.random.Random
 
 /** Where the app is: signing in, or in the user's library. */
 sealed interface Stage {
@@ -43,9 +44,10 @@ sealed interface Stage {
     data class SignedIn(val account: Account) : Stage
 }
 
-/** The user's albums, as the library shows them. */
+/** The user's albums, as the library shows them: `any` when there are some, shown or not. */
 data class Library(
     val albums: List<AlbumCard> = emptyList(),
+    val any: Boolean = false,
     val refreshing: Boolean = false,
     val error: String? = null,
 )
@@ -108,10 +110,44 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         private set
     private var searching: Job? = null
 
+    /** Show the library's albums as `view` says, keeping its sort and filters for next time. */
+    fun show(view: LibraryView) {
+        this.view = view
+        settings.libraryView = view
+        filtering?.cancel()
+        filtering = viewModelScope.launch { reshow() }
+    }
+
+    /** The genres and decades of the user's albums, to filter them by. */
+    fun libraryGenres(): List<String> = core.libraryGenres()
+
+    fun libraryDecades(): List<UShort> = core.libraryDecades()
+
+    /** Play one of the albums shown, picked at random: another than the one playing, when there's another. */
+    fun playRandom() {
+        val albums = _library.value.albums
+        if (albums.isEmpty()) return
+        var index = Random.nextInt(albums.size)
+        if (albums.size > 1 && albums[index].id == playback.now.value?.albumId) index = (index + 1) % albums.size
+        val card = albums[index]
+        viewModelScope.launch {
+            try {
+                playback.play(album(card.id))
+            } catch (expired: PochetteException.SignedOut) {
+                return@launch
+            } catch (err: PochetteException) {
+                _notice.value = "Can't play “${card.title}”: ${err.message}"
+            }
+        }
+    }
+
     /** The stats period picked, none for the latest year. */
     var statsPeriod by mutableStateOf<Period?>(null)
 
-    private var view = LibraryView("", emptyList(), emptyList(), Sort.DATE_ADDED, false)
+    /** Which albums the library shows, and in what order. */
+    var view by mutableStateOf(settings.libraryView)
+        private set
+    private var filtering: Job? = null
     private var signingIn: Job? = null
 
     init {
@@ -189,7 +225,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 core.setFavorite(album.id, favorite)
-                _library.value = _library.value.copy(albums = albums())
+                reshow()
             } catch (err: PochetteException) {
                 failed()
                 val change = if (favorite) "add “${album.title}” to" else "take “${album.title}” out of"
@@ -331,7 +367,8 @@ class AppModel(app: Application) : AndroidViewModel(app) {
                 } catch (err: PochetteException) {
                     err.message
                 }
-            _library.value = Library(albums = albums(), error = error)
+            _library.value = _library.value.copy(refreshing = false, error = error)
+            reshow()
         }
     }
 
@@ -350,7 +387,17 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         refresh()
     }
 
-    private suspend fun albums(): List<AlbumCard> = withContext(Dispatchers.Default) { core.library(view) }
+    /** Show the albums the view picks. */
+    private suspend fun reshow() {
+        val view = view
+        val (albums, any) =
+            withContext(Dispatchers.Default) {
+                val albums = core.library(view)
+                // Whether none match, or there's none at all.
+                albums to (albums.isNotEmpty() || core.library(LibraryView("", emptyList(), emptyList(), Sort.DATE_ADDED, false)).isNotEmpty())
+            }
+        _library.value = _library.value.copy(albums = albums, any = any)
+    }
 
     companion object {
         /** Opens the app: the browser goes there once signed in. See the manifest. */
