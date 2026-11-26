@@ -13,6 +13,7 @@ use relm4::{
 use tokio::task::JoinHandle;
 
 use crate::{
+    album_tile,
     clamp::Clamp,
     covers,
     favorites::{Favorites, Heart, with_heart},
@@ -350,8 +351,6 @@ impl Component for AlbumPage {
             error: String::new(),
             task: None,
             cover: gtk::Picture::builder()
-                .width_request(COVER_SIZE)
-                .height_request(COVER_SIZE)
                 .content_fit(gtk::ContentFit::Cover)
                 .overflow(gtk::Overflow::Hidden)
                 .css_classes(["pochette-cover", "pochette-cover-large"])
@@ -364,7 +363,12 @@ impl Component for AlbumPage {
             playback: player.status().borrow().clone(),
             player,
         };
-        let cover_box = &with_heart(&model.cover, &model.heart);
+        // Framed: alone, the picture asks for its image's size, and grows toward it when the
+        // page is shorter than the window.
+        let cover_box = &with_heart(
+            &album_tile::CoverFrame::new(&model.cover, COVER_SIZE),
+            &model.heart,
+        );
         let track_list = &model.track_list;
         let widgets = view_output!();
         ComponentParts { model, widgets }
