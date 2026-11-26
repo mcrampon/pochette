@@ -90,10 +90,6 @@ android {
 
 /** Runs Cargo in the repository: it knows itself what to build again. */
 abstract class Cargo : DefaultTask() {
-    /** Cargo itself: the one on the PATH, unless `pochette.cargo` says where, as F-Droid's build does. */
-    @get:Input
-    abstract val cargo: Property<String>
-
     @get:Input
     abstract val arguments: ListProperty<String>
 
@@ -127,13 +123,9 @@ abstract class Cargo : DefaultTask() {
         execOperations.exec {
             workingDir(workspace.get().asFile)
             rustFlags.orNull?.let { environment("RUSTFLAGS", it) }
-            commandLine(listOf(cargo.get()) + arguments.get().map { if (it == OUT) out!! else it })
+            commandLine(listOf("cargo") + arguments.get().map { if (it == OUT) out!! else it })
         }
     }
-}
-
-tasks.withType<Cargo>().configureEach {
-    cargo.set(findProperty("pochette.cargo") as String? ?: "cargo")
 }
 
 /** The core for Android, for each ABI: always optimized, a debug build is 140 MB. */
@@ -144,9 +136,24 @@ val rustAndroid = tasks.register<Cargo>("rustAndroid") {
         listOf("ndk") + abis.flatMap { listOf("-t", it) } +
             listOf("--platform", "29", "-o", Cargo.OUT, "build", "-p", "pochette-ffi", "--release", "--locked"),
     )
-    // The same library wherever it's built: no paths of this computer in it.
+    // The same library wherever it's built: no paths of this computer in it. Rust names its standard
+    // library's sources /rustc/<commit>, unless they're installed, as for an editor: then it names
+    // them where they are, so they're named back.
     val cargoHome = System.getenv("CARGO_HOME") ?: "${System.getProperty("user.home")}/.cargo"
-    rustFlags.set("--remap-path-prefix=${repository.path}=/pochette --remap-path-prefix=$cargoHome=/cargo")
+    val sysroot = providers.exec { commandLine("rustc", "--print", "sysroot") }.standardOutput.asText
+    val commit =
+        providers.exec { commandLine("rustc", "-vV") }.standardOutput.asText.map { info ->
+            Regex("(?m)^commit-hash: (\\S+)").find(info)!!.groupValues[1]
+        }
+    rustFlags.set(
+        sysroot.zip(commit) { root, hash ->
+            listOf(
+                "--remap-path-prefix=${repository.path}=/pochette",
+                "--remap-path-prefix=$cargoHome=/cargo",
+                "--remap-path-prefix=${root.trim()}/lib/rustlib/src/rust=/rustc/$hash",
+            ).joinToString(" ")
+        },
+    )
 }
 
 /** The core for this computer: the bindings are generated from it, and the tests load it. */

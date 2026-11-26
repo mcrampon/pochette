@@ -1,44 +1,45 @@
 # The recipe F-Droid builds the app with, for metadata/io.github.mcrampon.pochette.yml in
 # https://gitlab.com/fdroid/fdroiddata: kept here to send it and keep it in step. F-Droid finds
-# new versions by the android-v tags on its own (UpdateCheckMode), and the store listing in
-# fastlane/metadata/android.
-
-Categories:
-  - Multimedia
-License: GPL-3.0-or-later
-SourceCode: https://github.com/mcrampon/pochette
-IssueTracker: https://github.com/mcrampon/pochette/issues
-
-AutoName: Pochette
+# new versions by the android-v tags on its own (UpdateCheckMode), the store listing in
+# fastlane/metadata/android, and checks its build against the release's APK (Binaries), to
+# publish that one, signed with the release key. Checked in F-Droid's buildserver image.
 
 AntiFeatures:
   NonFreeNet:
     en-US: Plays music from Qobuz, a paid streaming service.
+Categories:
+  - Multimedia
+License: GPL-3.0-or-later
+AuthorName: mcrampon
+SourceCode: https://github.com/mcrampon/pochette
+IssueTracker: https://github.com/mcrampon/pochette/issues
+Changelog: https://github.com/mcrampon/pochette/releases
+
+AutoName: Pochette
 
 RepoType: git
 Repo: https://github.com/mcrampon/pochette.git
+Binaries: 
+  https://github.com/mcrampon/pochette/releases/download/android-v%v/pochette-android-%v.apk
 
 Builds:
   - versionName: 1.0.0
     versionCode: 10000
-    commit: android-v1.0.0
+    commit: 232d68aebeb2b1cef53c503167ea77c51fc3bfc8
     subdir: android/app
     sudo:
       - apt-get update
-      - apt-get install -y build-essential cmake
-    output: build/outputs/apk/release/app-release-unsigned.apk
-    srclibs:
-      - rustup@1.28.2
-    prebuild:
-      # The Rust the app is released with: see `rustc --version` in the dev shell.
-      - $$rustup$$/rustup-init.sh -y --profile minimal --default-toolchain 1.99.1 --target
-        aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
-      - $HOME/.cargo/bin/cargo install cargo-ndk --version 4.1.2 --locked
+      - apt-get install -y build-essential cmake rustup
     gradle:
       - yes
-    gradleprops:
-      - pochette.cargo=/home/vagrant/.cargo/bin/cargo
+    prebuild:
+      - rustup set profile minimal
+      - rustup default 1.99.1
+      - rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+      - cargo install cargo-ndk --version 4.1.2 --locked
     ndk: 29.0.14206865
+
+AllowedAPKSigningKeys: 2d41ebad5ba83983fc85b9d1963cdaf6c409aa596e6ab007cc926106c222ad00
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^android-v.*$
