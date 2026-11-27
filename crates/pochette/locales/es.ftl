@@ -123,6 +123,8 @@ search-artists = Artistas
 
 album-cannot-load = No se pueden cargar las pistas: { $error }
 album-about = Acerca de este álbum
+album-copy-link = Copiar enlace
+album-link-copied = Enlace copiado
 # $plays es «12 reproducciones», $last cuándo, como «ayer».
 album-played = { $plays } · última reproducción { $last }
 hi-res = Hi-Res

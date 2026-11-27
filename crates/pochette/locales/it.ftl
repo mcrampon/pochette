@@ -122,6 +122,8 @@ search-artists = Artisti
 
 album-cannot-load = Impossibile caricare i brani: { $error }
 album-about = Informazioni sull'album
+album-copy-link = Copia link
+album-link-copied = Link copiato
 album-played = { $plays } · ultimo ascolto { $last }
 hi-res = Hi-Res
 album-disc = Disco { $number }

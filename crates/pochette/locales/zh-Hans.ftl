@@ -128,6 +128,8 @@ search-artists = 艺人
 
 album-cannot-load = 无法加载曲目：{ $error }
 album-about = 关于这张专辑
+album-copy-link = 复制链接
+album-link-copied = 已复制链接
 # $plays 如“12 次播放”，$last 表示何时，如“昨天”。
 album-played = { $plays } · 上次播放：{ $last }
 hi-res = Hi-Res

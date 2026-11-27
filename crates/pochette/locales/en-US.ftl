@@ -128,6 +128,9 @@ search-artists = Artists
 
 album-cannot-load = Can't load the tracks: { $error }
 album-about = About This Album
+# The share button: it copies the album's link, to paste it anywhere.
+album-copy-link = Copy Link
+album-link-copied = Link Copied
 # $plays is "12 plays", $last when, as "yesterday".
 album-played = { $plays } · last played { $last }
 hi-res = Hi-Res

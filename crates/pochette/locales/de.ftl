@@ -125,6 +125,8 @@ search-artists = Künstler
 
 album-cannot-load = Die Titel konnten nicht geladen werden: { $error }
 album-about = Über dieses Album
+album-copy-link = Link kopieren
+album-link-copied = Link kopiert
 # $plays: „12 Wiedergaben“, $last: wann, etwa „gestern“.
 album-played = { $plays } · zuletzt { $last } gehört
 hi-res = Hi-Res

@@ -68,6 +68,8 @@
 
     <!-- Un álbum. -->
     <string name="add_to_favorites">Añadir a favoritos</string>
+    <string name="share_album">Compartir</string>
+    <string name="share_album_text">Escucha %1$s de %2$s en Qobuz\n%3$s</string>
     <string name="remove_from_favorites">Quitar de favoritos</string>
     <!-- Sobre el título, cuando Qobuz no dice qué tipo de lanzamiento es. -->
     <string name="album">Álbum</string>

@@ -66,3 +66,10 @@ pub fn month_name(month: i32) -> String {
 pub fn short_month_name(month: i32) -> String {
     format::short_month(month)
 }
+
+/// The link to share an album by, on Qobuz.
+#[uniffi::export]
+#[must_use]
+pub fn album_link(id: &str) -> String {
+    pochette_core::album_link(id)
+}

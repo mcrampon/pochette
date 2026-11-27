@@ -6,6 +6,15 @@ use relm4::gtk::{self, glib, prelude::*, subclass::prelude::*};
 /// Two arrows, one each way: swap.
 pub const SWAP: &str = "M 2.5 5 H 13 M 10 2 L 13 5 L 10 8 M 13.5 11 H 3 M 6 8 L 3 11 L 6 14";
 
+/// Three dots joined, one to the two others: share.
+pub const SHARE: &str = "M 13.5 3.5 A 2 2 0 1 1 9.5 3.5 A 2 2 0 1 1 13.5 3.5 \
+                         M 6.5 8 A 2 2 0 1 1 2.5 8 A 2 2 0 1 1 6.5 8 \
+                         M 13.5 12.5 A 2 2 0 1 1 9.5 12.5 A 2 2 0 1 1 13.5 12.5 \
+                         M 6.2 6.9 L 9.8 4.6 M 6.2 9.1 L 9.8 11.4";
+
+/// A check mark: done.
+pub const CHECK: &str = "M 3 8.5 L 6.5 12 L 13 4.5";
+
 /// An arrow pointing up: ascending.
 pub const UP: &str = "M 8 13 V 3 M 4 7 L 8 3 L 12 7";
 

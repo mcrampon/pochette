@@ -1,5 +1,7 @@
 package io.github.mcrampon.pochette.ui
 
+import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
@@ -57,6 +60,7 @@ import io.github.mcrampon.pochette.core.TrackRow
 import io.github.mcrampon.pochette.core.ago
 import io.github.mcrampon.pochette.core.playCount
 import io.github.mcrampon.pochette.core.trackDuration
+import io.github.mcrampon.pochette.core.albumLink
 import io.github.mcrampon.pochette.playback.NowPlaying
 import androidx.compose.ui.res.stringResource
 
@@ -71,6 +75,17 @@ class AlbumActions(
     val openArtist: (id: ULong, name: String) -> Unit,
     val back: () -> Unit,
 )
+
+/** Offer to send `card`'s link, with a word on it, through the apps that can. */
+private fun shareAlbum(context: Context, card: AlbumCard) {
+    val text = context.getString(R.string.share_album_text, card.title, card.artist, albumLink(card.id))
+    val send =
+        Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+    context.startActivity(Intent.createChooser(send, null))
+}
 
 private sealed interface Load {
     data object Pending : Load
@@ -104,6 +119,7 @@ fun AlbumScreen(
     val card = page?.card ?: preview
     var favorite by rememberSaveable(id) { mutableStateOf(actions.isFavorite()) }
     val ours = now?.albumId == id
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -116,6 +132,9 @@ fun AlbumScreen(
                 },
                 actions = {
                     if (card != null) {
+                        IconButton(onClick = { shareAlbum(context, card) }) {
+                            Icon(painterResource(R.drawable.ic_share), contentDescription = stringResource(R.string.share_album))
+                        }
                         IconButton(onClick = {
                             favorite = !favorite
                             actions.setFavorite(card, favorite) { favorite = !favorite }

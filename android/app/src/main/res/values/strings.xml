@@ -68,6 +68,9 @@
 
     <!-- An album. -->
     <string name="add_to_favorites">Add to Favorites</string>
+    <string name="share_album">Share</string>
+    <!-- What sharing an album sends, as a message to edit: %1$s: its title, %2$s: its artist, %3$s: its link. -->
+    <string name="share_album_text">Listen to %1$s by %2$s on Qobuz\n%3$s</string>
     <string name="remove_from_favorites">Remove from Favorites</string>
     <!-- Over the title, when Qobuz doesn't say what kind of release it is. -->
     <string name="album">Album</string>

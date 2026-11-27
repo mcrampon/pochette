@@ -45,6 +45,13 @@ pub fn platform() -> &'static Platform {
         .expect("pochette_core::init is called before anything else")
 }
 
+/// The link to share an album by: Qobuz's own, which opens the album in its app, or on its
+/// site for those without it.
+#[must_use]
+pub fn album_link(id: &str) -> String {
+    format!("https://open.qobuz.com/album/{id}")
+}
+
 /// `name`, as it can be in a file name.
 #[must_use]
 pub fn file_name(name: &str) -> String {

@@ -1,6 +1,6 @@
 //! An album's page: its cover and details, its tracks, then its review.
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use qobuz::{
     Client,
@@ -20,6 +20,7 @@ use crate::{
     format, history,
     i18n::tr,
     navigation::{Destination, PageOutput},
+    path_icon::{self, PathIcon},
     player::{Player, State, Status},
     plays::Plays,
 };
@@ -29,6 +30,9 @@ const MAX_WIDTH: i32 = 960;
 
 /// The side of the cover, in logical pixels.
 const COVER_SIZE: i32 = 280;
+
+/// How long the share button says the link was copied.
+const LINK_COPIED_FOR: Duration = Duration::from_secs(2);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Tracks {
@@ -54,6 +58,10 @@ pub struct AlbumPage {
     plays: Plays,
     player: Player,
     playback: Status,
+    /// While the button says the link was copied: the count of copies, so only the last
+    /// one's end stops saying it.
+    link_copied: Option<u32>,
+    copies: u32,
 }
 
 #[derive(Debug)]
@@ -80,6 +88,10 @@ pub enum AlbumPageMsg {
     PlayTrack(u64),
     PlaybackChanged(Status),
     PlaysChanged,
+    /// Copy the album's link, to share it.
+    CopyLink,
+    /// The link copied a while ago, by the count of copies then: no longer worth saying.
+    LinkCopiedShown(u32),
 }
 
 #[relm4::component(pub)]
@@ -152,29 +164,57 @@ impl Component for AlbumPage {
                             set_valign: gtk::Align::End,
                             set_hexpand: true,
 
-                            gtk::Button {
+                            gtk::Box {
+                                set_spacing: 8,
                                 set_halign: gtk::Align::Start,
                                 set_margin_bottom: 12,
-                                add_css_class: "suggested-action",
-                                add_css_class: "pochette-play",
-                                #[watch]
-                                set_sensitive: model.can_play(),
-                                connect_clicked => AlbumPageMsg::PlayPressed,
 
-                                gtk::Box {
-                                    set_spacing: 8,
+                                gtk::Button {
+                                    add_css_class: "suggested-action",
+                                    add_css_class: "pochette-play",
+                                    #[watch]
+                                    set_sensitive: model.can_play(),
+                                    connect_clicked => AlbumPageMsg::PlayPressed,
 
-                                    gtk::Image {
-                                        #[watch]
-                                        set_icon_name: Some(if model.is_playing() {
-                                            "media-playback-pause-symbolic"
-                                        } else {
-                                            "media-playback-start-symbolic"
-                                        }),
+                                    gtk::Box {
+                                        set_spacing: 8,
+
+                                        gtk::Image {
+                                            #[watch]
+                                            set_icon_name: Some(if model.is_playing() {
+                                                "media-playback-pause-symbolic"
+                                            } else {
+                                                "media-playback-start-symbolic"
+                                            }),
+                                        },
+                                        gtk::Label {
+                                            #[watch]
+                                            set_label: &if model.is_playing() { tr!("pause") } else { tr!("play") },
+                                        },
                                     },
-                                    gtk::Label {
+                                },
+                                // Copies the album's link, and says so for a moment.
+                                gtk::Button {
+                                    set_valign: gtk::Align::Center,
+                                    add_css_class: "circular",
+                                    #[watch]
+                                    set_sensitive: model.album.is_some(),
+                                    #[watch]
+                                    set_tooltip_text: Some(&if model.link_copied.is_some() {
+                                        tr!("album-link-copied")
+                                    } else {
+                                        tr!("album-copy-link")
+                                    }),
+                                    connect_clicked => AlbumPageMsg::CopyLink,
+
+                                    #[wrap(Some)]
+                                    set_child = &PathIcon::new(path_icon::SHARE) {
                                         #[watch]
-                                        set_label: &if model.is_playing() { tr!("pause") } else { tr!("play") },
+                                        set_path: if model.link_copied.is_some() {
+                                            path_icon::CHECK
+                                        } else {
+                                            path_icon::SHARE
+                                        },
                                     },
                                 },
                             },
@@ -363,6 +403,8 @@ impl Component for AlbumPage {
             plays,
             playback: player.status().borrow().clone(),
             player,
+            link_copied: None,
+            copies: 0,
         };
         // Framed: alone, the picture asks for its image's size, and grows toward it when the
         // page is shorter than the window.
@@ -387,6 +429,23 @@ impl Component for AlbumPage {
                 self.load(&sender);
             }
             AlbumPageMsg::Retry => self.load(&sender),
+            AlbumPageMsg::CopyLink => {
+                if let Some(album) = &self.album {
+                    root.clipboard()
+                        .set_text(&pochette_core::album_link(&album.id));
+                    self.copies += 1;
+                    self.link_copied = Some(self.copies);
+                    let (input, copy) = (sender.input_sender().clone(), self.copies);
+                    glib::timeout_add_local_once(LINK_COPIED_FOR, move || {
+                        let _ = input.send(AlbumPageMsg::LinkCopiedShown(copy));
+                    });
+                }
+            }
+            AlbumPageMsg::LinkCopiedShown(copy) => {
+                if self.link_copied == Some(copy) {
+                    self.link_copied = None;
+                }
+            }
             AlbumPageMsg::Back => {
                 let _ = sender.output(PageOutput::Back);
             }

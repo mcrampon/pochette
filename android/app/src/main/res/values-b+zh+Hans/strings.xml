@@ -63,6 +63,8 @@
 
     <!-- 专辑。 -->
     <string name="add_to_favorites">收藏</string>
+    <string name="share_album">分享</string>
+    <string name="share_album_text">在 Qobuz 上收听 %2$s 的《%1$s》\n%3$s</string>
     <string name="remove_from_favorites">取消收藏</string>
     <!-- 显示在标题上方，Qobuz 未说明发行类型时。 -->
     <string name="album">专辑</string>
