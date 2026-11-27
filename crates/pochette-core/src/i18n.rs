@@ -170,8 +170,153 @@ fn script(language: &LanguageIdentifier) -> Option<&str> {
     }
 }
 
+/// What's wrong with `translation`, a language's `.ftl` file, next to `source`, the US
+/// English one: errors, and messages it lacks, or that US English doesn't have, or that use
+/// values US English doesn't give them: those it uses, or its comment names. For the tests
+/// of each app's texts.
+#[doc(hidden)]
+#[must_use]
+pub fn problems(source: &str, translation: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    let (source, translation) = (
+        parse_ftl(source, &mut problems),
+        parse_ftl(translation, &mut problems),
+    );
+    for (id, variables) in &translation {
+        match source.iter().find(|(source_id, _)| source_id == id) {
+            None => problems.push(format!("{id}: not in US English")),
+            Some((_, source_variables)) => {
+                for variable in variables {
+                    if !source_variables.contains(variable) {
+                        problems.push(format!("{id}: no ${variable} in US English"));
+                    }
+                }
+            }
+        }
+    }
+    for (id, _) in &source {
+        if !translation.iter().any(|(translated, _)| translated == id) {
+            problems.push(format!("{id}: missing"));
+        }
+    }
+    problems
+}
+
+/// The errors in formatting each message of `translation`, the `.ftl` file of the language
+/// `tag`, with every value US English `source` gives it, numbers as 1, 2, 5 and 22 in turn.
+/// For the tests of each app's texts.
+#[doc(hidden)]
+#[must_use]
+pub fn formatting_problems(source: &str, tag: &str, translation: &str) -> Vec<String> {
+    /// The values that are numbers, which plurals pick their form from.
+    const NUMBERS: [&str; 10] = [
+        "count", "days", "weeks", "minutes", "hours", "bits", "day", "number", "port", "decade",
+    ];
+    let mut problems = Vec::new();
+    let messages = parse_ftl(source, &mut problems);
+    let Some(bundle) = bundle(tag, translation) else {
+        return vec![format!("{tag}: not a language tag")];
+    };
+    for (id, variables) in messages {
+        let Some(pattern) = bundle.get_message(&id).and_then(|message| message.value()) else {
+            continue;
+        };
+        for number in [1, 2, 5, 22] {
+            let mut args = FluentArgs::new();
+            for variable in &variables {
+                if NUMBERS.contains(&variable.as_str()) {
+                    args.set(variable.clone(), number);
+                } else {
+                    args.set(variable.clone(), "x");
+                }
+            }
+            let mut errors = Vec::new();
+            let text = bundle.format_pattern(pattern, Some(&args), &mut errors);
+            if !errors.is_empty() || text.is_empty() {
+                problems.push(format!("{id} with {number}: {errors:?} gives {text:?}"));
+            }
+        }
+    }
+    problems
+}
+
+/// The messages of an `.ftl` file, with the variables each uses.
+fn parse_ftl(text: &str, problems: &mut Vec<String>) -> Vec<(String, Vec<String>)> {
+    use fluent_syntax::ast::{Entry, Expression, InlineExpression, Pattern, PatternElement};
+
+    fn pattern_variables(pattern: &Pattern<&str>, variables: &mut Vec<String>) {
+        for element in &pattern.elements {
+            if let PatternElement::Placeable { expression } = element {
+                expression_variables(expression, variables);
+            }
+        }
+    }
+    fn expression_variables(expression: &Expression<&str>, variables: &mut Vec<String>) {
+        match expression {
+            Expression::Select { selector, variants } => {
+                inline_variables(selector, variables);
+                for variant in variants {
+                    pattern_variables(&variant.value, variables);
+                }
+            }
+            Expression::Inline(inline) => inline_variables(inline, variables),
+        }
+    }
+    fn inline_variables(inline: &InlineExpression<&str>, variables: &mut Vec<String>) {
+        match inline {
+            InlineExpression::VariableReference { id } => variables.push(id.name.to_owned()),
+            InlineExpression::Placeable { expression } => {
+                expression_variables(expression, variables);
+            }
+            _ => {}
+        }
+    }
+
+    let resource = match fluent_syntax::parser::parse(text) {
+        Ok(resource) => resource,
+        Err((resource, errors)) => {
+            problems.extend(errors.iter().map(|error| format!("syntax: {error:?}")));
+            resource
+        }
+    };
+    let mut messages = Vec::new();
+    for entry in &resource.body {
+        match entry {
+            Entry::Message(message) => {
+                let mut variables = Vec::new();
+                if let Some(pattern) = &message.value {
+                    pattern_variables(pattern, &mut variables);
+                }
+                // Those the comment names are given too, for the translations that need them.
+                for line in message.comment.iter().flat_map(|comment| &comment.content) {
+                    variables.extend(line.split('$').skip(1).map(|rest| {
+                        rest.chars()
+                            .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
+                            .collect::<String>()
+                    }));
+                }
+                messages.push((message.id.name.to_owned(), variables));
+            }
+            Entry::Junk { content } => problems.push(format!("unreadable: {content}")),
+            _ => {}
+        }
+    }
+    messages
+}
+
 /// The core's own translations.
-const TRANSLATIONS: [(&str, &str); 1] = [(SOURCE, include_str!("../locales/en-US.ftl"))];
+const TRANSLATIONS: [(&str, &str); 10] = [
+    (SOURCE, include_str!("../locales/en-US.ftl")),
+    ("de", include_str!("../locales/de.ftl")),
+    ("en-GB", include_str!("../locales/en-GB.ftl")),
+    ("es", include_str!("../locales/es.ftl")),
+    ("fr", include_str!("../locales/fr.ftl")),
+    ("fr-CA", include_str!("../locales/fr-CA.ftl")),
+    ("it", include_str!("../locales/it.ftl")),
+    ("pl", include_str!("../locales/pl.ftl")),
+    ("pt-BR", include_str!("../locales/pt-BR.ftl")),
+    ("zh-Hans", include_str!("../locales/zh-Hans.ftl")),
+];
 
 static CORE: RwLock<Option<Catalog>> = RwLock::new(None);
 
@@ -208,6 +353,8 @@ pub(crate) use tr;
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use super::*;
 
     const AVAILABLE: [&str; 5] = ["en-US", "fr", "fr-CA", "pt-BR", "zh-Hans"];
@@ -252,6 +399,56 @@ mod tests {
         for id in used.into_iter().chain(months) {
             assert!(catalog.has(&id), "no text {id}");
         }
+    }
+
+    /// Every translation in `locales` is whole and sound.
+    #[test]
+    fn translations_are_sound() {
+        check_translations(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("locales")
+                .as_path(),
+        );
+    }
+
+    /// Every message of every translation formats.
+    #[test]
+    fn translations_format() {
+        let mut found = Vec::new();
+        for (tag, translation) in TRANSLATIONS {
+            found.extend(formatting_problems(TRANSLATIONS[0].1, tag, translation));
+        }
+        assert!(found.is_empty(), "{}", found.join("\n"));
+    }
+
+    /// Every translation in `locales` is built in.
+    #[test]
+    fn has_every_translation() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("locales");
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let name = entry.unwrap().file_name().to_string_lossy().into_owned();
+            let tag = name.trim_end_matches(".ftl");
+            assert!(
+                TRANSLATIONS.iter().any(|(built_in, _)| *built_in == tag),
+                "{name} isn't built in"
+            );
+        }
+    }
+
+    /// Check each `.ftl` file in `dir` against its US English one.
+    fn check_translations(dir: &Path) {
+        let source = std::fs::read_to_string(dir.join("en-US.ftl")).unwrap();
+        let mut found = Vec::new();
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            let translation = std::fs::read_to_string(&path).unwrap();
+            found.extend(
+                problems(&source, &translation)
+                    .into_iter()
+                    .map(|problem| format!("{}: {problem}", path.display())),
+            );
+        }
+        assert!(found.is_empty(), "{}", found.join("\n"));
     }
 
     /// The ids `tr!` is called with in `source`.

@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ce que dit l'application, en français (France). Les textes que fait le cœur (durées, nombres
+     d'écoutes, dates, mois, qualités) viennent traduits de lui. -->
+<resources>
+    <!-- Communs à plusieurs écrans. -->
+    <string name="back">Retour</string>
+    <string name="clear">Effacer</string>
+    <string name="cancel">Annuler</string>
+    <string name="try_again">Réessayer</string>
+    <string name="play">Lecture</string>
+    <string name="pause">Pause</string>
+    <string name="next_track">Titre suivant</string>
+    <string name="playing">En cours de lecture</string>
+    <string name="see_all">Voir tout</string>
+    <string name="albums">Albums</string>
+    <string name="artists">Artistes</string>
+    <string name="genres">Genres</string>
+    <string name="all_genres">Tous les genres</string>
+    <!-- Valide les choix cochés dans une liste. -->
+    <string name="show">Afficher</string>
+    <string name="no_albums_here">Aucun album ici.</string>
+
+    <!-- Les onglets. -->
+    <string name="tab_albums">Albums</string>
+    <string name="tab_discover">Découvrir</string>
+    <string name="tab_search">Rechercher</string>
+    <string name="tab_stats">Stats</string>
+
+    <!-- Connexion et démarrage. -->
+    <string name="sign_in_tagline">Vos albums Qobuz, et ce que vous écoutez.</string>
+    <string name="sign_in">Se connecter avec Qobuz</string>
+    <string name="sign_in_waiting">Connectez-vous sur la page de Qobuz, puis revenez ici.</string>
+    <string name="sign_in_no_browser">Aucun navigateur n\'a pu l\'ouvrir. Ouvrez cette adresse dans un navigateur :</string>
+    <!-- %1$s : pourquoi, d'après Qobuz. -->
+    <string name="sign_in_again">Reconnectez-vous : %1$s</string>
+    <string name="no_connection">Pas de connexion</string>
+
+    <!-- Les albums, la bibliothèque. -->
+    <string name="play_random_album">Écouter un album au hasard</string>
+    <string name="play_random_album_filtered">Écouter un album au hasard parmi ceux-ci</string>
+    <string name="more">Plus d\'options</string>
+    <string name="settings">Paramètres</string>
+    <string name="sign_out">Se déconnecter</string>
+    <string name="no_albums_yet">Pas encore d\'albums : ajoutez-en à vos favoris sur Qobuz.</string>
+    <string name="no_matching_albums">Aucun album correspondant</string>
+    <string name="clear_search_and_filters">Effacer la recherche et les filtres</string>
+    <string name="search_library">Rechercher des albums, artistes, labels</string>
+    <string name="decades">Décennies</string>
+    <string name="all_decades">Toutes les décennies</string>
+    <!-- Le nombre de genres qui filtrent les albums : 2 ou plus. -->
+    <plurals name="genres_picked">
+        <item quantity="one">%1$d genre</item>
+        <item quantity="many">%1$d genres</item>
+        <item quantity="other">%1$d genres</item>
+    </plurals>
+    <!-- Le nombre de décennies qui filtrent les albums : 2 ou plus. -->
+    <plurals name="decades_picked">
+        <item quantity="one">%1$d décennie</item>
+        <item quantity="many">%1$d décennies</item>
+        <item quantity="other">%1$d décennies</item>
+    </plurals>
+    <!-- Une décennie, par sa première année : années 1970. -->
+    <string name="decade">Années %1$d</string>
+    <!-- %1$s : le titre de l'album, %2$s : pourquoi, d'après Qobuz. -->
+    <string name="cant_play_album">Impossible de lire « %1$s » : %2$s</string>
+    <string name="cant_add_favorite">Impossible d\'ajouter « %1$s » à vos favoris : %2$s</string>
+    <string name="cant_remove_favorite">Impossible de retirer « %1$s » de vos favoris : %2$s</string>
+
+    <!-- Un album. -->
+    <string name="add_to_favorites">Ajouter aux favoris</string>
+    <string name="remove_from_favorites">Retirer des favoris</string>
+    <!-- Au-dessus du titre, quand Qobuz ne dit pas quel genre de parution c'est. -->
+    <string name="album">Album</string>
+    <!-- %1$s : combien de fois il a été écouté, %2$s : depuis quand. -->
+    <string name="plays_last_played">%1$s · dernière écoute %2$s</string>
+    <!-- %1$s : la meilleure qualité de l'album, comme 24 bits / 96 kHz. -->
+    <string name="hi_res_quality">Hi-Res · %1$s</string>
+    <!-- %1$s : pourquoi, d'après Qobuz. -->
+    <string name="cant_load_tracks">Impossible de charger les titres : %1$s</string>
+    <string name="disc">Disque %1$d</string>
+    <!-- Sur les titres explicites, dans un petit badge. -->
+    <string name="explicit">E</string>
+    <string name="about_album">À propos de cet album</string>
+
+    <!-- Un artiste. -->
+    <!-- Au-dessus du nom de l'artiste. -->
+    <string name="artist_kicker">ARTISTE</string>
+    <string name="cant_load_artist">Impossible de charger l\'artiste : %1$s</string>
+    <string name="no_albums_from_artist">Aucun album de cet artiste à écouter en streaming.</string>
+    <string name="similar_artists">Artistes similaires</string>
+    <string name="about_artist">À propos</string>
+    <string name="read_more">Lire la suite</string>
+    <string name="releases_albums">Albums</string>
+    <string name="releases_eps_singles">EP et singles</string>
+    <string name="releases_live">Live</string>
+    <string name="releases_compilations">Compilations</string>
+    <string name="releases_other">Autres parutions</string>
+
+    <!-- Découvrir. -->
+    <string name="cant_load_discover">Impossible de charger Découvrir : %1$s</string>
+    <string name="cant_load_genres">Impossible de charger les genres : %1$s</string>
+    <string name="new_releases">Nouveautés</string>
+    <string name="press_awards">Distinctions de la presse</string>
+    <string name="ideal_discography">Discothèque idéale</string>
+
+    <!-- Recherche. -->
+    <string name="search_hint">Albums et artistes</string>
+    <string name="search_prompt">Recherchez des albums et des artistes sur Qobuz.</string>
+    <!-- %1$s : ce qui a été cherché. -->
+    <string name="search_no_albums">Aucun album ne correspond à « %1$s ».</string>
+
+    <!-- Statistiques. -->
+    <string name="stats">Statistiques</string>
+    <string name="all_time">Depuis toujours</string>
+    <string name="whole_year">Toute l\'année</string>
+    <!-- Sous le temps d'écoute. -->
+    <string name="listened">Temps d\'écoute</string>
+    <string name="album_plays">Écoutes d\'albums</string>
+    <string name="by_year">Par année</string>
+    <string name="by_month">Par mois</string>
+    <string name="by_day">Par jour</string>
+    <string name="top_artists">Top artistes</string>
+    <string name="top_genres">Top genres</string>
+    <string name="top_albums">Top albums</string>
+    <!-- La part d'un genre dans le temps d'écoute. -->
+    <string name="percent">%1$d %%</string>
+    <string name="nothing_played">Aucune écoute pour l\'instant</string>
+    <string name="nothing_played_detail">Écoutez quelques albums : votre temps d\'écoute, vos albums, artistes et genres préférés apparaîtront ici.</string>
+
+    <!-- Lecture en cours. -->
+    <string name="close">Fermer</string>
+    <string name="show_cover">Afficher la pochette</string>
+    <string name="show_lyrics">Afficher les paroles</string>
+    <string name="tracks">Titres</string>
+    <string name="previous_track">Titre précédent</string>
+    <string name="cant_load_lyrics">Impossible de charger les paroles : %1$s</string>
+    <string name="instrumental">Instrumental</string>
+    <string name="no_lyrics">Pas de paroles pour ce titre</string>
+    <string name="best_quality">Meilleure qualité</string>
+    <string name="best_quality_detail">Chaque titre est lu dans sa meilleure qualité, jusqu\'à celle-ci, selon ce que permet votre abonnement.</string>
+    <string name="quality_mp3">MP3 · 320 kbps</string>
+    <string name="quality_cd">CD · 16 bits / 44,1 kHz</string>
+    <string name="quality_hi_res_96">Hi-Res · jusqu\'à 24 bits / 96 kHz</string>
+    <string name="quality_hi_res_192">Hi-Res · jusqu\'à 24 bits / 192 kHz</string>
+    <string name="done">OK</string>
+    <!-- Pourquoi la lecture s'est arrêtée. -->
+    <string name="error_no_connection">Pas de connexion : appuyez sur lecture pour réessayer</string>
+    <string name="error_stream_refused">Qobuz a refusé le flux</string>
+    <string name="error_no_stream">Impossible d\'obtenir le flux de Qobuz</string>
+    <string name="error_cant_play">Impossible de lire ce titre</string>
+
+    <!-- Paramètres : la langue. -->
+    <string name="language">Langue</string>
+    <string name="language_system">Langue du système</string>
+
+    <!-- Paramètres : les appareils. -->
+    <string name="devices">Appareils</string>
+    <!-- %1$s : le nom de ce téléphone. -->
+    <string name="devices_about">Les appareils associés partagent entre eux ce que vous écoutez, pour les statistiques et le nombre d\'écoutes, dès qu\'ils sont sur le même réseau. Ce téléphone s\'appelle « %1$s ».</string>
+    <string name="paired_devices">Appareils associés</string>
+    <string name="sync_in_background">Synchroniser même quand Pochette est fermé</string>
+    <string name="sync_in_background_detail">Toutes les 15 minutes environ, en Wi-Fi.</string>
+    <string name="pair_a_device">Associer un appareil</string>
+    <string name="pair_a_device_detail">Ouvrez aussi les paramètres de Pochette sur l\'autre appareil : il apparaîtra ici.</string>
+    <string name="pair">Associer</string>
+    <string name="looking_for_devices">Recherche d\'appareils sur ce réseau…</string>
+    <string name="pair_by_address">Associer par adresse</string>
+    <string name="address_example">Par exemple 192.168.1.20</string>
+    <!-- %1$d : le port TCP sur lequel Pochette synchronise. -->
+    <string name="pair_by_address_detail">Si les appareils ne se trouvent pas, le réseau ou un pare-feu les en empêche peut-être. Pochette a besoin du port TCP %1$d pour la synchronisation, et du port UDP 5353 pour trouver les appareils.</string>
+    <!-- %1$s : le nom de l'autre appareil, dans tous ceux-ci. -->
+    <string name="paired_with">Associé à %1$s.</string>
+    <string name="not_paired_with">Non associé à %1$s.</string>
+    <string name="declined_to_pair">%1$s a refusé l\'association.</string>
+    <!-- %2$s : pourquoi. -->
+    <string name="cant_pair_with">Impossible d\'associer %1$s : %2$s</string>
+    <string name="pair_with">Associer à %1$s</string>
+    <string name="connecting">Connexion…</string>
+    <string name="check_code">Vérifiez que %1$s affiche le même code, puis confirmez l\'association sur les deux appareils.</string>
+    <string name="waiting_to_confirm">En attente de la confirmation de %1$s…</string>
+    <string name="syncing">Synchronisation…</string>
+    <!-- %1$s : depuis quand, comme il y a 3 minutes. -->
+    <string name="synced_ago">Synchronisé %1$s</string>
+    <!-- %1$s : depuis quand, %2$s : ce qui a échoué depuis. -->
+    <string name="synced_ago_error">Synchronisé %1$s. %2$s</string>
+    <string name="not_synced_yet">Pas encore synchronisé</string>
+    <string name="forget">Oublier</string>
+    <string name="forget_device">Oublier %1$s ?</string>
+    <string name="forget_device_detail">Ce téléphone cessera de se synchroniser avec lui. Les écoutes déjà partagées sont conservées. Associez-les de nouveau pour reprendre la synchronisation.</string>
+</resources>

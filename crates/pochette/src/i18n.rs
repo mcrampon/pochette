@@ -9,7 +9,18 @@ use pochette_core::i18n::{self, Catalog, SOURCE};
 use relm4::gtk::glib;
 
 /// The app's own translations, by language tag; the core has its own.
-const TRANSLATIONS: [(&str, &str); 1] = [(SOURCE, include_str!("../locales/en-US.ftl"))];
+const TRANSLATIONS: [(&str, &str); 10] = [
+    (SOURCE, include_str!("../locales/en-US.ftl")),
+    ("de", include_str!("../locales/de.ftl")),
+    ("en-GB", include_str!("../locales/en-GB.ftl")),
+    ("es", include_str!("../locales/es.ftl")),
+    ("fr", include_str!("../locales/fr.ftl")),
+    ("fr-CA", include_str!("../locales/fr-CA.ftl")),
+    ("it", include_str!("../locales/it.ftl")),
+    ("pl", include_str!("../locales/pl.ftl")),
+    ("pt-BR", include_str!("../locales/pt-BR.ftl")),
+    ("zh-Hans", include_str!("../locales/zh-Hans.ftl")),
+];
 
 static CATALOG: OnceLock<Catalog> = OnceLock::new();
 
@@ -70,6 +81,52 @@ mod tests {
         assert!(used.len() > 100, "found only {} texts", used.len());
         for (file, id) in used {
             assert!(catalog.has(&id), "no text {id}, used in {file}");
+        }
+    }
+
+    /// Every translation in `locales` is whole and sound.
+    #[test]
+    fn translations_are_sound() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("locales");
+        let source = std::fs::read_to_string(dir.join("en-US.ftl")).unwrap();
+        let mut found = Vec::new();
+        for entry in std::fs::read_dir(&dir).unwrap() {
+            let path = entry.unwrap().path();
+            let translation = std::fs::read_to_string(&path).unwrap();
+            found.extend(
+                i18n::problems(&source, &translation)
+                    .into_iter()
+                    .map(|problem| format!("{}: {problem}", path.display())),
+            );
+        }
+        assert!(found.is_empty(), "{}", found.join("\n"));
+    }
+
+    /// Every message of every translation formats.
+    #[test]
+    fn translations_format() {
+        let mut found = Vec::new();
+        for (tag, translation) in TRANSLATIONS {
+            found.extend(i18n::formatting_problems(
+                TRANSLATIONS[0].1,
+                tag,
+                translation,
+            ));
+        }
+        assert!(found.is_empty(), "{}", found.join("\n"));
+    }
+
+    /// Every translation in `locales` is built in.
+    #[test]
+    fn has_every_translation() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("locales");
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let name = entry.unwrap().file_name().to_string_lossy().into_owned();
+            let tag = name.trim_end_matches(".ftl");
+            assert!(
+                TRANSLATIONS.iter().any(|(built_in, _)| *built_in == tag),
+                "{name} isn't built in"
+            );
         }
     }
 

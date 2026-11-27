@@ -15,6 +15,7 @@ humantime.workspace = true
 uuid.workspace = true
 base64.workspace = true
 fluent-bundle.workspace = true
+fluent-syntax.workspace = true
 unic-langid.workspace = true
 jiff.workspace = true
 md5.workspace = true
