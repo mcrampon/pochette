@@ -15,6 +15,7 @@ use crate::{
     albums::{AlbumsMsg, AlbumsOutput, AlbumsPage},
     discover::{DiscoverMsg, DiscoverOutput, DiscoverPage},
     favorites::Favorites,
+    i18n::tr,
     icon_label::{HeaderFit, IconLabel},
     mpris,
     navigation::{self, Destination},
@@ -137,7 +138,7 @@ impl Component for App {
                 #[wrap(Some)]
                 set_child = &gtk::HeaderBar {
                     pack_start = &gtk::SearchEntry {
-                        set_placeholder_text: Some("Search Qobuz"),
+                        set_placeholder_text: Some(&tr!("search-qobuz")),
                         set_width_request: 260,
                         // Each search is a request: wait for the typing to pause.
                         set_search_delay: 300,
@@ -163,7 +164,7 @@ impl Component for App {
 
                     pack_end = &gtk::MenuButton {
                         set_icon_name: "open-menu-symbolic",
-                        set_tooltip_text: Some("Main Menu"),
+                        set_tooltip_text: Some(&tr!("main-menu")),
                         set_menu_model: Some(&main_menu),
                         #[watch]
                         set_visible: model.screen == Screen::SignedIn,
@@ -174,7 +175,7 @@ impl Component for App {
                         set_child: Some(&now_playing_label),
                         // Its padding is an icon's, which the label balances.
                         add_css_class: "image-button",
-                        set_tooltip_text: Some("Now Playing"),
+                        set_tooltip_text: Some(&tr!("now-playing")),
                         #[watch]
                         set_visible: model.screen == Screen::SignedIn && model.playing,
                         #[watch]
@@ -206,7 +207,7 @@ impl Component for App {
                     set_valign: gtk::Align::Center,
 
                     gtk::Label {
-                        set_label: "Can't Reach Qobuz",
+                        set_label: &tr!("unreachable"),
                         add_css_class: "pochette-heading",
                     },
                     gtk::Label {
@@ -218,7 +219,7 @@ impl Component for App {
                         set_justify: gtk::Justification::Center,
                     },
                     gtk::Button {
-                        set_label: "Try Again",
+                        set_label: &tr!("try-again"),
                         set_halign: gtk::Align::Center,
                         connect_clicked => Msg::Start,
                     },
@@ -235,11 +236,11 @@ impl Component for App {
                         add_css_class: "pochette-title",
                     },
                     gtk::Label {
-                        set_label: "Your Qobuz library, album by album.",
+                        set_label: &tr!("sign-in-tagline"),
                         add_css_class: "dim-label",
                     },
                     gtk::Button {
-                        set_label: "Sign In with Qobuz",
+                        set_label: &tr!("sign-in"),
                         set_halign: gtk::Align::Center,
                         add_css_class: "suggested-action",
                         add_css_class: "pochette-pill",
@@ -256,7 +257,7 @@ impl Component for App {
                         set_justify: gtk::Justification::Center,
                     },
                     gtk::Label {
-                        set_label: "Signing in opens Qobuz in your browser.\nRequires a Qobuz subscription.",
+                        set_label: &tr!("sign-in-hint"),
                         add_css_class: "dim-label",
                         add_css_class: "pochette-caption",
                         set_justify: gtk::Justification::Center,
@@ -274,11 +275,11 @@ impl Component for App {
                         set_size_request: (32, 32),
                     },
                     gtk::Label {
-                        set_label: "Continue in Your Browser",
+                        set_label: &tr!("sign-in-continue"),
                         add_css_class: "pochette-heading",
                     },
                     gtk::Label {
-                        set_label: "Sign in to Qobuz in the browser tab that just opened.\nPochette continues as soon as you're done.",
+                        set_label: &tr!("sign-in-continue-hint"),
                         add_css_class: "dim-label",
                         set_justify: gtk::Justification::Center,
                     },
@@ -287,20 +288,20 @@ impl Component for App {
                         set_halign: gtk::Align::Center,
 
                         gtk::Button {
-                            set_label: "Open Browser Again",
+                            set_label: &tr!("sign-in-open-again"),
                             #[watch]
                             set_sensitive: model.sign_in_url.is_some(),
                             connect_clicked => Msg::OpenBrowser,
                         },
                         gtk::Button {
-                            set_label: "Copy Link",
+                            set_label: &tr!("sign-in-copy-link"),
                             #[watch]
                             set_sensitive: model.sign_in_url.is_some(),
                             connect_clicked => Msg::CopyLink,
                         },
                     },
                     gtk::Button {
-                        set_label: "Cancel",
+                        set_label: &tr!("sign-in-cancel"),
                         set_halign: gtk::Align::Center,
                         add_css_class: "flat",
                         connect_clicked => Msg::CancelSignIn,
@@ -313,7 +314,7 @@ impl Component for App {
                     gtk::Label {
                         #[watch]
                         set_visible: model.account.as_ref().is_some_and(|a| !a.user.can_stream()),
-                        set_label: "This account can only play 30-second previews.",
+                        set_label: &tr!("previews-only"),
                         add_css_class: "warning",
                         set_margin_all: 6,
                     },
@@ -329,8 +330,8 @@ impl Component for App {
                         set_content = &gtk::Stack {
                         set_transition_type: gtk::StackTransitionType::Crossfade,
 
-                        add_titled: (model.discover.widget(), Some("discover"), "Discover"),
-                        add_titled: (model.albums.widget(), Some("albums"), "Albums"),
+                        add_titled: (model.discover.widget(), Some("discover"), &tr!("tab-discover")),
+                        add_titled: (model.albums.widget(), Some("albums"), &tr!("tab-albums")),
                         // Without a title, so without a button: the search bar shows it.
                         add_named: (model.search_view.widget(), Some("search")),
                         add_named: (model.stats.widget(), Some("stats")),
@@ -347,9 +348,9 @@ impl Component for App {
 
     menu! {
         main_menu: {
-            "Listening Stats" => StatsAction,
-            "Settings" => SettingsAction,
-            "Sign Out" => SignOutAction,
+            &tr!("menu-stats") => StatsAction,
+            &tr!("settings") => SettingsAction,
+            &tr!("menu-sign-out") => SignOutAction,
         }
     }
 
@@ -415,7 +416,7 @@ impl Component for App {
             pane_open: false,
             collapsed: false,
         };
-        let now_playing_label = IconLabel::new("audio-x-generic-symbolic", "Now Playing");
+        let now_playing_label = IconLabel::new("audio-x-generic-symbolic", &tr!("now-playing"));
         let widgets = view_output!();
         widgets.header_fit.set_label(&now_playing_label);
         model.library = Some(widgets.library.clone());
@@ -535,7 +536,7 @@ impl Component for App {
             Msg::SessionExpired => {
                 tracing::info!("Qobuz no longer accepts the session");
                 self.sign_out();
-                self.error = Some("Your session expired. Sign in again.".to_owned());
+                self.error = Some(tr!("session-expired"));
             }
 
             Msg::PlayingChanged(playing) => {

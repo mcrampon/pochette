@@ -6,7 +6,7 @@ use std::{cell::RefCell, rc::Rc};
 use gstreamer::{self as gst, prelude::*};
 use relm4::gtk;
 
-use crate::{choice_picker::ChoicePicker, player::Player, settings::Settings};
+use crate::{choice_picker::ChoicePicker, i18n::tr, player::Player, settings::Settings};
 
 /// An audio output.
 struct Output {
@@ -127,7 +127,7 @@ impl OutputPicker {
             player.set_output(sink);
         }
 
-        let picker = ChoicePicker::with_icon("audio-speakers-symbolic", "Output");
+        let picker = ChoicePicker::with_icon("audio-speakers-symbolic", &tr!("output"));
         // The outputs offered, after the default.
         let offered: Rc<RefCell<Vec<Output>>> = Rc::default();
         let chosen = Rc::new(RefCell::new(saved));
@@ -135,7 +135,7 @@ impl OutputPicker {
         let (refresh, shown, current_id) = (picker.clone(), offered.clone(), chosen.clone());
         picker.connect_opening(move || {
             let outputs = outputs(monitor.as_ref());
-            let mut names = vec!["System Default".to_owned()];
+            let mut names = vec![tr!("output-default")];
             names.extend(outputs.iter().map(|output| output.name.clone()));
             let position = current_id
                 .borrow()

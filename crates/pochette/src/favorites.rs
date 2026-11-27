@@ -10,6 +10,8 @@ use std::{
 use qobuz::{Client, models::Album};
 use relm4::gtk::{self, prelude::*};
 
+use crate::i18n::tr;
+
 /// Which albums are favorites. Cheap to clone: every clone is the same.
 #[derive(Clone, Default)]
 pub struct Favorites(Rc<Inner>);
@@ -189,10 +191,10 @@ impl Heart {
         // No tooltip, which got in the way over covers, but a name for screen readers.
         inner
             .button
-            .update_property(&[gtk::accessible::Property::Label(if favorite {
-                "Remove From Your Albums"
+            .update_property(&[gtk::accessible::Property::Label(&if favorite {
+                tr!("favorite-remove")
             } else {
-                "Add to Your Albums"
+                tr!("favorite-add")
             })]);
         if favorite {
             inner.button.add_css_class("pochette-favorite");

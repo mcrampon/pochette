@@ -15,6 +15,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import io.github.mcrampon.pochette.R
 
 /**
  * Signing in, on Qobuz's own page: `url` while it's open, `error` if the last try failed.
@@ -33,22 +35,22 @@ fun SignInScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("Pochette", style = MaterialTheme.typography.displaySmall)
+        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displaySmall)
         Text(
-            "Your Qobuz albums, and what you listen to.",
+            stringResource(R.string.sign_in_tagline),
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
         )
         if (url == null) {
-            Button(onClick = onSignIn) { Text("Sign In with Qobuz") }
+            Button(onClick = onSignIn) { Text(stringResource(R.string.sign_in)) }
         } else {
             CircularProgressIndicator()
-            Text("Sign in on Qobuz's page, then come back here.", textAlign = TextAlign.Center)
+            Text(stringResource(R.string.sign_in_waiting), textAlign = TextAlign.Center)
             if (browserMissing) {
-                Text("No browser could open it. Open this address in one:", textAlign = TextAlign.Center)
+                Text(stringResource(R.string.sign_in_no_browser), textAlign = TextAlign.Center)
                 SelectionContainer { Text(url, style = MaterialTheme.typography.bodySmall) }
             }
-            TextButton(onClick = onCancel) { Text("Cancel") }
+            TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
         }
         if (error != null) {
             Text(
@@ -72,9 +74,9 @@ fun StartingScreen(error: String?, onRetry: () -> Unit) {
         if (error == null) {
             CircularProgressIndicator()
         } else {
-            Text("No Connection", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.no_connection), style = MaterialTheme.typography.titleLarge)
             Text(error, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
-            Button(onClick = onRetry) { Text("Try Again") }
+            Button(onClick = onRetry) { Text(stringResource(R.string.try_again)) }
         }
     }
 }

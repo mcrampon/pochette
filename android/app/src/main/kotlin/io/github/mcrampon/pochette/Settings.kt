@@ -26,6 +26,11 @@ class Settings(context: Context) {
         get() = prefs.getBoolean(SYNC_IN_BACKGROUND, true)
         set(value) = prefs.edit { putBoolean(SYNC_IN_BACKGROUND, value) }
 
+    /** The language picked, by BCP 47 tag, none for the phone's: kept here before Android 13 only, which keeps it itself. */
+    var language: String?
+        get() = prefs.getString(LANGUAGE, null)
+        set(value) = prefs.edit { putString(LANGUAGE, value) }
+
     /** How the library sorts and which genres and decades it shows: the search isn't kept. */
     var libraryView: LibraryView
         get() =
@@ -53,6 +58,7 @@ class Settings(context: Context) {
         const val QUALITY = "quality"
         const val DISCOVER_GENRES = "discover_genres"
         const val SYNC_IN_BACKGROUND = "sync_in_background"
+        const val LANGUAGE = "language"
         const val LIBRARY_GENRES = "library_genres"
         const val LIBRARY_DECADES = "library_decades"
         const val LIBRARY_SORT = "library_sort"

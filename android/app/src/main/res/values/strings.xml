@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What the app says, in US English: the other languages translate these. The texts the core
+     makes (durations, play counts, dates, months, qualities) come translated from it. -->
+<resources>
+    <string name="app_name" translatable="false">Pochette</string>
+
+    <!-- Shared by several screens. -->
+    <string name="back">Back</string>
+    <string name="clear">Clear</string>
+    <string name="cancel">Cancel</string>
+    <string name="try_again">Try Again</string>
+    <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="next_track">Next Track</string>
+    <string name="playing">Playing</string>
+    <string name="see_all">See All</string>
+    <string name="albums">Albums</string>
+    <string name="artists">Artists</string>
+    <string name="genres">Genres</string>
+    <string name="all_genres">All Genres</string>
+    <!-- Confirms the choices checked in a list. -->
+    <string name="show">Show</string>
+    <string name="no_albums_here">No albums here.</string>
+
+    <!-- The tabs. -->
+    <string name="tab_albums">Albums</string>
+    <string name="tab_discover">Discover</string>
+    <string name="tab_search">Search</string>
+    <string name="tab_stats">Stats</string>
+
+    <!-- Signing in, and starting. -->
+    <string name="sign_in_tagline">Your Qobuz albums, and what you listen to.</string>
+    <string name="sign_in">Sign In with Qobuz</string>
+    <string name="sign_in_waiting">Sign in on Qobuz\'s page, then come back here.</string>
+    <string name="sign_in_no_browser">No browser could open it. Open this address in one:</string>
+    <!-- %1$s: why, from Qobuz. -->
+    <string name="sign_in_again">Sign in again: %1$s</string>
+    <string name="no_connection">No Connection</string>
+
+    <!-- Albums, the library. -->
+    <string name="play_random_album">Play a Random Album</string>
+    <string name="play_random_album_filtered">Play a Random Album From These</string>
+    <string name="more">More</string>
+    <string name="settings">Settings</string>
+    <string name="sign_out">Sign Out</string>
+    <string name="no_albums_yet">No albums yet: add some to your favorites on Qobuz.</string>
+    <string name="no_matching_albums">No Matching Albums</string>
+    <string name="clear_search_and_filters">Clear Search and Filters</string>
+    <string name="search_library">Search albums, artists, labels</string>
+    <string name="decades">Decades</string>
+    <string name="all_decades">All Decades</string>
+    <!-- How many genres the albums are filtered by: 2 or more. -->
+    <plurals name="genres_picked">
+        <item quantity="one">%1$d Genre</item>
+        <item quantity="other">%1$d Genres</item>
+    </plurals>
+    <!-- How many decades the albums are filtered by: 2 or more. -->
+    <plurals name="decades_picked">
+        <item quantity="one">%1$d Decade</item>
+        <item quantity="other">%1$d Decades</item>
+    </plurals>
+    <!-- A decade, by its first year: 1970s. -->
+    <string name="decade">%1$ds</string>
+    <!-- %1$s: the album's title, %2$s: why, from Qobuz. -->
+    <string name="cant_play_album">Can\'t play “%1$s”: %2$s</string>
+    <string name="cant_add_favorite">Can\'t add “%1$s” to your favorites: %2$s</string>
+    <string name="cant_remove_favorite">Can\'t take “%1$s” out of your favorites: %2$s</string>
+
+    <!-- An album. -->
+    <string name="add_to_favorites">Add to Favorites</string>
+    <string name="remove_from_favorites">Remove from Favorites</string>
+    <!-- Over the title, when Qobuz doesn't say what kind of release it is. -->
+    <string name="album">Album</string>
+    <!-- %1$s: how many times it was played, %2$s: how long ago it was last. -->
+    <string name="plays_last_played">%1$s · last played %2$s</string>
+    <!-- %1$s: the best the album has, as 24-bit / 96 kHz. -->
+    <string name="hi_res_quality">Hi-Res · %1$s</string>
+    <!-- %1$s: why, from Qobuz. -->
+    <string name="cant_load_tracks">Can\'t load the tracks: %1$s</string>
+    <string name="disc">Disc %1$d</string>
+    <!-- On explicit tracks, in a small badge. -->
+    <string name="explicit">E</string>
+    <string name="about_album">About This Album</string>
+
+    <!-- An artist. -->
+    <!-- Over the artist's name. -->
+    <string name="artist_kicker">ARTIST</string>
+    <string name="cant_load_artist">Can\'t load the artist: %1$s</string>
+    <string name="no_albums_from_artist">No albums to stream from this artist.</string>
+    <string name="similar_artists">Similar Artists</string>
+    <string name="about_artist">About</string>
+    <string name="read_more">Read More</string>
+    <string name="releases_albums">Albums</string>
+    <string name="releases_eps_singles">EPs &amp; Singles</string>
+    <string name="releases_live">Live</string>
+    <string name="releases_compilations">Compilations</string>
+    <string name="releases_other">Other Releases</string>
+
+    <!-- Discover. -->
+    <string name="cant_load_discover">Can\'t load Discover: %1$s</string>
+    <string name="cant_load_genres">Can\'t load the genres: %1$s</string>
+    <string name="new_releases">New Releases</string>
+    <string name="press_awards">Press Awards</string>
+    <string name="ideal_discography">Ideal Discography</string>
+
+    <!-- Search. -->
+    <string name="search_hint">Albums and artists</string>
+    <string name="search_prompt">Search Qobuz for albums and artists.</string>
+    <!-- %1$s: what was searched. -->
+    <string name="search_no_albums">No albums match “%1$s”.</string>
+
+    <!-- Stats. -->
+    <string name="stats">Stats</string>
+    <string name="all_time">All Time</string>
+    <string name="whole_year">Whole Year</string>
+    <!-- Under how long was listened to. -->
+    <string name="listened">Listened</string>
+    <string name="album_plays">Album Plays</string>
+    <string name="by_year">By Year</string>
+    <string name="by_month">By Month</string>
+    <string name="by_day">By Day</string>
+    <string name="top_artists">Top Artists</string>
+    <string name="top_genres">Top Genres</string>
+    <string name="top_albums">Top Albums</string>
+    <!-- A genre's share of the time listened. -->
+    <string name="percent">%1$d%%</string>
+    <string name="nothing_played">Nothing Played Yet</string>
+    <string name="nothing_played_detail">Play some albums: how much you listen, your top albums, artists and genres show up here.</string>
+
+    <!-- Now Playing. -->
+    <string name="close">Close</string>
+    <string name="show_cover">Show the Cover</string>
+    <string name="show_lyrics">Show the Lyrics</string>
+    <string name="tracks">Tracks</string>
+    <string name="previous_track">Previous Track</string>
+    <string name="cant_load_lyrics">Can\'t load the lyrics: %1$s</string>
+    <string name="instrumental">Instrumental</string>
+    <string name="no_lyrics">No lyrics for this track</string>
+    <string name="best_quality">Best Quality</string>
+    <string name="best_quality_detail">Each track streams in the best it has, up to this, as your subscription allows.</string>
+    <string name="quality_mp3">MP3 · 320 kbps</string>
+    <string name="quality_cd">CD · 16-bit / 44.1 kHz</string>
+    <string name="quality_hi_res_96">Hi-Res · up to 24-bit / 96 kHz</string>
+    <string name="quality_hi_res_192">Hi-Res · up to 24-bit / 192 kHz</string>
+    <string name="done">Done</string>
+    <!-- Why playing stopped. -->
+    <string name="error_no_connection">No connection: tap play to try again</string>
+    <string name="error_stream_refused">Qobuz refused the stream</string>
+    <string name="error_no_stream">Can\'t get the stream from Qobuz</string>
+    <string name="error_cant_play">Can\'t play this track</string>
+
+    <!-- Settings: the language. -->
+    <string name="language">Language</string>
+    <string name="language_system">System default</string>
+
+    <!-- Settings: the devices. -->
+    <string name="devices">Devices</string>
+    <!-- %1$s: this phone's name. -->
+    <string name="devices_about">Paired devices share what you play with each other, for the stats and play counts, whenever they\'re on the same network. This phone is “%1$s”.</string>
+    <string name="paired_devices">Paired Devices</string>
+    <string name="sync_in_background">Keep syncing while Pochette is closed</string>
+    <string name="sync_in_background_detail">Every 15 minutes or so, on Wi-Fi.</string>
+    <string name="pair_a_device">Pair a Device</string>
+    <string name="pair_a_device_detail">Open Settings in Pochette on the other device as well, and it shows up here.</string>
+    <string name="pair">Pair</string>
+    <string name="looking_for_devices">Looking for devices on this network…</string>
+    <string name="pair_by_address">Pair by Address</string>
+    <string name="address_example">Such as 192.168.1.20</string>
+    <!-- %1$d: the TCP port Pochette syncs on. -->
+    <string name="pair_by_address_detail">If the devices can\'t find each other, the network or a firewall may be in the way. Pochette needs TCP port %1$d to sync, and UDP port 5353 to find devices.</string>
+    <!-- %1$s: the other device's name, in all of these. -->
+    <string name="paired_with">Paired with %1$s.</string>
+    <string name="not_paired_with">Not paired with %1$s.</string>
+    <string name="declined_to_pair">%1$s declined to pair.</string>
+    <!-- %2$s: why. -->
+    <string name="cant_pair_with">Can\'t pair with %1$s: %2$s</string>
+    <string name="pair_with">Pair With %1$s</string>
+    <string name="connecting">Connecting…</string>
+    <string name="check_code">Check that %1$s shows the same code, then pair on both.</string>
+    <string name="waiting_to_confirm">Waiting for %1$s to confirm…</string>
+    <string name="syncing">Syncing…</string>
+    <!-- %1$s: how long ago, as 3 minutes ago. -->
+    <string name="synced_ago">Synced %1$s</string>
+    <!-- %1$s: how long ago, %2$s: what went wrong since. -->
+    <string name="synced_ago_error">Synced %1$s. %2$s</string>
+    <string name="not_synced_yet">Not synced yet</string>
+    <string name="forget">Forget</string>
+    <string name="forget_device">Forget %1$s?</string>
+    <string name="forget_device_detail">This phone stops syncing with it. The plays already shared stay. Pair again to sync again.</string>
+</resources>

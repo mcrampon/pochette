@@ -6,6 +6,7 @@
 
 pub mod format;
 pub mod history;
+pub mod i18n;
 pub mod library;
 pub mod listening;
 pub mod lyrics;

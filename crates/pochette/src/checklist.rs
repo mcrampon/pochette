@@ -29,9 +29,9 @@ struct Inner {
 }
 
 impl Checklist {
-    /// A checklist of `what`, in the plural: "Genres".
-    pub fn new(what: &str) -> Self {
-        let all_label = format!("All {what}");
+    /// A checklist of `what`, in the plural: "Genres", with `all_label` to pick them all:
+    /// "All Genres".
+    pub fn new(what: &str, all_label: &str) -> Self {
         let list = gtk::Box::new(gtk::Orientation::Vertical, 0);
         let scroller = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
@@ -41,7 +41,7 @@ impl Checklist {
             .child(&list)
             .build();
         let all = gtk::Button::builder()
-            .label(&all_label)
+            .label(all_label)
             .css_classes(["flat"])
             .build();
         let content = gtk::Box::new(gtk::Orientation::Vertical, 6);

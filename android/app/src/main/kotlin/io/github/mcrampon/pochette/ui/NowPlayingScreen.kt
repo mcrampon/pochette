@@ -80,6 +80,8 @@ import io.github.mcrampon.pochette.core.lyricsLeadMs
 import io.github.mcrampon.pochette.core.trackDuration
 import io.github.mcrampon.pochette.playback.NowPlaying
 import kotlinx.coroutines.delay
+import androidx.annotation.StringRes
+import androidx.compose.ui.res.stringResource
 
 /** How long the lyrics stop following the song once the user scrolled them. */
 private const val FOLLOW_PAUSE_MS = 4000L
@@ -119,7 +121,7 @@ fun NowPlayingScreen(now: NowPlaying, actions: NowPlayingActions) {
                 title = {},
                 navigationIcon = {
                     IconButton(onClick = actions.back) {
-                        Icon(painterResource(R.drawable.ic_expand_more), contentDescription = "Close")
+                        Icon(painterResource(R.drawable.ic_expand_more), contentDescription = stringResource(R.string.close))
                     }
                 },
             )
@@ -171,7 +173,7 @@ private fun Artwork(now: NowPlaying, actions: NowPlayingActions, showLyrics: Boo
         FilledTonalIconButton(onClick = onToggle, modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp)) {
             Icon(
                 painterResource(if (showLyrics) R.drawable.ic_image else R.drawable.ic_lyrics),
-                contentDescription = if (showLyrics) "Show the Cover" else "Show the Lyrics",
+                contentDescription = stringResource(if (showLyrics) R.string.show_cover else R.string.show_lyrics),
             )
         }
     }
@@ -207,9 +209,9 @@ private fun Details(now: NowPlaying, actions: NowPlayingActions, position: Long,
     })
     Controls(now, actions)
     now.error?.let {
-        Text(it, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+        Text(stringResource(it), color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
     }
-    Text("Tracks", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 24.dp, bottom = 4.dp))
+    Text(stringResource(R.string.tracks), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 24.dp, bottom = 4.dp))
 }
 
 private fun LazyListScope.queue(now: NowPlaying, onSkip: (Int) -> Unit) {
@@ -227,7 +229,7 @@ private fun LazyListScope.queue(now: NowPlaying, onSkip: (Int) -> Unit) {
         ) {
             Box(Modifier.width(28.dp)) {
                 if (current) {
-                    Icon(painterResource(R.drawable.ic_graphic_eq), contentDescription = "Playing", tint = color, modifier = Modifier.size(18.dp))
+                    Icon(painterResource(R.drawable.ic_graphic_eq), contentDescription = stringResource(R.string.playing), tint = color, modifier = Modifier.size(18.dp))
                 } else {
                     Text("${index + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 }
@@ -270,7 +272,7 @@ private fun Controls(now: NowPlaying, actions: NowPlayingActions) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = actions.previous, modifier = Modifier.size(56.dp)) {
-            Icon(painterResource(R.drawable.ic_skip_previous), contentDescription = "Previous Track", modifier = Modifier.size(32.dp))
+            Icon(painterResource(R.drawable.ic_skip_previous), contentDescription = stringResource(R.string.previous_track), modifier = Modifier.size(32.dp))
         }
         FilledIconButton(
             onClick = actions.playPause,
@@ -279,12 +281,12 @@ private fun Controls(now: NowPlaying, actions: NowPlayingActions) {
         ) {
             Icon(
                 painterResource(if (now.playing) R.drawable.ic_pause else R.drawable.ic_play),
-                contentDescription = if (now.playing) "Pause" else "Play",
+                contentDescription = stringResource(if (now.playing) R.string.pause else R.string.play),
                 modifier = Modifier.size(36.dp),
             )
         }
         IconButton(onClick = actions.next, enabled = now.hasNext, modifier = Modifier.size(56.dp)) {
-            Icon(painterResource(R.drawable.ic_skip_next), contentDescription = "Next Track", modifier = Modifier.size(32.dp))
+            Icon(painterResource(R.drawable.ic_skip_next), contentDescription = stringResource(R.string.next_track), modifier = Modifier.size(32.dp))
         }
     }
 }
@@ -314,7 +316,7 @@ private fun LyricsView(now: NowPlaying, actions: NowPlayingActions) {
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)))
         when (val current = load) {
             LyricsLoad.Pending -> CircularProgressIndicator(Modifier.align(Alignment.Center), color = Color.White)
-            is LyricsLoad.Failed -> Message("Can't load the lyrics: ${current.error}")
+            is LyricsLoad.Failed -> Message(stringResource(R.string.cant_load_lyrics, current.error))
             is LyricsLoad.Done ->
                 when (val lyrics = current.lyrics) {
                     is Lyrics.Synced -> Synced(lyrics.lines, actions)
@@ -325,8 +327,8 @@ private fun LyricsView(now: NowPlaying, actions: NowPlayingActions) {
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
                         )
-                    Lyrics.Instrumental -> Message("Instrumental")
-                    Lyrics.Missing -> Message("No lyrics for this track")
+                    Lyrics.Instrumental -> Message(stringResource(R.string.instrumental))
+                    Lyrics.Missing -> Message(stringResource(R.string.no_lyrics))
                 }
         }
     }
@@ -425,11 +427,11 @@ private fun QualityDialog(saved: Quality, onChoose: (Quality) -> Unit, onDismiss
     var chosen by remember { mutableStateOf(saved) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Best Quality") },
+        title = { Text(stringResource(R.string.best_quality)) },
         text = {
             Column {
                 Text(
-                    "Each track streams in the best it has, up to this, as your subscription allows.",
+                    stringResource(R.string.best_quality_detail),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 8.dp),
@@ -445,19 +447,20 @@ private fun QualityDialog(saved: Quality, onChoose: (Quality) -> Unit, onDismiss
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(selected = quality == chosen, onClick = null)
-                        Text(qualityName(quality), modifier = Modifier.padding(start = 12.dp))
+                        Text(stringResource(qualityName(quality)), modifier = Modifier.padding(start = 12.dp))
                     }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.done)) } },
     )
 }
 
+@StringRes
 private fun qualityName(quality: Quality) =
     when (quality) {
-        Quality.MP3 -> "MP3 · 320 kbps"
-        Quality.CD -> "CD · 16-bit / 44.1 kHz"
-        Quality.HI_RES96 -> "Hi-Res · up to 24-bit / 96 kHz"
-        Quality.HI_RES192 -> "Hi-Res · up to 24-bit / 192 kHz"
+        Quality.MP3 -> R.string.quality_mp3
+        Quality.CD -> R.string.quality_cd
+        Quality.HI_RES96 -> R.string.quality_hi_res_96
+        Quality.HI_RES192 -> R.string.quality_hi_res_192
     }

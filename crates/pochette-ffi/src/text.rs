@@ -1,6 +1,14 @@
 //! The words and numbers the screens show, worded as on desktop.
 
-use pochette_core::format;
+use pochette_core::{format, i18n};
+
+/// Have the texts made here speak the first language of `tags` they can, BCP 47 tags in
+/// order of preference, as the app's locales: then US English.
+#[uniffi::export]
+#[expect(clippy::needless_pass_by_value, reason = "UniFFI hands it over")]
+pub fn set_languages(tags: Vec<String>) {
+    i18n::set_languages(&tags);
+}
 
 /// A track length: "3:33", or "1:02:05" past an hour.
 #[uniffi::export]
@@ -49,12 +57,12 @@ pub fn since(at: i64) -> String {
 #[uniffi::export]
 #[must_use]
 pub fn month_name(month: i32) -> String {
-    format::month(month).to_owned()
+    format::month(month)
 }
 
 /// A month by its number, from 1: "Jan".
 #[uniffi::export]
 #[must_use]
 pub fn short_month_name(month: i32) -> String {
-    format::short_month(month).to_owned()
+    format::short_month(month)
 }

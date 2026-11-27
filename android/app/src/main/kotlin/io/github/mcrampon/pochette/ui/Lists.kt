@@ -52,6 +52,8 @@ import io.github.mcrampon.pochette.Load
 import io.github.mcrampon.pochette.Paged
 import io.github.mcrampon.pochette.core.AlbumCard
 import io.github.mcrampon.pochette.core.ArtistCard
+import androidx.compose.ui.res.stringResource
+import io.github.mcrampon.pochette.R
 
 /** What a tile can say under the artist, such as the album's awards. */
 typealias Caption = (AlbumCard) -> String?
@@ -99,7 +101,7 @@ fun Heading(title: String, onSeeAll: (() -> Unit)? = null) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-        onSeeAll?.let { TextButton(onClick = it) { Text("See All") } }
+        onSeeAll?.let { TextButton(onClick = it) { Text(stringResource(R.string.see_all)) } }
     }
 }
 
@@ -198,7 +200,7 @@ fun PagedGrid(
                     error != null ->
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(error, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-                            TextButton(onClick = paged::more) { Text("Try Again") }
+                            TextButton(onClick = paged::more) { Text(stringResource(R.string.try_again)) }
                         }
                     paged.albums.isEmpty() -> Text(empty, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -224,7 +226,7 @@ fun Failed(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) 
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(message, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        TextButton(onClick = onRetry) { Text("Try Again") }
+        TextButton(onClick = onRetry) { Text(stringResource(R.string.try_again)) }
     }
 }
 
@@ -275,7 +277,7 @@ fun <T> ChecklistDialog(
             TextButton(onClick = {
                 onPick(chosen.toList())
                 onDismiss()
-            }) { Text("Show") }
+            }) { Text(stringResource(R.string.show)) }
         },
         dismissButton = {
             TextButton(onClick = {

@@ -24,7 +24,10 @@ use tokio::{
     task::JoinHandle,
 };
 
-use crate::history::{AlbumRecord, Listen, Log};
+use crate::{
+    history::{AlbumRecord, Listen, Log},
+    i18n::tr,
+};
 
 /// Within this much of a track's start, "previous" goes to the previous track rather than
 /// back to the start of this one.
@@ -537,12 +540,16 @@ impl Actor {
                 self.playbin.set_property("uri", &file.url);
                 self.starting = Some(Upcoming::new(index, file));
                 if let Err(err) = self.playbin.set_state(gst::State::Playing) {
-                    self.fail(&format!("Can't start playback: {err}"));
+                    self.fail(&tr!("playback-cannot-start", error = err.to_string()));
                 }
             }
             Err(err) => {
                 let title = self.queue[index].title.clone();
-                self.fail(&format!("Can't stream \u{201c}{title}\u{201d}: {err}"));
+                self.fail(&tr!(
+                    "playback-cannot-stream",
+                    title = title,
+                    error = err.to_string()
+                ));
             }
         }
     }
@@ -824,7 +831,7 @@ impl Actor {
             });
         }
         self.quality = if started.file.format_id == Quality::Mp3 as u32 {
-            Some("MP3 \u{b7} 320 kbps".to_owned())
+            Some(tr!("quality-mp3-playing"))
         } else {
             crate::format::audio_quality(started.file.bit_depth, started.file.sampling_rate)
         };

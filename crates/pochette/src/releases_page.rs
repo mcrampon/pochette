@@ -13,6 +13,7 @@ use crate::{
     album_tile::{self, AlbumItem},
     artist_page::release_kind_title,
     covers::VisibleCovers,
+    i18n::tr,
     navigation::{Destination, PageOutput},
     playback::CoverActions,
 };
@@ -101,13 +102,13 @@ impl Component for ReleasesPage {
 
                 gtk::Button {
                     set_icon_name: "go-previous-symbolic",
-                    set_tooltip_text: Some("Back"),
+                    set_tooltip_text: Some(&tr!("back")),
                     add_css_class: "flat",
                     connect_clicked => ReleasesPageMsg::Back,
                 },
                 gtk::Label {
                     #[watch]
-                    set_label: release_kind_title(model.kind),
+                    set_label: &release_kind_title(model.kind),
                     add_css_class: "pochette-heading",
                 },
                 gtk::Label {
@@ -156,10 +157,10 @@ impl Component for ReleasesPage {
                     #[watch]
                     set_visible: !model.loading,
                     #[watch]
-                    set_label: if model.error.is_some() {
-                        "Can't Load These Albums"
+                    set_label: &if model.error.is_some() {
+                        tr!("releases-cannot-load")
                     } else {
-                        "No Albums Here"
+                        tr!("releases-empty")
                     },
                     add_css_class: "pochette-heading",
                 },

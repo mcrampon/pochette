@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The languages Android 13 and later offer in the app's settings, as the app's own Settings
+     does (Language.choices): US English first, the language of the default texts. -->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en-US" />
+    <locale android:name="de" />
+    <locale android:name="en-GB" />
+    <locale android:name="es" />
+    <locale android:name="fr" />
+    <locale android:name="fr-CA" />
+    <locale android:name="it" />
+    <locale android:name="pl" />
+    <locale android:name="pt-BR" />
+    <locale android:name="zh-Hans" />
+</locale-config>

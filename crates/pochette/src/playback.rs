@@ -10,6 +10,7 @@ use relm4::gtk::{self, prelude::*};
 
 use crate::{
     favorites::Favorites,
+    i18n::tr,
     player::{Player, State},
     plays::Plays,
 };
@@ -195,10 +196,10 @@ impl PlayButton {
         // No tooltip, which got in the way over covers, but a name for screen readers.
         inner
             .button
-            .update_property(&[gtk::accessible::Property::Label(if playing {
-                "Pause"
+            .update_property(&[gtk::accessible::Property::Label(&if playing {
+                tr!("pause")
             } else {
-                "Play"
+                tr!("play")
             })]);
         inner.button.set_visible(album.streamable);
     }

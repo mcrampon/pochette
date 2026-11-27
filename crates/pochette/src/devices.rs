@@ -13,6 +13,7 @@ use relm4::{
 
 use crate::{
     format, history,
+    i18n::tr,
     sync::{
         self, PeerStatus, Stage, Status, autostart,
         client::{Client, Error},
@@ -82,8 +83,7 @@ impl Component for Devices {
                 set_spacing: 18,
 
                 gtk::Label {
-                    set_label: "Paired devices share what you play with each other, for the \
-                                stats and play counts, whenever they're on the same network.",
+                    set_label: &tr!("devices-about"),
                     set_wrap: true,
                     set_max_width_chars: 50,
                     set_xalign: 0.0,
@@ -118,7 +118,7 @@ impl Component for Devices {
                     set_visible: !model.status.peers.is_empty(),
 
                     gtk::Label {
-                        set_label: "Paired Devices",
+                        set_label: &tr!("devices-paired"),
                         set_xalign: 0.0,
                         add_css_class: "heading",
                     },
@@ -128,7 +128,7 @@ impl Component for Devices {
                         set_spacing: 6,
                     },
                     gtk::CheckButton {
-                        set_label: Some("Keep syncing while Pochette is closed"),
+                        set_label: Some(&tr!("devices-in-background")),
                         set_margin_top: 6,
                         #[watch]
                         #[block_signal(background_toggled)]
@@ -144,13 +144,12 @@ impl Component for Devices {
                     set_spacing: 8,
 
                     gtk::Label {
-                        set_label: "Pair a Device",
+                        set_label: &tr!("devices-pair-a-device"),
                         set_xalign: 0.0,
                         add_css_class: "heading",
                     },
                     gtk::Label {
-                        set_label: "Open Settings in Pochette on the other device as well, \
-                                    and it shows up here.",
+                        set_label: &tr!("devices-pair-hint"),
                         set_wrap: true,
                         set_max_width_chars: 50,
                         set_xalign: 0.0,
@@ -172,13 +171,13 @@ impl Component for Devices {
                             set_spinning: model.open && model.status.nearby.is_empty(),
                         },
                         gtk::Label {
-                            set_label: "Looking for devices on this network…",
+                            set_label: &tr!("devices-looking"),
                             set_xalign: 0.0,
                             add_css_class: "dim-label",
                         },
                     },
                     gtk::Expander {
-                        set_label: Some("Pair by Address"),
+                        set_label: Some(&tr!("devices-by-address")),
                         set_margin_top: 6,
 
                         gtk::Box {
@@ -192,21 +191,16 @@ impl Component for Devices {
                                 #[local_ref]
                                 address -> gtk::Entry {
                                     set_hexpand: true,
-                                    set_placeholder_text: Some("Its address, such as 192.168.1.20"),
+                                    set_placeholder_text: Some(&tr!("devices-address")),
                                     connect_activate => DevicesMsg::PairAddress,
                                 },
                                 gtk::Button {
-                                    set_label: "Pair",
+                                    set_label: &tr!("devices-pair"),
                                     connect_clicked => DevicesMsg::PairAddress,
                                 },
                             },
                             gtk::Label {
-                                set_label: &format!(
-                                    "If the devices can't find each other, the network or a \
-                                     firewall may be in the way. Pochette needs TCP port {} to \
-                                     sync, and UDP port 5353 to find devices.",
-                                    sync::PORT,
-                                ),
+                                set_label: &tr!("devices-firewall", port = sync::PORT),
                                 set_wrap: true,
                                 set_max_width_chars: 50,
                                 set_xalign: 0.0,
@@ -228,7 +222,7 @@ impl Component for Devices {
 
                 gtk::Label {
                     #[watch]
-                    set_label: &format!("Pair With {}", model.pairing_name()),
+                    set_label: &tr!("devices-pair-with", name = model.pairing_name()),
                     add_css_class: "pochette-heading",
                     set_wrap: true,
                     set_justify: gtk::Justification::Center,
@@ -266,11 +260,11 @@ impl Component for Devices {
                     set_visible: model.pairing_stage() == Some(&Stage::Confirm),
 
                     gtk::Button {
-                        set_label: "Cancel",
+                        set_label: &tr!("devices-cancel"),
                         connect_clicked => DevicesMsg::Answer(false),
                     },
                     gtk::Button {
-                        set_label: "Pair",
+                        set_label: &tr!("devices-pair"),
                         add_css_class: "suggested-action",
                         connect_clicked => DevicesMsg::Answer(true),
                     },
@@ -458,10 +452,14 @@ impl Devices {
         if let Some(pairing) = &status.pairing {
             let name = &pairing.name;
             let notice = match &pairing.stage {
-                Stage::Paired => Some(format!("Paired with {name}.")),
-                Stage::Declined { here: true } => Some(format!("Not paired with {name}.")),
-                Stage::Declined { here: false } => Some(format!("{name} declined to pair.")),
-                Stage::Failed { reason } => Some(format!("Can't pair with {name}: {reason}")),
+                Stage::Paired => Some(tr!("devices-paired-with", name = name)),
+                Stage::Declined { here: true } => Some(tr!("devices-not-paired", name = name)),
+                Stage::Declined { here: false } => Some(tr!("devices-declined", name = name)),
+                Stage::Failed { reason } => Some(tr!(
+                    "devices-pairing-failed",
+                    name = name,
+                    reason = reason.as_str(),
+                )),
                 _ => None,
             };
             if let Some(notice) = notice {
@@ -492,25 +490,31 @@ impl Devices {
         let now = history::now();
         for peer in peers {
             let detail = if peer.syncing {
-                "Syncing…".to_owned()
+                tr!("devices-syncing")
             } else {
                 match (peer.last_sync, &peer.error) {
                     (_, Some(error)) if peer.last_sync.is_none_or(|at| now - at > 15 * 60) => {
                         peer.last_sync.map_or_else(
                             || error.clone(),
-                            |at| format!("Synced {}. {error}", format::since(at, now)),
+                            |at| {
+                                tr!(
+                                    "devices-synced-error",
+                                    when = format::since(at, now),
+                                    error = error,
+                                )
+                            },
                         )
                     }
-                    (Some(at), _) => format!("Synced {}", format::since(at, now)),
-                    (None, _) => "Not synced yet".to_owned(),
+                    (Some(at), _) => tr!("devices-synced", when = format::since(at, now)),
+                    (None, _) => tr!("devices-not-synced"),
                 }
             };
             let id = peer.id.clone();
             let sender = sender.clone();
             let forget = gtk::Button::builder()
-                .label("Forget")
+                .label(tr!("devices-forget"))
                 .valign(gtk::Align::Center)
-                .tooltip_text("Stop syncing with this device")
+                .tooltip_text(tr!("devices-forget-tooltip"))
                 .build();
             forget.connect_clicked(move |_| sender.input(DevicesMsg::Forget(id.clone())));
             self.peers.append(&row(&peer.name, Some(&detail), &forget));
@@ -525,7 +529,7 @@ impl Devices {
             let id = device.id.clone();
             let sender = sender.clone();
             let pair = gtk::Button::builder()
-                .label("Pair")
+                .label(tr!("devices-pair"))
                 .valign(gtk::Align::Center)
                 .build();
             pair.connect_clicked(move |_| sender.input(DevicesMsg::Pair(id.clone())));
@@ -538,7 +542,7 @@ impl Devices {
             Ok(()) => self.background = background,
             Err(err) => {
                 tracing::warn!("cannot change whether syncing starts with the session: {err}");
-                self.error = Some(format!("Can't change it: {err}"));
+                self.error = Some(tr!("devices-cannot-change", error = err.to_string()));
             }
         }
     }
@@ -572,11 +576,9 @@ impl Devices {
     fn pairing_hint(&self) -> String {
         let name = self.pairing_name();
         match self.pairing_stage() {
-            Some(Stage::Connecting) => "Connecting…".to_owned(),
-            Some(Stage::Confirm) => {
-                format!("Check that {name} shows the same code, then pair on both.")
-            }
-            Some(Stage::Waiting) => format!("Waiting for {name} to confirm…"),
+            Some(Stage::Connecting) => tr!("devices-connecting"),
+            Some(Stage::Confirm) => tr!("devices-confirm", name = name),
+            Some(Stage::Waiting) => tr!("devices-waiting", name = name),
             _ => String::new(),
         }
     }

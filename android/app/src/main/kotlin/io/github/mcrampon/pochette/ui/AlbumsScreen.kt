@@ -60,6 +60,10 @@ import io.github.mcrampon.pochette.core.LibraryView
 import io.github.mcrampon.pochette.core.Sort
 import io.github.mcrampon.pochette.core.orderLabel
 import io.github.mcrampon.pochette.core.sortLabel
+import android.content.res.Resources
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 
 /** What can be asked of the library. */
 class AlbumsActions(
@@ -81,13 +85,13 @@ fun AlbumsScreen(library: Library, view: LibraryView, actions: AlbumsActions) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Albums") },
+                title = { Text(stringResource(R.string.tab_albums)) },
                 actions = {
                     if (library.albums.isNotEmpty()) {
                         IconButton(onClick = actions.playRandom) {
                             Icon(
                                 painterResource(R.drawable.ic_shuffle),
-                                contentDescription = if (filtered) "Play a Random Album From These" else "Play a Random Album",
+                                contentDescription = stringResource(if (filtered) R.string.play_random_album_filtered else R.string.play_random_album),
                             )
                         }
                     }
@@ -106,7 +110,7 @@ fun AlbumsScreen(library: Library, view: LibraryView, actions: AlbumsActions) {
             if (!library.any && !library.refreshing) {
                 Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                     Text(
-                        library.error ?: "No albums yet: add some to your favorites on Qobuz.",
+                        library.error ?: stringResource(R.string.no_albums_yet),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                     )
@@ -127,11 +131,11 @@ fun AlbumsScreen(library: Library, view: LibraryView, actions: AlbumsActions) {
                 if (library.albums.isEmpty() && filtered) {
                     item(key = "none", span = { GridItemSpan(maxLineSpan) }) {
                         Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("No Matching Albums", style = MaterialTheme.typography.titleMedium)
+                            Text(stringResource(R.string.no_matching_albums), style = MaterialTheme.typography.titleMedium)
                             TextButton(
                                 onClick = { actions.show(view.copy(query = "", genres = emptyList(), decades = emptyList())) },
                                 modifier = Modifier.padding(top = 8.dp),
-                            ) { Text("Clear Search and Filters") }
+                            ) { Text(stringResource(R.string.clear_search_and_filters)) }
                         }
                     }
                 }
@@ -145,13 +149,13 @@ fun AlbumsScreen(library: Library, view: LibraryView, actions: AlbumsActions) {
 private fun Menu(actions: AlbumsActions) {
     var open by remember { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { open = true }) { Icon(painterResource(R.drawable.ic_more_vert), contentDescription = "More") }
+        IconButton(onClick = { open = true }) { Icon(painterResource(R.drawable.ic_more_vert), contentDescription = stringResource(R.string.more)) }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(text = { Text("Settings") }, onClick = {
+            DropdownMenuItem(text = { Text(stringResource(R.string.settings)) }, onClick = {
                 open = false
                 actions.settings()
             })
-            DropdownMenuItem(text = { Text("Sign Out") }, onClick = {
+            DropdownMenuItem(text = { Text(stringResource(R.string.sign_out)) }, onClick = {
                 open = false
                 actions.signOut()
             })
@@ -163,17 +167,18 @@ private fun Menu(actions: AlbumsActions) {
 @Composable
 private fun Controls(view: LibraryView, actions: AlbumsActions) {
     val focus = LocalFocusManager.current
+    val resources = LocalResources.current
     var picking by remember { mutableStateOf<Filter?>(null) }
     Column(Modifier.padding(top = 4.dp)) {
         OutlinedTextField(
             value = view.query,
             onValueChange = { actions.show(view.copy(query = it)) },
-            placeholder = { Text("Search albums, artists, labels") },
+            placeholder = { Text(stringResource(R.string.search_library)) },
             leadingIcon = { Icon(painterResource(R.drawable.ic_search), contentDescription = null) },
             trailingIcon = {
                 if (view.query.isNotEmpty()) {
                     IconButton(onClick = { actions.show(view.copy(query = "")) }) {
-                        Icon(painterResource(R.drawable.ic_close), contentDescription = "Clear")
+                        Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.clear))
                     }
                 }
             },
@@ -190,9 +195,9 @@ private fun Controls(view: LibraryView, actions: AlbumsActions) {
             Chip(
                 label =
                     when (view.genres.size) {
-                        0 -> "Genres"
+                        0 -> stringResource(R.string.genres)
                         1 -> view.genres.first()
-                        else -> "${view.genres.size} Genres"
+                        else -> pluralStringResource(R.plurals.genres_picked, view.genres.size, view.genres.size)
                     },
                 on = view.genres.isNotEmpty(),
                 onClick = { picking = Filter.Genres },
@@ -200,9 +205,9 @@ private fun Controls(view: LibraryView, actions: AlbumsActions) {
             Chip(
                 label =
                     when (view.decades.size) {
-                        0 -> "Decades"
-                        1 -> decade(view.decades.first())
-                        else -> "${view.decades.size} Decades"
+                        0 -> stringResource(R.string.decades)
+                        1 -> decade(resources, view.decades.first())
+                        else -> pluralStringResource(R.plurals.decades_picked, view.decades.size, view.decades.size)
                     },
                 on = view.decades.isNotEmpty(),
                 onClick = { picking = Filter.Decades },
@@ -213,19 +218,19 @@ private fun Controls(view: LibraryView, actions: AlbumsActions) {
     when (picking) {
         Filter.Genres ->
             ChecklistDialog(
-                title = "Genres",
+                title = stringResource(R.string.genres),
                 options = remember { Load.Done(actions.genres().map { it to it }) },
                 picked = view.genres,
-                all = "All Genres",
+                all = stringResource(R.string.all_genres),
                 onPick = { actions.show(view.copy(genres = it.sorted())) },
                 onDismiss = { picking = null },
             )
         Filter.Decades ->
             ChecklistDialog(
-                title = "Decades",
-                options = remember { Load.Done(actions.decades().map { it to decade(it) }) },
+                title = stringResource(R.string.decades),
+                options = remember { Load.Done(actions.decades().map { it to decade(resources, it) }) },
                 picked = view.decades,
-                all = "All Decades",
+                all = stringResource(R.string.all_decades),
                 onPick = { actions.show(view.copy(decades = it.sorted())) },
                 onDismiss = { picking = null },
             )
@@ -235,7 +240,7 @@ private fun Controls(view: LibraryView, actions: AlbumsActions) {
 
 private enum class Filter { Genres, Decades }
 
-private fun decade(decade: UShort) = "${decade}s"
+private fun decade(resources: Resources, decade: UShort) = resources.getString(R.string.decade, decade.toInt())
 
 @Composable
 private fun Chip(label: String, on: Boolean, onClick: () -> Unit) {

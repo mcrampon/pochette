@@ -15,6 +15,7 @@ mod covers;
 mod devices;
 mod discover;
 mod favorites;
+mod i18n;
 mod icon_label;
 mod lyrics_view;
 mod mpris;
@@ -141,6 +142,7 @@ fn main() -> ExitCode {
         return sync::run();
     }
 
+    i18n::init(settings::Settings::load().language.as_deref());
     if let Some(instance) = instance() {
         tracing::info!("running as the separate instance {instance}");
     }

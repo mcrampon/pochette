@@ -2,6 +2,7 @@ package io.github.mcrampon.pochette
 
 import android.app.Application
 import android.util.Log
+import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -138,7 +139,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
             } catch (expired: PochetteException.SignedOut) {
                 return@launch
             } catch (err: PochetteException) {
-                _notice.value = "Can't play “${card.title}”: ${err.message}"
+                _notice.value = text(R.string.cant_play_album, card.title, err.message.orEmpty())
             }
         }
     }
@@ -198,7 +199,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
                 signedIn(core.restore(kept))
             } catch (expired: PochetteException.SignedOut) {
                 sessions.clear()
-                _stage.value = Stage.SignedOut(error = "Sign in again: ${expired.message}")
+                _stage.value = Stage.SignedOut(error = text(R.string.sign_in_again, expired.message.orEmpty()))
             } catch (err: PochetteException) {
                 _stage.value = Stage.Unreachable(err.message.orEmpty())
             }
@@ -259,8 +260,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
                 reshow()
             } catch (err: PochetteException) {
                 failed()
-                val change = if (favorite) "add “${album.title}” to" else "take “${album.title}” out of"
-                _notice.value = "Can't $change your favorites: ${err.message}"
+                _notice.value = text(if (favorite) R.string.cant_add_favorite else R.string.cant_remove_favorite, album.title, err.message.orEmpty())
             }
         }
     }
@@ -401,6 +401,9 @@ class AppModel(app: Application) : AndroidViewModel(app) {
             reshow()
         }
     }
+
+    /** A text of the app, in the language it shows. */
+    private fun text(@StringRes id: Int, vararg args: Any): String = Language.wrap(getApplication()).getString(id, *args)
 
     /** Ask Qobuz, signing out if it no longer takes the session. */
     private suspend fun <T> ask(call: suspend () -> T): T =

@@ -6,7 +6,7 @@ use qobuz::models::Album;
 use serde::{Deserialize, Serialize};
 use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
 
-use crate::history::History;
+use crate::{history::History, i18n::tr};
 
 /// `text` in lower case and without accents, so "Beyoncé" matches "beyonce".
 pub fn fold(text: &str) -> String {
@@ -83,14 +83,14 @@ impl Sort {
     ];
 
     #[must_use]
-    pub fn label(self) -> &'static str {
+    pub fn label(self) -> String {
         match self {
-            Self::DateAdded => "Date Added",
-            Self::Title => "Title",
-            Self::Artist => "Artist",
-            Self::ReleaseDate => "Release Date",
-            Self::LastPlayed => "Last Played",
-            Self::PlayCount => "Play Count",
+            Self::DateAdded => tr!("sort-date-added"),
+            Self::Title => tr!("sort-title"),
+            Self::Artist => tr!("sort-artist"),
+            Self::ReleaseDate => tr!("sort-release-date"),
+            Self::LastPlayed => tr!("sort-last-played"),
+            Self::PlayCount => tr!("sort-play-count"),
         }
     }
 
@@ -194,19 +194,19 @@ impl View {
 
     /// How the order reads: "Newest First", "A to Z"…
     #[must_use]
-    pub fn order_label(&self) -> &'static str {
+    pub fn order_label(&self) -> String {
         match (self.sort, self.reversed) {
-            (Sort::LastPlayed, false) => return "Most Recent First",
-            (Sort::LastPlayed, true) => return "Least Recent First",
-            (Sort::PlayCount, false) => return "Most Played First",
-            (Sort::PlayCount, true) => return "Least Played First",
+            (Sort::LastPlayed, false) => return tr!("order-most-recent-first"),
+            (Sort::LastPlayed, true) => return tr!("order-least-recent-first"),
+            (Sort::PlayCount, false) => return tr!("order-most-played-first"),
+            (Sort::PlayCount, true) => return tr!("order-least-played-first"),
             _ => {}
         }
         match (self.sort.newest_first(), self.reversed) {
-            (true, false) => "Newest First",
-            (true, true) => "Oldest First",
-            (false, false) => "A to Z",
-            (false, true) => "Z to A",
+            (true, false) => tr!("order-newest-first"),
+            (true, true) => tr!("order-oldest-first"),
+            (false, false) => tr!("order-a-to-z"),
+            (false, true) => tr!("order-z-to-a"),
         }
     }
 

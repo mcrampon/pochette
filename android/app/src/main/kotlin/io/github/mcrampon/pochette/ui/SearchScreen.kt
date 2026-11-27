@@ -39,6 +39,7 @@ import io.github.mcrampon.pochette.R
 import io.github.mcrampon.pochette.core.AlbumCard
 import io.github.mcrampon.pochette.core.ArtistCard
 import kotlinx.coroutines.delay
+import androidx.compose.ui.res.stringResource
 
 /** How long typing pauses before searching. */
 private const val TYPING_PAUSE_MS = 400L
@@ -61,14 +62,14 @@ fun SearchScreen(found: Found?, onSearch: (String) -> Unit, onOpenAlbum: (AlbumC
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                placeholder = { Text("Albums and artists") },
+                placeholder = { Text(stringResource(R.string.search_hint)) },
                 leadingIcon = { Icon(painterResource(R.drawable.ic_search), contentDescription = null) },
                 trailingIcon = {
                     if (query.isNotEmpty()) {
                         IconButton(onClick = {
                             query = ""
                             focus.requestFocus()
-                        }) { Icon(painterResource(R.drawable.ic_close), contentDescription = "Clear") }
+                        }) { Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.clear)) }
                     }
                 },
                 singleLine = true,
@@ -87,25 +88,25 @@ fun SearchScreen(found: Found?, onSearch: (String) -> Unit, onOpenAlbum: (AlbumC
         if (found == null) {
             Box(Modifier.fillMaxSize().padding(padding).padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(
-                    "Search Qobuz for albums and artists.",
+                    stringResource(R.string.search_prompt),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                 )
             }
             return@Scaffold
         }
-        PagedGrid(found.albums, onOpenAlbum, Modifier.fillMaxSize().padding(padding), empty = "No albums match “${found.query}”.") {
+        PagedGrid(found.albums, onOpenAlbum, Modifier.fillMaxSize().padding(padding), empty = stringResource(R.string.search_no_albums, found.query)) {
             val artists = (found.artists as? Load.Done)?.value.orEmpty()
             if (artists.isNotEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Column(Modifier.fullBleed(16.dp)) {
-                        Heading("Artists")
+                        Heading(stringResource(R.string.artists))
                         ArtistShelf(artists, onOpen = onOpenArtist)
                     }
                 }
             }
             if (found.albums.albums.isNotEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) { Column(Modifier.fullBleed(16.dp)) { Heading("Albums") } }
+                item(span = { GridItemSpan(maxLineSpan) }) { Column(Modifier.fullBleed(16.dp)) { Heading(stringResource(R.string.albums)) } }
             }
         }
     }

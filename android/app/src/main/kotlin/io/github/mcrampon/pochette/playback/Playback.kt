@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.os.SystemClock
+import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.media3.common.C
@@ -16,6 +17,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.util.Util
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import io.github.mcrampon.pochette.R
 import io.github.mcrampon.pochette.core.AlbumPage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,7 +38,7 @@ data class NowPlaying(
     val playing: Boolean,
     val hasNext: Boolean,
     /** Why it stopped, if it broke. */
-    val error: String?,
+    @StringRes val error: Int?,
     val queue: List<Queued>,
     /** Of the track playing, in the queue. */
     val index: Int,
@@ -227,13 +229,14 @@ class Playback(context: Context) {
     }
 
     /** Only the error's code crosses from the service: its cause stays there. */
-    private fun describe(error: PlaybackException): String =
+    @StringRes
+    private fun describe(error: PlaybackException): Int =
         when (error.errorCode) {
             PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
             PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
-            -> "No connection: tap play to try again"
-            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> "Qobuz refused the stream"
-            in 2000..2999 -> "Can't get the stream from Qobuz"
-            else -> "Can't play this track"
+            -> R.string.error_no_connection
+            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> R.string.error_stream_refused
+            in 2000..2999 -> R.string.error_no_stream
+            else -> R.string.error_cant_play
         }
 }

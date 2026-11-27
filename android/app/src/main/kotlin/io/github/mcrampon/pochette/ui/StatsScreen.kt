@@ -63,6 +63,7 @@ import io.github.mcrampon.pochette.core.monthName
 import io.github.mcrampon.pochette.core.playCount
 import io.github.mcrampon.pochette.core.shortMonthName
 import java.time.LocalDate
+import androidx.compose.ui.res.stringResource
 
 /** How many artists and genres the stats rank, as on desktop. */
 private const val TOP = 10
@@ -95,7 +96,7 @@ fun StatsScreen(
     val load by produceState<Load<StatsPage?>>(Load.Pending, period, plays) { value = Load.Done(actions.load()) }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Stats") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.stats)) }) },
         contentWindowInsets = WindowInsets(0),
     ) { padding ->
         when (val current = load) {
@@ -134,7 +135,7 @@ private fun StatsContent(page: StatsPage, actions: StatsActions, modifier: Modif
             across("genres") { Genres(stats) }
         }
         if (stats.albums.isNotEmpty()) {
-            across("albums") { Heading("Top Albums") }
+            across("albums") { Heading(stringResource(R.string.top_albums)) }
             items(stats.albums, key = { "album/${it.album.id}" }) { stat ->
                 AlbumTile(
                     stat.album,
@@ -155,6 +156,8 @@ private fun LazyGridScope.across(key: String, content: @Composable () -> Unit) =
 @Composable
 private fun Periods(page: StatsPage, pick: (Period) -> Unit) {
     val period = page.period
+    val allTime = stringResource(R.string.all_time)
+    val wholeYear = stringResource(R.string.whole_year)
     val year =
         when (period) {
             Period.All -> null
@@ -163,14 +166,14 @@ private fun Periods(page: StatsPage, pick: (Period) -> Unit) {
         }
     Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Picker(
-            shown = year?.toString() ?: "All Time",
-            choices = page.years.map { it.toString() to Period.Year(it) } + ("All Time" to Period.All),
+            shown = year?.toString() ?: allTime,
+            choices = page.years.map { it.toString() to Period.Year(it) } + (allTime to Period.All),
             pick = pick,
         )
         if (year != null) {
             Picker(
-                shown = (period as? Period.Month)?.let { monthName(it.month) } ?: "Whole Year",
-                choices = listOf("Whole Year" to Period.Year(year)) + page.months.map { monthName(it) to Period.Month(year, it) },
+                shown = (period as? Period.Month)?.let { monthName(it.month) } ?: wholeYear,
+                choices = listOf(wholeYear to Period.Year(year)) + page.months.map { monthName(it) to Period.Month(year, it) },
                 pick = pick,
             )
         }
@@ -201,9 +204,9 @@ private fun Picker(shown: String, choices: List<Pair<String, Period>>, pick: (Pe
 private fun Numbers(stats: Stats) {
     Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         for ((value, name) in listOf(
-            listeningTime(stats.time) to "Listened",
-            stats.albumPlays.toString() to "Album Plays",
-            stats.artists.size.toString() to "Artists",
+            listeningTime(stats.time) to stringResource(R.string.listened),
+            stats.albumPlays.toString() to stringResource(R.string.album_plays),
+            stats.artists.size.toString() to stringResource(R.string.artists),
         )) {
             Surface(
                 color = MaterialTheme.colorScheme.surfaceContainer,
@@ -233,9 +236,9 @@ private fun Numbers(stats: Stats) {
 private fun Timeline(stats: Stats, period: Period, pick: (Period) -> Unit) {
     Heading(
         when (period) {
-            Period.All -> "By Year"
-            is Period.Year -> "By Month"
-            is Period.Month -> "By Day"
+            Period.All -> stringResource(R.string.by_year)
+            is Period.Year -> stringResource(R.string.by_month)
+            is Period.Month -> stringResource(R.string.by_day)
         },
     )
     val most = (stats.timeline.maxOfOrNull { it.time } ?: 0u).coerceAtLeast(1u).toFloat()
@@ -329,7 +332,7 @@ private fun Bar(point: TimelinePoint, label: String, most: Float, onClick: (() -
 @Composable
 private fun Artists(stats: Stats, open: (ArtistStat) -> Unit) {
     Column {
-        Heading("Top Artists")
+        Heading(stringResource(R.string.top_artists))
         stats.artists.take(TOP).forEachIndexed { rank, artist ->
             Row(
                 Modifier
@@ -356,13 +359,13 @@ private fun Artists(stats: Stats, open: (ArtistStat) -> Unit) {
 private fun Genres(stats: Stats) {
     val total = stats.genres.sumOf { it.time }.coerceAtLeast(1u).toFloat()
     Column {
-        Heading("Top Genres")
+        Heading(stringResource(R.string.top_genres))
         for (genre in stats.genres.take(TOP)) {
             val share = genre.time.toFloat() / total
             Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Row {
                     Text(genre.name, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    Text("${Math.round(share * 100)}%", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.percent, Math.round(share * 100)), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 LinearProgressIndicator(
                     progress = { share },
@@ -389,9 +392,9 @@ private fun NothingPlayed(modifier: Modifier) {
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(48.dp),
         )
-        Text("Nothing Played Yet", style = MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.nothing_played), style = MaterialTheme.typography.titleLarge)
         Text(
-            "Play some albums: how much you listen, your top albums, artists and genres show up here.",
+            stringResource(R.string.nothing_played_detail),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )

@@ -58,6 +58,7 @@ import io.github.mcrampon.pochette.core.ago
 import io.github.mcrampon.pochette.core.playCount
 import io.github.mcrampon.pochette.core.trackDuration
 import io.github.mcrampon.pochette.playback.NowPlaying
+import androidx.compose.ui.res.stringResource
 
 /** What can be asked of the album page. */
 class AlbumActions(
@@ -110,7 +111,7 @@ fun AlbumScreen(
                 title = {},
                 navigationIcon = {
                     IconButton(onClick = actions.back) {
-                        Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = "Back")
+                        Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.back))
                     }
                 },
                 actions = {
@@ -121,7 +122,7 @@ fun AlbumScreen(
                         }) {
                             Icon(
                                 painterResource(if (favorite) R.drawable.ic_favorite else R.drawable.ic_favorite_border),
-                                contentDescription = if (favorite) "Remove from Favorites" else "Add to Favorites",
+                                contentDescription = stringResource(if (favorite) R.string.remove_from_favorites else R.string.add_to_favorites),
                                 tint = if (favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
@@ -150,11 +151,11 @@ fun AlbumScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             Text(
-                                "Can't load the tracks: ${current.error}",
+                                stringResource(R.string.cant_load_tracks, current.error),
                                 textAlign = TextAlign.Center,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            TextButton(onClick = { attempt++ }) { Text("Try Again") }
+                            TextButton(onClick = { attempt++ }) { Text(stringResource(R.string.try_again)) }
                         }
                     }
                 is Load.Done -> {
@@ -176,7 +177,7 @@ private fun Header(card: AlbumCard?, page: AlbumPage?, ours: Boolean, now: NowPl
             Cover(card?.coverLarge ?: card?.cover, Modifier.widthIn(max = minOf(360.dp, most)).fillMaxWidth(), corner = 12)
         }
         Spacer(Modifier.height(16.dp))
-        val kicker = listOfNotNull(page?.kind ?: "Album", card?.year).joinToString(" · ").uppercase()
+        val kicker = listOfNotNull(page?.kind ?: stringResource(R.string.album), card?.year).joinToString(" · ").uppercase()
         Text(kicker, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
         Text(card?.title.orEmpty(), style = MaterialTheme.typography.headlineSmall)
         // A link to the artist's page.
@@ -193,8 +194,8 @@ private fun Header(card: AlbumCard?, page: AlbumPage?, ours: Boolean, now: NowPl
         val details = listOfNotNull(card?.genre, page?.label).joinToString(" · ")
         if (details.isNotEmpty()) Dim(details)
         if (page != null) Dim("${page.trackCount} · ${page.length}")
-        plays.last?.let { Dim("${playCount(plays.count)} · last played ${ago(it)}") }
-        val quality = card?.hires?.let { "Hi-Res · $it" } ?: page?.quality
+        plays.last?.let { Dim(stringResource(R.string.plays_last_played, playCount(plays.count), ago(it))) }
+        val quality = card?.hires?.let { stringResource(R.string.hi_res_quality, it) } ?: page?.quality
         if (quality != null) {
             Surface(
                 color = MaterialTheme.colorScheme.secondaryContainer,
@@ -220,10 +221,10 @@ private fun Header(card: AlbumCard?, page: AlbumPage?, ours: Boolean, now: NowPl
                 modifier = Modifier.size(20.dp),
             )
             Spacer(Modifier.width(8.dp))
-            Text(if (playing) "Pause" else "Play")
+            Text(stringResource(if (playing) R.string.pause else R.string.play))
         }
         if (ours && now?.error != null) {
-            Text(now.error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(now.error), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
         }
         Spacer(Modifier.height(16.dp))
     }
@@ -244,7 +245,7 @@ private fun LazyListScope.tracks(page: AlbumPage, playing: ULong?, onPlay: (ULon
             val number = track.disc
             disc = number
             work = null
-            item(key = "disc/$number") { DiscHeading("Disc $number") }
+            item(key = "disc/$number") { DiscHeading(stringResource(R.string.disc, number.toInt())) }
         }
         val trackWork = track.work
         if (trackWork != null && trackWork != work) {
@@ -279,7 +280,7 @@ private fun Track(track: TrackRow, albumArtist: String, playing: Boolean, onClic
     ) {
         Box(Modifier.width(28.dp)) {
             if (playing) {
-                Icon(painterResource(R.drawable.ic_graphic_eq), contentDescription = "Playing", tint = color, modifier = Modifier.size(18.dp))
+                Icon(painterResource(R.drawable.ic_graphic_eq), contentDescription = stringResource(R.string.playing), tint = color, modifier = Modifier.size(18.dp))
             } else {
                 Text(track.number.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             }
@@ -293,7 +294,7 @@ private fun Track(track: TrackRow, albumArtist: String, playing: Boolean, onClic
         }
         if (track.explicit) {
             Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(3.dp)) {
-                Text("E", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 4.dp))
+                Text(stringResource(R.string.explicit), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 4.dp))
             }
         }
         Text(trackDuration(track.duration), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -304,7 +305,7 @@ private fun LazyListScope.about(page: AlbumPage) {
     page.description?.let { review ->
         item(key = "about") {
             Column(Modifier.padding(horizontal = 16.dp).padding(top = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("About This Album", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.about_album), style = MaterialTheme.typography.titleMedium)
                 Text(review, style = MaterialTheme.typography.bodyMedium)
             }
         }

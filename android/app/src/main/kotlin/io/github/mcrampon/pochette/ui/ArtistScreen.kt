@@ -38,6 +38,8 @@ import io.github.mcrampon.pochette.core.ArtistCard
 import io.github.mcrampon.pochette.core.ArtistPage
 import io.github.mcrampon.pochette.core.PochetteException
 import io.github.mcrampon.pochette.core.ReleaseKind
+import androidx.annotation.StringRes
+import androidx.compose.ui.res.stringResource
 
 /** What can be asked of an artist's page. */
 class ArtistActions(
@@ -67,7 +69,7 @@ fun ArtistScreen(name: String, actions: ArtistActions) {
                 title = {},
                 navigationIcon = {
                     IconButton(onClick = actions.back) {
-                        Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = "Back")
+                        Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.back))
                     }
                 },
             )
@@ -80,7 +82,7 @@ fun ArtistScreen(name: String, actions: ArtistActions) {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Portrait(page?.portrait, name, 160.dp)
                     Text(
-                        "ARTIST",
+                        stringResource(R.string.artist_kicker),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(top = 16.dp),
@@ -90,16 +92,16 @@ fun ArtistScreen(name: String, actions: ArtistActions) {
             }
             when (val current = load) {
                 Load.Pending -> item { Loading() }
-                is Load.Failed -> item { Failed("Can't load the artist: ${current.error}", onRetry = { attempt++ }) }
+                is Load.Failed -> item { Failed(stringResource(R.string.cant_load_artist, current.error), onRetry = { attempt++ }) }
                 is Load.Done -> {
                     val artist = current.value
                     if (artist.releases.none { it.albums.albums.isNotEmpty() }) {
-                        item { Failed("No albums to stream from this artist.", onRetry = { attempt++ }) }
+                        item { Failed(stringResource(R.string.no_albums_from_artist), onRetry = { attempt++ }) }
                     }
                     for (releases in artist.releases.filter { it.albums.albums.isNotEmpty() }) {
                         item(key = releases.kind.name) {
                             Column {
-                                Heading(kindTitle(releases.kind), onSeeAll = { actions.seeAll(releases.kind) }.takeIf { releases.albums.hasMore })
+                                Heading(stringResource(kindTitle(releases.kind)), onSeeAll = { actions.seeAll(releases.kind) }.takeIf { releases.albums.hasMore })
                                 AlbumShelf(releases.albums.albums, onOpen = actions.openAlbum)
                             }
                         }
@@ -107,7 +109,7 @@ fun ArtistScreen(name: String, actions: ArtistActions) {
                     if (artist.similar.isNotEmpty()) {
                         item(key = "similar") {
                             Column {
-                                Heading("Similar Artists")
+                                Heading(stringResource(R.string.similar_artists))
                                 ArtistShelf(artist.similar, onOpen = actions.openArtist)
                             }
                         }
@@ -124,22 +126,23 @@ fun ArtistScreen(name: String, actions: ArtistActions) {
 private fun Biography(text: String) {
     var whole by rememberSaveable { mutableStateOf(false) }
     Column(Modifier.padding(horizontal = 16.dp).padding(top = 20.dp).animateContentSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("About", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.about_artist), style = MaterialTheme.typography.titleMedium)
         Text(
             text,
             style = MaterialTheme.typography.bodyMedium,
             maxLines = if (whole) Int.MAX_VALUE else 6,
             overflow = TextOverflow.Ellipsis,
         )
-        if (!whole) TextButton(onClick = { whole = true }) { Text("Read More") }
+        if (!whole) TextButton(onClick = { whole = true }) { Text(stringResource(R.string.read_more)) }
     }
 }
 
+@StringRes
 fun kindTitle(kind: ReleaseKind) =
     when (kind) {
-        ReleaseKind.ALBUM -> "Albums"
-        ReleaseKind.EP_SINGLE -> "EPs & Singles"
-        ReleaseKind.LIVE -> "Live"
-        ReleaseKind.COMPILATION -> "Compilations"
-        ReleaseKind.OTHER -> "Other Releases"
+        ReleaseKind.ALBUM -> R.string.releases_albums
+        ReleaseKind.EP_SINGLE -> R.string.releases_eps_singles
+        ReleaseKind.LIVE -> R.string.releases_live
+        ReleaseKind.COMPILATION -> R.string.releases_compilations
+        ReleaseKind.OTHER -> R.string.releases_other
     }

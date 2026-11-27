@@ -51,6 +51,15 @@ import io.github.mcrampon.pochette.core.SyncStatus
 import io.github.mcrampon.pochette.core.since
 import io.github.mcrampon.pochette.core.syncPort
 import kotlinx.coroutines.delay
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.material3.RadioButton
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import io.github.mcrampon.pochette.Language
 
 /** How often "Synced 3 minutes ago" is said again. */
 private const val CLOCK_MS = 30_000L
@@ -58,8 +67,12 @@ private const val CLOCK_MS = 30_000L
 /** A sync error shows once the last sync is this old, in seconds: a device that's just off for a moment isn't news. */
 private const val STALE_SECONDS = 15 * 60
 
-/** What can be asked of the settings: the devices. */
+/** What can be asked of the settings: the language, the devices. */
 class SettingsActions(
+    /** The language picked, by BCP 47 tag, none for the phone's. */
+    val language: () -> String?,
+    /** Show the language of a BCP 47 tag, the phone's when none. */
+    val setLanguage: (String?) -> Unit,
     val setPairable: (Boolean) -> Unit,
     val pair: (String) -> Unit,
     val answer: (Boolean) -> Unit,
@@ -71,8 +84,8 @@ class SettingsActions(
 )
 
 /**
- * The settings: the devices the plays sync with, and pairing more: on the same network, the code checked on
- * both.
+ * The settings: the language, and the devices the plays sync with, and pairing more: on the same network, the
+ * code checked on both.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,8 +95,10 @@ fun SettingsScreen(status: SyncStatus, actions: SettingsActions) {
         actions.setPairable(true)
         onDispose { actions.setPairable(false) }
     }
+    val resources = LocalResources.current
     var notice by rememberSaveable { mutableStateOf<String?>(null) }
     var background by rememberSaveable { mutableStateOf(actions.background()) }
+    var choosingLanguage by remember { mutableStateOf(false) }
     // How the last pairing went, once it's over.
     val pairing = status.pairing
     LaunchedEffect(pairing) {
@@ -91,9 +106,9 @@ fun SettingsScreen(status: SyncStatus, actions: SettingsActions) {
         val name = pairing.name
         val outcome =
             when (val stage = pairing.stage) {
-                PairingStage.Paired -> "Paired with $name."
-                is PairingStage.Declined -> if (stage.here) "Not paired with $name." else "$name declined to pair."
-                is PairingStage.Failed -> "Can't pair with $name: ${stage.reason}"
+                PairingStage.Paired -> resources.getString(R.string.paired_with, name)
+                is PairingStage.Declined -> resources.getString(if (stage.here) R.string.not_paired_with else R.string.declined_to_pair, name)
+                is PairingStage.Failed -> resources.getString(R.string.cant_pair_with, name, stage.reason)
                 else -> return@LaunchedEffect
             }
         // Syncing is what pairing is for: in the background too, from the first device on.
@@ -114,10 +129,10 @@ fun SettingsScreen(status: SyncStatus, actions: SettingsActions) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = { Text(stringResource(R.string.settings)) },
                 navigationIcon = {
                     IconButton(onClick = actions.back) {
-                        Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = "Back")
+                        Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.back))
                     }
                 },
             )
@@ -125,24 +140,31 @@ fun SettingsScreen(status: SyncStatus, actions: SettingsActions) {
         contentWindowInsets = WindowInsets(0),
     ) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(bottom = 24.dp)) {
-            item(key = "devices") { Section("Devices") }
+            item(key = "language") {
+                Column {
+                    Section(stringResource(R.string.language))
+                    ListItem(
+                        headlineContent = { Text(actions.language()?.let(Language::name) ?: stringResource(R.string.language_system)) },
+                        trailingContent = { Icon(painterResource(R.drawable.ic_expand_more), contentDescription = null) },
+                        modifier = Modifier.clickable { choosingLanguage = true },
+                    )
+                }
+            }
+            item(key = "devices") { Section(stringResource(R.string.devices)) }
             item(key = "about") {
                 Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Dim(
-                        "Paired devices share what you play with each other, for the stats and play counts, whenever " +
-                            "they're on the same network. This phone is “${status.name}”.",
-                    )
+                    Dim(stringResource(R.string.devices_about, status.name))
                     status.problem?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     notice?.let { Text(it) }
                 }
             }
             if (status.peers.isNotEmpty()) {
-                item(key = "paired") { Heading("Paired Devices") }
+                item(key = "paired") { Heading(stringResource(R.string.paired_devices)) }
                 items(status.peers, key = { "peer/${it.id}" }) { peer -> PeerRow(peer, clock, actions.forget) }
                 item(key = "background") {
                     ListItem(
-                        headlineContent = { Text("Keep syncing while Pochette is closed") },
-                        supportingContent = { Text("Every 15 minutes or so, on Wi-Fi.") },
+                        headlineContent = { Text(stringResource(R.string.sync_in_background)) },
+                        supportingContent = { Text(stringResource(R.string.sync_in_background_detail)) },
                         trailingContent = {
                             Switch(checked = background, onCheckedChange = {
                                 background = it
@@ -154,14 +176,14 @@ fun SettingsScreen(status: SyncStatus, actions: SettingsActions) {
             }
             item(key = "pair") {
                 Column {
-                    Heading("Pair a Device")
-                    Dim("Open Settings in Pochette on the other device as well, and it shows up here.", Modifier.padding(horizontal = 16.dp))
+                    Heading(stringResource(R.string.pair_a_device))
+                    Dim(stringResource(R.string.pair_a_device_detail), Modifier.padding(horizontal = 16.dp))
                 }
             }
             items(status.nearby, key = { "nearby/${it.id}" }) { device ->
                 ListItem(
                     headlineContent = { Text(device.name) },
-                    trailingContent = { FilledTonalButton(onClick = { actions.pair(device.id) }) { Text("Pair") } },
+                    trailingContent = { FilledTonalButton(onClick = { actions.pair(device.id) }) { Text(stringResource(R.string.pair)) } },
                 )
             }
             if (status.nearby.isEmpty()) {
@@ -172,7 +194,7 @@ fun SettingsScreen(status: SyncStatus, actions: SettingsActions) {
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                        Dim("Looking for devices on this network…")
+                        Dim(stringResource(R.string.looking_for_devices))
                     }
                 }
             }
@@ -180,6 +202,16 @@ fun SettingsScreen(status: SyncStatus, actions: SettingsActions) {
         }
     }
     if (pairing != null && pairing.stage.ongoing) PairingDialog(pairing, actions.answer)
+    if (choosingLanguage) {
+        LanguageDialog(
+            actions.language(),
+            onChoose = {
+                choosingLanguage = false
+                actions.setLanguage(it)
+            },
+            onDismiss = { choosingLanguage = false },
+        )
+    }
 }
 
 /** A section of the settings, over its own headings. */
@@ -204,30 +236,30 @@ private fun PeerRow(peer: Peer, clock: Int, forget: (String) -> Unit) {
             val last = peer.lastSync
             val error = peer.error
             when {
-                peer.syncing -> "Syncing…"
+                peer.syncing -> stringResource(R.string.syncing)
                 error != null && (last == null || System.currentTimeMillis() / 1000 - last > STALE_SECONDS) ->
-                    if (last == null) error else "Synced ${since(last)}. $error"
-                last != null -> "Synced ${since(last)}"
-                else -> "Not synced yet"
+                    if (last == null) error else stringResource(R.string.synced_ago_error, since(last), error)
+                last != null -> stringResource(R.string.synced_ago, since(last))
+                else -> stringResource(R.string.not_synced_yet)
             }
         }
     ListItem(
         headlineContent = { Text(peer.name) },
         supportingContent = { Text(detail) },
-        trailingContent = { TextButton(onClick = { forgetting = true }) { Text("Forget") } },
+        trailingContent = { TextButton(onClick = { forgetting = true }) { Text(stringResource(R.string.forget)) } },
     )
     if (forgetting) {
         AlertDialog(
             onDismissRequest = { forgetting = false },
-            title = { Text("Forget ${peer.name}?") },
-            text = { Text("This phone stops syncing with it. The plays already shared stay. Pair again to sync again.") },
+            title = { Text(stringResource(R.string.forget_device, peer.name)) },
+            text = { Text(stringResource(R.string.forget_device_detail)) },
             confirmButton = {
                 TextButton(onClick = {
                     forgetting = false
                     forget(peer.id)
-                }) { Text("Forget") }
+                }) { Text(stringResource(R.string.forget)) }
             },
-            dismissButton = { TextButton(onClick = { forgetting = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { forgetting = false }) { Text(stringResource(R.string.cancel)) } },
         )
     }
 }
@@ -238,24 +270,23 @@ private fun ByAddress(pair: (String) -> Unit) {
     var open by rememberSaveable { mutableStateOf(false) }
     var address by rememberSaveable { mutableStateOf("") }
     Column(Modifier.padding(horizontal = 16.dp).padding(top = 8.dp)) {
-        TextButton(onClick = { open = !open }, contentPadding = PaddingValues(0.dp)) { Text("Pair by Address") }
+        TextButton(onClick = { open = !open }, contentPadding = PaddingValues(0.dp)) { Text(stringResource(R.string.pair_by_address)) }
         if (open) {
             val go = { if (address.isNotBlank()) pair(address.trim()) }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = address,
                     onValueChange = { address = it },
-                    placeholder = { Text("Such as 192.168.1.20") },
+                    placeholder = { Text(stringResource(R.string.address_example)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
                     keyboardActions = KeyboardActions(onGo = { go() }),
                     modifier = Modifier.weight(1f),
                 )
-                Button(onClick = go, enabled = address.isNotBlank()) { Text("Pair") }
+                Button(onClick = go, enabled = address.isNotBlank()) { Text(stringResource(R.string.pair)) }
             }
             Dim(
-                "If the devices can't find each other, the network or a firewall may be in the way. Pochette needs " +
-                    "TCP port ${syncPort()} to sync, and UDP port 5353 to find devices.",
+                stringResource(R.string.pair_by_address_detail, syncPort().toInt()),
                 Modifier.padding(top = 8.dp),
                 small = true,
             )
@@ -271,14 +302,14 @@ private fun PairingDialog(pairing: Pairing, answer: (Boolean) -> Unit) {
     AlertDialog(
         // Only the buttons answer: the code is what pairing is about.
         onDismissRequest = {},
-        title = { Text("Pair With $name", textAlign = TextAlign.Center) },
+        title = { Text(stringResource(R.string.pair_with, name), textAlign = TextAlign.Center) },
         text = {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(
                     when (pairing.stage) {
-                        PairingStage.Connecting -> "Connecting…"
-                        PairingStage.Confirm -> "Check that $name shows the same code, then pair on both."
-                        else -> "Waiting for $name to confirm…"
+                        PairingStage.Connecting -> stringResource(R.string.connecting)
+                        PairingStage.Confirm -> stringResource(R.string.check_code, name)
+                        else -> stringResource(R.string.waiting_to_confirm, name)
                     },
                     textAlign = TextAlign.Center,
                 )
@@ -289,8 +320,8 @@ private fun PairingDialog(pairing: Pairing, answer: (Boolean) -> Unit) {
                 }
             }
         },
-        confirmButton = { if (confirming) TextButton(onClick = { answer(true) }) { Text("Pair") } },
-        dismissButton = { if (confirming) TextButton(onClick = { answer(false) }) { Text("Cancel") } },
+        confirmButton = { if (confirming) TextButton(onClick = { answer(true) }) { Text(stringResource(R.string.pair)) } },
+        dismissButton = { if (confirming) TextButton(onClick = { answer(false) }) { Text(stringResource(R.string.cancel)) } },
     )
 }
 
@@ -301,5 +332,33 @@ private fun Dim(text: String, modifier: Modifier = Modifier, small: Boolean = fa
         style = if (small) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = modifier,
+    )
+}
+
+/** The languages to show the app in, by their own names, the phone's first: `chosen` is the tag of the one picked. */
+@Composable
+private fun LanguageDialog(chosen: String?, onChoose: (String?) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.language)) },
+        text = {
+            val choices = listOf(null to stringResource(R.string.language_system)) + Language.choices
+            LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                items(choices, key = { it.first.orEmpty() }) { (tag, name) ->
+                    val selected = tag.equals(chosen, ignoreCase = true)
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .selectable(selected = selected, role = Role.RadioButton) { if (selected) onDismiss() else onChoose(tag) }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = selected, onClick = null)
+                        Text(name, modifier = Modifier.padding(start = 12.dp))
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }

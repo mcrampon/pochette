@@ -5,7 +5,10 @@ use std::rc::Rc;
 
 use relm4::gtk::{self, prelude::*};
 
-use crate::path_icon::{self, PathIcon};
+use crate::{
+    i18n::tr,
+    path_icon::{self, PathIcon},
+};
 
 pub struct SortPicker {
     button: gtk::MenuButton,
@@ -24,7 +27,7 @@ struct Row {
 impl SortPicker {
     /// A picker of the sorts named `names`, calling `pick` with the position of the one
     /// clicked: it stays open, to turn that sort around with another click.
-    pub fn new(names: &[&str], pick: impl Fn(usize) + 'static) -> Self {
+    pub fn new(names: &[String], pick: impl Fn(usize) + 'static) -> Self {
         let pick = Rc::new(pick);
         let list = gtk::Box::new(gtk::Orientation::Vertical, 0);
         let mut rows = Vec::with_capacity(names.len());
@@ -35,7 +38,7 @@ impl SortPicker {
             let content = gtk::Box::new(gtk::Orientation::Horizontal, 0);
             content.append(
                 &gtk::Label::builder()
-                    .label(*name)
+                    .label(name.as_str())
                     .xalign(0.0)
                     .hexpand(true)
                     .build(),
@@ -49,7 +52,7 @@ impl SortPicker {
             button.connect_clicked(move |_| pick(index));
             list.append(&button);
             rows.push(Row {
-                name: (*name).to_owned(),
+                name: name.clone(),
                 button,
                 arrow,
             });
@@ -81,7 +84,7 @@ impl SortPicker {
             "view-sort-ascending-symbolic"
         }));
         self.button
-            .set_tooltip_text(Some(&format!("Sort By {name}, {order}")));
+            .set_tooltip_text(Some(&tr!("sort-by", sort = name, order = order)));
         let arrow = if descending {
             path_icon::DOWN
         } else {
@@ -93,7 +96,7 @@ impl SortPicker {
             row.arrow.set_opacity(if is_picked { 1.0 } else { 0.0 });
             row.arrow.set_path(arrow);
             let label = if is_picked {
-                format!("{}, {order}", row.name)
+                tr!("sort-picked", sort = row.name.as_str(), order = order)
             } else {
                 row.name.clone()
             };

@@ -31,6 +31,8 @@ pub struct Settings {
     pub quality: Quality,
     /// The audio output to play through, by its id, or the system's default when `None`.
     pub output: Option<String>,
+    /// The language to speak, as a BCP 47 tag, or the system's when `None`.
+    pub language: Option<String>,
 }
 
 impl Default for Settings {
@@ -46,6 +48,7 @@ impl Default for Settings {
             discover_genres: Vec::new(),
             quality: Quality::default(),
             output: None,
+            language: None,
         }
     }
 }

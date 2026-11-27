@@ -4,7 +4,10 @@ use std::time::Duration;
 
 use qobuz::{Client, auth::BrowserLogin, models::User};
 
-use crate::session_store::{self, SessionStore};
+use crate::{
+    i18n::tr,
+    session_store::{self, SessionStore},
+};
 
 /// How long the sign-in page stays usable before we stop listening for its redirect.
 const LOGIN_TIMEOUT: Duration = Duration::from_mins(10);
@@ -20,9 +23,9 @@ pub struct Account {
 pub enum Error {
     #[error(transparent)]
     Qobuz(#[from] qobuz::Error),
-    #[error("Can't save the session: {0}")]
+    #[error("{}", tr!("sign-in-cannot-save", error = .0.to_string()))]
     Store(#[from] session_store::Error),
-    #[error("The sign-in took too long. Try again.")]
+    #[error("{}", tr!("sign-in-timed-out"))]
     TimedOut,
 }
 

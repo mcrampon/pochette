@@ -13,6 +13,7 @@ use crate::{
     covers::VisibleCovers,
     favorites::{Heart, with_heart},
     format,
+    i18n::tr,
     playback::{CoverActions, PlayButton},
     tile_grid::TileGrid,
     tile_strip::TileStrip,
@@ -327,7 +328,7 @@ pub fn album_row(
     let header = row_header(title);
     if let Some((see_all, more_beyond)) = see_all {
         let button = gtk::Button::builder()
-            .label("See All")
+            .label(tr!("see-all"))
             .css_classes(["flat"])
             .margin_start(6)
             .visible(more_beyond)

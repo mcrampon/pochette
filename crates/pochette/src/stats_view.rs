@@ -16,6 +16,7 @@ use crate::{
     covers::VisibleCovers,
     format,
     history::{Period, Summary},
+    i18n::tr,
     navigation::{Destination, Navigator, NavigatorMsg},
     playback::CoverActions,
     player::Player,
@@ -132,10 +133,10 @@ impl Component for StatsView {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let year_picker = ChoicePicker::new("Year");
+        let year_picker = ChoicePicker::new(&tr!("stats-year"));
         let input = sender.input_sender().clone();
         year_picker.connect_picked(move |position| input.emit(StatsViewMsg::Year(position)));
-        let month_picker = ChoicePicker::new("Month");
+        let month_picker = ChoicePicker::new(&tr!("stats-month"));
         let input = sender.input_sender().clone();
         month_picker.connect_picked(move |position| input.emit(StatsViewMsg::Month(position)));
         let input = sender.input_sender().clone();
@@ -267,7 +268,7 @@ impl StatsView {
         self.period = Some(period);
 
         let mut years: Vec<String> = self.years.iter().map(ToString::to_string).collect();
-        years.push("All Time".to_owned());
+        years.push(tr!("stats-all-time"));
         let year_position = match period {
             Period::Year(year) | Period::Month(year, _) => {
                 self.years.iter().position(|y| *y == year).unwrap_or(0)
@@ -281,12 +282,8 @@ impl StatsView {
             Period::All => None,
         };
         self.months = year.map(|year| history.months(year)).unwrap_or_default();
-        let mut months = vec!["Whole Year".to_owned()];
-        months.extend(
-            self.months
-                .iter()
-                .map(|month| format::month(*month).to_owned()),
-        );
+        let mut months = vec![tr!("stats-whole-year")];
+        months.extend(self.months.iter().map(|month| format::month(*month)));
         let month_position = match period {
             Period::Month(_, month) => self
                 .months
@@ -332,7 +329,7 @@ impl StatsView {
             (history.summary(period), period)
         };
 
-        let header = album_tile::row_header("Listening Stats");
+        let header = album_tile::row_header(&tr!("menu-stats"));
         let pickers = gtk::Box::builder()
             .spacing(6)
             .margin_start(12)
@@ -378,7 +375,7 @@ impl StatsView {
             .collect();
         if !self.albums.is_empty() {
             let row = gtk::Box::new(gtk::Orientation::Vertical, 6);
-            row.append(&album_tile::row_header("Top Albums"));
+            row.append(&album_tile::row_header(&tr!("stats-top-albums")));
             let grid = album_tile::unbounded_grid();
             row.append(&grid);
             self.content.append(&row);
@@ -448,16 +445,13 @@ fn empty() -> gtk::Box {
         .build();
     empty.append(
         &gtk::Label::builder()
-            .label("Nothing Played Yet")
+            .label(tr!("stats-nothing"))
             .css_classes(["pochette-heading"])
             .build(),
     );
     empty.append(
         &gtk::Label::builder()
-            .label(
-                "Play some albums: how much you listen, your top albums, artists and \
-                 genres show up here.",
-            )
+            .label(tr!("stats-nothing-hint"))
             .wrap(true)
             .max_width_chars(50)
             .justify(gtk::Justification::Center)
@@ -480,9 +474,9 @@ fn numbers(summary: &Summary) -> gtk::FlowBox {
         .margin_end(36)
         .build();
     let stats = [
-        (format::listening_time(summary.time), "Listened"),
-        (summary.album_plays.to_string(), "Album Plays"),
-        (summary.artists.len().to_string(), "Artists"),
+        (format::listening_time(summary.time), tr!("stats-listened")),
+        (summary.album_plays.to_string(), tr!("stats-album-plays")),
+        (summary.artists.len().to_string(), tr!("stats-artists")),
     ];
     for (value, name) in stats {
         let stat = gtk::Box::builder()
@@ -499,7 +493,7 @@ fn numbers(summary: &Summary) -> gtk::FlowBox {
         );
         stat.append(
             &gtk::Label::builder()
-                .label(name)
+                .label(&name)
                 .xalign(0.0)
                 .css_classes(["dim-label"])
                 .build(),
@@ -513,12 +507,12 @@ fn numbers(summary: &Summary) -> gtk::FlowBox {
 /// bars; clicking a year or a month with plays shows it.
 fn timeline(summary: &Summary, period: Period, sender: &ComponentSender<StatsView>) -> gtk::Box {
     let title = match period {
-        Period::All => "By Year",
-        Period::Year(_) => "By Month",
-        Period::Month(..) => "By Day",
+        Period::All => tr!("stats-by-year"),
+        Period::Year(_) => tr!("stats-by-month"),
+        Period::Month(..) => tr!("stats-by-day"),
     };
     let section = gtk::Box::new(gtk::Orientation::Vertical, 12);
-    section.append(&album_tile::row_header(title));
+    section.append(&album_tile::row_header(&title));
 
     let bars = gtk::Box::builder()
         .homogeneous(true)
@@ -545,13 +539,18 @@ fn timeline(summary: &Summary, period: Period, sender: &ComponentSender<StatsVie
                 Some(Period::Year(bucket)),
             ),
             Period::Year(year) => (
-                format::month(bucket).to_owned(),
-                format::short_month(bucket).to_owned(),
+                format::month(bucket),
+                format::short_month(bucket),
                 Some(Period::Month(year, bucket)),
             ),
             // Only some days named, or they wouldn't fit.
             Period::Month(_, month) => (
-                format!("{} {bucket}", format::month(month)),
+                tr!(
+                    "stats-day",
+                    month = format::month(month),
+                    number = month,
+                    day = bucket
+                ),
                 if bucket == 1 || bucket % 5 == 0 {
                     bucket.to_string()
                 } else {
@@ -564,7 +563,11 @@ fn timeline(summary: &Summary, period: Period, sender: &ComponentSender<StatsVie
         if few {
             column.set_width_request(FEW_BARS_WIDTH);
         }
-        column.set_tooltip_text(Some(&format!("{name}: {}", format::listening_time(time))));
+        column.set_tooltip_text(Some(&tr!(
+            "stats-bar",
+            name = name,
+            time = format::listening_time(time),
+        )));
         if let Some(opens) = opens.filter(|_| time > 0) {
             column.add_css_class("pochette-bar-column");
             column.set_cursor_from_name(Some("pointer"));
@@ -629,7 +632,7 @@ fn card(title: &str) -> (gtk::Box, gtk::ListBox) {
 }
 
 fn top_artists(summary: &Summary, sender: &ComponentSender<StatsView>) -> gtk::Box {
-    let (card, list) = card("Top Artists");
+    let (card, list) = card(&tr!("stats-top-artists"));
     let artists: Vec<_> = summary.artists.iter().take(TOP).cloned().collect();
     for (rank, (artist, time)) in artists.iter().enumerate() {
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
@@ -676,7 +679,7 @@ fn top_artists(summary: &Summary, sender: &ComponentSender<StatsView>) -> gtk::B
 }
 
 fn top_genres(summary: &Summary) -> gtk::Box {
-    let (card, list) = card("Top Genres");
+    let (card, list) = card(&tr!("stats-top-genres"));
     let total: u64 = summary.genres.iter().map(|(_, time)| time).sum();
     for (genre, time) in summary.genres.iter().take(TOP) {
         #[expect(clippy::cast_precision_loss)]
@@ -694,7 +697,10 @@ fn top_genres(summary: &Summary) -> gtk::Box {
         );
         line.append(
             &gtk::Label::builder()
-                .label(format!("{:.0}%", share * 100.0))
+                .label(tr!(
+                    "stats-share",
+                    percent = format!("{:.0}", share * 100.0)
+                ))
                 .css_classes(["dim-label", "pochette-numeric"])
                 .build(),
         );

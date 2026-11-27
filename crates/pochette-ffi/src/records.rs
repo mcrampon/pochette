@@ -122,10 +122,7 @@ impl AlbumPage {
         let discs = tracks.iter().map(|track| track.disc).max().unwrap_or(1);
         Self {
             card: AlbumCard::from(album),
-            kind: album
-                .release_type
-                .as_deref()
-                .map(|kind| format::release_type(kind).to_owned()),
+            kind: album.release_type.as_deref().map(format::release_type),
             label: album.label.as_ref().map(|label| label.name.clone()),
             released: album
                 .release_date_original

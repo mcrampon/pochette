@@ -32,6 +32,7 @@ class PochetteApp : Application() {
                     appVersion = packageManager.getPackageInfo(packageName, 0).versionName.orEmpty(),
                 ),
             )
+        Language.tell(this)
         sync = Sync(this, core, scope)
         SyncWorker.schedule(this, Settings(this).syncInBackground)
     }

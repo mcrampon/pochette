@@ -1,6 +1,7 @@
 package io.github.mcrampon.pochette
 
 import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -29,8 +30,13 @@ class MainActivity : ComponentActivity() {
     /** No browser could open the sign-in page. */
     private var browserMissing by mutableStateOf(false)
 
+    // In the language picked, before Android 13, which does it itself.
+    override fun attachBaseContext(newBase: Context) = super.attachBaseContext(Language.wrap(newBase))
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Again, as picking a language shows the activity again.
+        Language.tell(this)
         enableEdgeToEdge()
         comeBackOnceRedirected()
         setContent {

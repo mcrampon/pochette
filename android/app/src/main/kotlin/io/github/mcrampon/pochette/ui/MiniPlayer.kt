@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.mcrampon.pochette.R
 import io.github.mcrampon.pochette.playback.NowPlaying
+import androidx.compose.ui.res.stringResource
 
 /** What's playing, under every screen: tap it to open its album. */
 @Composable
@@ -39,7 +40,7 @@ fun MiniPlayer(now: NowPlaying, onClick: () -> Unit, onPlayPause: () -> Unit, on
             Column(Modifier.weight(1f)) {
                 Text(now.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    now.error ?: now.artist,
+                    now.error?.let { stringResource(it) } ?: now.artist,
                     style = MaterialTheme.typography.bodySmall,
                     color = if (now.error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -49,11 +50,11 @@ fun MiniPlayer(now: NowPlaying, onClick: () -> Unit, onPlayPause: () -> Unit, on
             IconButton(onClick = onPlayPause) {
                 Icon(
                     painterResource(if (now.playing) R.drawable.ic_pause else R.drawable.ic_play),
-                    contentDescription = if (now.playing) "Pause" else "Play",
+                    contentDescription = stringResource(if (now.playing) R.string.pause else R.string.play),
                 )
             }
             IconButton(onClick = onNext, enabled = now.hasNext) {
-                Icon(painterResource(R.drawable.ic_skip_next), contentDescription = "Next Track")
+                Icon(painterResource(R.drawable.ic_skip_next), contentDescription = stringResource(R.string.next_track))
             }
         }
     }

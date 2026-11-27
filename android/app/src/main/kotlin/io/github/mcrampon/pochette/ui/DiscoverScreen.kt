@@ -32,6 +32,9 @@ import io.github.mcrampon.pochette.core.Discover
 import io.github.mcrampon.pochette.core.Genre
 import io.github.mcrampon.pochette.core.PochetteException
 import io.github.mcrampon.pochette.core.Section
+import androidx.annotation.StringRes
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 
 /** What can be asked of Discover. */
 class DiscoverActions(
@@ -53,12 +56,12 @@ fun DiscoverScreen(discover: Load<Discover>, actions: DiscoverActions) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Discover") },
+                title = { Text(stringResource(R.string.tab_discover)) },
                 actions = {
                     IconButton(onClick = { picking = true }) {
                         Icon(
                             painterResource(R.drawable.ic_filter_list),
-                            contentDescription = "Genres",
+                            contentDescription = stringResource(R.string.genres),
                             tint = if (picked.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
                         )
                     }
@@ -70,13 +73,13 @@ fun DiscoverScreen(discover: Load<Discover>, actions: DiscoverActions) {
         PullToRefreshBox(isRefreshing = false, onRefresh = actions.load, modifier = Modifier.fillMaxSize().padding(padding)) {
             when (discover) {
                 Load.Pending -> Loading()
-                is Load.Failed -> Failed("Can't load Discover: ${discover.error}", onRetry = actions.load)
+                is Load.Failed -> Failed(stringResource(R.string.cant_load_discover, discover.error), onRetry = actions.load)
                 is Load.Done ->
                     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
                         for ((section, list) in sections(discover.value)) {
                             item(key = section.name) {
                                 Column {
-                                    Heading(title(section), onSeeAll = { actions.seeAll(section) }.takeIf { list.hasMore })
+                                    Heading(stringResource(title(section)), onSeeAll = { actions.seeAll(section) }.takeIf { list.hasMore })
                                     AlbumShelf(list.albums, onOpen = actions.open, rows = 2, caption = caption(section))
                                 }
                             }
@@ -98,23 +101,25 @@ private fun sections(discover: Discover): List<Pair<Section, AlbumList>> =
 /** What tiles say under the artist: in the Press Awards, which awards. */
 fun caption(section: Section): Caption = if (section == Section.PRESS_AWARDS) awards else { _ -> null }
 
+@StringRes
 fun title(section: Section) =
     when (section) {
-        Section.NEW_RELEASES -> "New Releases"
-        Section.PRESS_AWARDS -> "Press Awards"
-        Section.IDEAL_DISCOGRAPHY -> "Ideal Discography"
+        Section.NEW_RELEASES -> R.string.new_releases
+        Section.PRESS_AWARDS -> R.string.press_awards
+        Section.IDEAL_DISCOGRAPHY -> R.string.ideal_discography
     }
 
 /** The genres to show, none for all. */
 @Composable
 private fun GenresDialog(actions: DiscoverActions, picked: List<ULong>, onDismiss: () -> Unit) {
+    val resources = LocalResources.current
     val genres by produceState<Load<List<Pair<ULong, String>>>>(Load.Pending) {
         value =
             try {
                 Load.Done(actions.genres().map { it.id to it.name })
             } catch (err: PochetteException) {
-                Load.Failed("Can't load the genres: ${err.message}")
+                Load.Failed(resources.getString(R.string.cant_load_genres, err.message.orEmpty()))
             }
     }
-    ChecklistDialog("Genres", genres, picked, all = "All Genres", onPick = actions.pick, onDismiss = onDismiss)
+    ChecklistDialog(stringResource(R.string.genres), genres, picked, all = stringResource(R.string.all_genres), onPick = actions.pick, onDismiss = onDismiss)
 }

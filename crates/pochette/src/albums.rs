@@ -21,6 +21,7 @@ use crate::{
     checklist::Checklist,
     covers::VisibleCovers,
     favorites::Favorites,
+    i18n::tr,
     library::{self, Entry, Sort, View},
     navigation::{Destination, Navigator, NavigatorMsg},
     playback::CoverActions,
@@ -147,7 +148,7 @@ impl Component for AlbumsPage {
                     set_valign: gtk::Align::Center,
 
                     gtk::Label {
-                        set_label: "Can't Load Your Albums",
+                        set_label: &tr!("albums-cannot-load"),
                         add_css_class: "pochette-heading",
                     },
                     gtk::Label {
@@ -159,7 +160,7 @@ impl Component for AlbumsPage {
                         set_justify: gtk::Justification::Center,
                     },
                     gtk::Button {
-                        set_label: "Try Again",
+                        set_label: &tr!("try-again"),
                         set_halign: gtk::Align::Center,
                         connect_clicked => AlbumsMsg::Reload,
                     },
@@ -174,11 +175,11 @@ impl Component for AlbumsPage {
                     set_valign: gtk::Align::Center,
 
                     gtk::Label {
-                        set_label: "No Saved Albums",
+                        set_label: &tr!("albums-none"),
                         add_css_class: "pochette-heading",
                     },
                     gtk::Label {
-                        set_label: "Albums you add to your favorites on Qobuz appear here.",
+                        set_label: &tr!("albums-none-hint"),
                         add_css_class: "dim-label",
                     },
                 },
@@ -199,7 +200,7 @@ impl Component for AlbumsPage {
                             set_width_request: 120,
                             // Searching is quick, so it needn't wait long for the typing to pause.
                             set_search_delay: 60,
-                            set_placeholder_text: Some("Search albums, artists, labels"),
+                            set_placeholder_text: Some(&tr!("albums-search")),
                             connect_search_changed[sender] => move |entry| {
                                 sender.input(AlbumsMsg::Search(entry.text().into()));
                             },
@@ -216,10 +217,10 @@ impl Component for AlbumsPage {
                         gtk::Button {
                             set_icon_name: "media-playlist-shuffle-symbolic",
                             #[watch]
-                            set_tooltip_text: Some(if model.view.is_filtered() {
-                                "Play a Random Album From These"
+                            set_tooltip_text: Some(&if model.view.is_filtered() {
+                                tr!("albums-random-filtered")
                             } else {
-                                "Play a Random Album"
+                                tr!("albums-random")
                             }),
                             set_margin_start: 6,
                             #[watch]
@@ -258,11 +259,11 @@ impl Component for AlbumsPage {
                         set_visible: model.shown == 0,
 
                         gtk::Label {
-                            set_label: "No Matching Albums",
+                            set_label: &tr!("albums-no-match"),
                             add_css_class: "pochette-heading",
                         },
                         gtk::Button {
-                            set_label: "Clear Search and Filters",
+                            set_label: &tr!("albums-clear-filters"),
                             set_halign: gtk::Align::Center,
                             connect_clicked => AlbumsMsg::ClearFilters,
                         },
@@ -281,7 +282,7 @@ impl Component for AlbumsPage {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let favorites = actions.favorites.clone();
-        let sort_labels: Vec<&str> = Sort::ALL.iter().map(|sort| sort.label()).collect();
+        let sort_labels: Vec<String> = Sort::ALL.iter().map(|sort| sort.label()).collect();
         let settings = Settings::load();
         let input = sender.input_sender().clone();
         let sort_picker = SortPicker::new(&sort_labels, move |position| {
@@ -303,8 +304,8 @@ impl Component for AlbumsPage {
             grid: TypedGridView::new(),
             visible: Rc::default(),
             search: gtk::SearchEntry::new(),
-            genre_picker: Checklist::new("Genres"),
-            decade_picker: Checklist::new("Decades"),
+            genre_picker: Checklist::new(&tr!("genres"), &tr!("genres-all")),
+            decade_picker: Checklist::new(&tr!("decades"), &tr!("decades-all")),
             sort_picker,
             client: None,
             nav: Navigator::new(player.clone(), actions.clone(), {
@@ -580,7 +581,7 @@ impl AlbumsPage {
         let labels: Vec<String> = self
             .decades
             .iter()
-            .map(|decade| format!("{decade}s"))
+            .map(|decade| tr!("decade", decade = decade))
             .collect();
         let picked: Vec<usize> = self
             .view
@@ -597,8 +598,11 @@ impl AlbumsPage {
             .iter()
             .position(|sort| *sort == self.view.sort)
             .unwrap_or(0);
-        self.sort_picker
-            .show(position, self.view.is_descending(), self.view.order_label());
+        self.sort_picker.show(
+            position,
+            self.view.is_descending(),
+            &self.view.order_label(),
+        );
     }
 
     /// Remember the decades and order picked, for the next run.

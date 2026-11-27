@@ -21,6 +21,9 @@ gtk = { package = "gtk4", version = "0.11", features = ["v4_14"] }
 relm4 = "0.11"
 gstreamer = "0.25"
 futures-util = "0.3"
+# Translations, with Fluent: pure Rust, built into the apps.
+fluent-bundle = "0.16"
+unic-langid = "0.9"
 humantime = "2"
 # Local time, without GLib, for the stats: it reads Android's time zones too.
 jiff = "0.2"

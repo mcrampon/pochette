@@ -21,6 +21,7 @@ use crate::{
     covers,
     favorites::{Favorites, Heart, with_heart},
     format,
+    i18n::tr,
     lyrics_view::{LyricsView, LyricsViewMsg},
     outputs::OutputPicker,
     path_icon::{self, PathIcon},
@@ -172,7 +173,7 @@ impl Component for NowPlaying {
                                     #[watch]
                                     set_visible: model.status.quality.is_some(),
                                     set_popover: Some(&quality_popover),
-                                    set_tooltip_text: Some("Quality"),
+                                    set_tooltip_text: Some(&tr!("now-playing-quality")),
                                     add_css_class: "pochette-quality",
                                     set_halign: gtk::Align::Center,
                                     set_margin_top: 6,
@@ -213,7 +214,7 @@ impl Component for NowPlaying {
                               add_css_class: "circular",
                               #[watch]
                               update_property: &[gtk::accessible::Property::Label(
-                                  if model.showing_lyrics { "Show the Cover" } else { "Show the Lyrics" },
+                                  &if model.showing_lyrics { tr!("now-playing-show-cover") } else { tr!("now-playing-show-lyrics") },
                               )],
                               connect_clicked[sender] => move |_| {
                                   sender.input(NowPlayingMsg::ToggleLyrics);
@@ -228,7 +229,7 @@ impl Component for NowPlaying {
                             #[local_ref]
                             progress -> gtk::Scale {
                                 set_draw_value: false,
-                                set_tooltip_text: Some("Position"),
+                                set_tooltip_text: Some(&tr!("now-playing-position")),
                                 connect_change_value[sender] => move |_, _, value| {
                                     sender.input(NowPlayingMsg::Scrub(value));
                                     glib::Propagation::Proceed
@@ -262,7 +263,7 @@ impl Component for NowPlaying {
 
                             gtk::Button {
                                 set_icon_name: "media-skip-backward-symbolic",
-                                set_tooltip_text: Some("Previous"),
+                                set_tooltip_text: Some(&tr!("previous")),
                                 set_valign: gtk::Align::Center,
                                 add_css_class: "circular",
                                 add_css_class: "flat",
@@ -277,7 +278,7 @@ impl Component for NowPlaying {
                                     "media-playback-start-symbolic"
                                 },
                                 #[watch]
-                                set_tooltip_text: Some(if model.is_playing() { "Pause" } else { "Play" }),
+                                set_tooltip_text: Some(&if model.is_playing() { tr!("pause") } else { tr!("play") }),
                                 add_css_class: "circular",
                                 add_css_class: "suggested-action",
                                 add_css_class: "pochette-play-pause",
@@ -285,7 +286,7 @@ impl Component for NowPlaying {
                             },
                             gtk::Button {
                                 set_icon_name: "media-skip-forward-symbolic",
-                                set_tooltip_text: Some("Next"),
+                                set_tooltip_text: Some(&tr!("next")),
                                 set_valign: gtk::Align::Center,
                                 add_css_class: "circular",
                                 add_css_class: "flat",
@@ -310,7 +311,7 @@ impl Component for NowPlaying {
                             gtk::Scale::with_range(gtk::Orientation::Horizontal, 0.0, 1.0, 0.05) {
                                 set_hexpand: true,
                                 set_draw_value: false,
-                                set_tooltip_text: Some("Volume"),
+                                set_tooltip_text: Some(&tr!("now-playing-volume")),
                                 set_value: model.player.volume(),
                                 connect_value_changed[sender] => move |scale| {
                                     sender.input(NowPlayingMsg::Volume(scale.value()));
@@ -333,7 +334,7 @@ impl Component for NowPlaying {
                         set_spacing: 6,
 
                         gtk::Label {
-                            set_label: "Tracks",
+                            set_label: &tr!("now-playing-tracks"),
                             set_xalign: 0.0,
                             add_css_class: "pochette-kicker",
                         },
@@ -660,16 +661,14 @@ fn quality_popover(sender: &ComponentSender<NowPlaying>) -> gtk::Popover {
         .build();
     content.append(
         &gtk::Label::builder()
-            .label("Best Quality")
+            .label(tr!("quality-best"))
             .xalign(0.0)
             .css_classes(["heading"])
             .build(),
     );
     content.append(
         &gtk::Label::builder()
-            .label(
-                "Each track streams in the best it has, up to this, as your subscription allows.",
-            )
+            .label(tr!("quality-hint"))
             .xalign(0.0)
             .wrap(true)
             .max_width_chars(30)
@@ -696,12 +695,12 @@ fn quality_popover(sender: &ComponentSender<NowPlaying>) -> gtk::Popover {
     gtk::Popover::builder().child(&content).build()
 }
 
-fn quality_name(quality: Quality) -> &'static str {
+fn quality_name(quality: Quality) -> String {
     match quality {
-        Quality::Mp3 => "MP3 \u{b7} 320 kbps",
-        Quality::Cd => "CD \u{b7} 16-bit / 44.1 kHz",
-        Quality::HiRes96 => "Hi-Res \u{b7} up to 24-bit / 96 kHz",
-        Quality::HiRes192 => "Hi-Res \u{b7} up to 24-bit / 192 kHz",
+        Quality::Mp3 => tr!("quality-mp3"),
+        Quality::Cd => tr!("quality-cd"),
+        Quality::HiRes96 => tr!("quality-hi-res-96"),
+        Quality::HiRes192 => tr!("quality-hi-res-192"),
     }
 }
 

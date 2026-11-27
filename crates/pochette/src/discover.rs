@@ -20,6 +20,7 @@ use crate::{
     album_tile::{self, AlbumItem, AlbumWidgets},
     checklist::Checklist,
     covers::VisibleCovers,
+    i18n::tr,
     navigation::{Destination, Navigator, NavigatorMsg},
     playback::CoverActions,
     player::Player,
@@ -177,7 +178,7 @@ impl Component for DiscoverPage {
                         set_valign: gtk::Align::Center,
 
                         gtk::Label {
-                            set_label: "Can't Load Discover",
+                            set_label: &tr!("discover-cannot-load"),
                             add_css_class: "pochette-heading",
                         },
                         gtk::Label {
@@ -189,7 +190,7 @@ impl Component for DiscoverPage {
                             set_justify: gtk::Justification::Center,
                         },
                         gtk::Button {
-                            set_label: "Try Again",
+                            set_label: &tr!("try-again"),
                             set_halign: gtk::Align::Center,
                             connect_clicked => DiscoverMsg::Reload,
                         },
@@ -248,13 +249,13 @@ impl Component for DiscoverPage {
 
                     gtk::Button {
                         set_icon_name: "go-previous-symbolic",
-                        set_tooltip_text: Some("Back"),
+                        set_tooltip_text: Some(&tr!("back")),
                         add_css_class: "flat",
                         connect_clicked => DiscoverMsg::CloseSection,
                     },
                     gtk::Label {
                         #[watch]
-                        set_label: model.section.map_or("", title),
+                        set_label: &model.section.map_or_else(String::new, title),
                         add_css_class: "pochette-heading",
                         set_hexpand: true,
                         set_xalign: 0.0,
@@ -305,10 +306,10 @@ impl Component for DiscoverPage {
                         #[watch]
                         set_visible: !model.loading_more,
                         #[watch]
-                        set_label: if model.section_error.is_some() {
-                            "Can't Load These Albums"
+                        set_label: &if model.section_error.is_some() {
+                            tr!("discover-section-cannot-load")
                         } else {
-                            "No Albums Here"
+                            tr!("discover-section-empty")
                         },
                         add_css_class: "pochette-heading",
                     },
@@ -347,8 +348,8 @@ impl Component for DiscoverPage {
             error: String::new(),
             genres: Vec::new(),
             genre_ids: Settings::load().discover_genres,
-            genre_picker: Checklist::new("Genres"),
-            section_genre_picker: Checklist::new("Genres"),
+            genre_picker: Checklist::new(&tr!("genres"), &tr!("genres-all")),
+            section_genre_picker: Checklist::new(&tr!("genres"), &tr!("genres-all")),
             rows: gtk::Box::default(),
             row_albums: Vec::new(),
             row_tiles: Vec::new(),
@@ -629,7 +630,7 @@ impl DiscoverPage {
             }
             let (open, see_all) = (sender.clone(), sender.clone());
             let (row, tiles) = album_tile::album_row(
-                title(section),
+                &title(section),
                 &albums,
                 |album| caption(section, album),
                 (&self.row_covers, &self.actions),
@@ -711,11 +712,11 @@ impl DiscoverPage {
     }
 }
 
-fn title(section: Section) -> &'static str {
+fn title(section: Section) -> String {
     match section {
-        Section::NewReleases => "New Releases",
-        Section::PressAwards => "Press Awards",
-        Section::IdealDiscography => "Ideal Discography",
+        Section::NewReleases => tr!("discover-new-releases"),
+        Section::PressAwards => tr!("discover-press-awards"),
+        Section::IdealDiscography => tr!("discover-ideal-discography"),
     }
 }
 

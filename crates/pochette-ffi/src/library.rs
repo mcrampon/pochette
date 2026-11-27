@@ -65,14 +65,14 @@ impl From<LibraryView> for View {
 #[uniffi::export]
 #[must_use]
 pub fn sort_label(sort: Sort) -> String {
-    CoreSort::from(sort).label().to_owned()
+    CoreSort::from(sort).label()
 }
 
 /// How `view`'s order reads: "Newest First", "A to Z"…
 #[uniffi::export]
 #[must_use]
 pub fn order_label(view: LibraryView) -> String {
-    View::from(view).order_label().to_owned()
+    View::from(view).order_label()
 }
 
 #[uniffi::export]

@@ -1,6 +1,7 @@
 package io.github.mcrampon.pochette.playback
 
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
@@ -22,6 +23,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import io.github.mcrampon.pochette.Language
 import io.github.mcrampon.pochette.MainActivity
 import io.github.mcrampon.pochette.PochetteApp
 import io.github.mcrampon.pochette.R
@@ -45,6 +47,9 @@ class PlaybackService : MediaSessionService() {
     /** Held here: preferences only keep a weak reference to their listeners. */
     private lateinit var qualityChanged: SharedPreferences.OnSharedPreferenceChangeListener
 
+    // The notification in the language picked, before Android 13, which does it itself.
+    override fun attachBaseContext(newBase: Context) = super.attachBaseContext(Language.wrap(newBase))
+
     override fun onCreate() {
         super.onCreate()
         // The app's icon in the status bar while it plays, not Media3's.
@@ -52,6 +57,7 @@ class PlaybackService : MediaSessionService() {
             DefaultMediaNotificationProvider.Builder(this).build().apply { setSmallIcon(R.drawable.ic_notification) },
         )
         val core = (application as PochetteApp).core
+        Language.tell(this)
         val settings = Settings(this)
         val streams = Streams(core) { settings.quality }
         // The next tracks stream in the new quality, not in the one they were fetched in.

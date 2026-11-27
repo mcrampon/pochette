@@ -21,9 +21,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.mcrampon.pochette.AppModel
+import io.github.mcrampon.pochette.Language
 import io.github.mcrampon.pochette.Screen
 import io.github.mcrampon.pochette.Tab
 import io.github.mcrampon.pochette.core.AlbumCard
@@ -68,7 +71,7 @@ fun SignedIn(model: AppModel) {
                                 selected = tab == navigation.tab,
                                 onClick = { navigation.select(tab).forEach(saved::removeState) },
                                 icon = { Icon(painterResource(tab.icon), contentDescription = null) },
-                                label = { Text(tab.label) },
+                                label = { Text(stringResource(tab.label)) },
                             )
                         }
                     }
@@ -192,9 +195,12 @@ private fun Screen(model: AppModel, screen: Screen, now: NowPlaying?, back: () -
             )
         Screen.Settings -> {
             val status by model.sync.status.collectAsStateWithLifecycle()
+            val context = LocalContext.current
             SettingsScreen(
                 status,
                 SettingsActions(
+                    language = { Language.chosen(context) },
+                    setLanguage = { Language.choose(context, it) },
                     setPairable = model::setPairable,
                     pair = model::pair,
                     answer = model::answerPairing,
@@ -206,7 +212,7 @@ private fun Screen(model: AppModel, screen: Screen, now: NowPlaying?, back: () -
                 ),
             )
         }
-        is Screen.Section -> ListScreen(title(screen.section), null, model.list(screen), openAlbum, back, caption(screen.section))
-        is Screen.Releases -> ListScreen(kindTitle(screen.kind), screen.artistName, model.list(screen), openAlbum, back)
+        is Screen.Section -> ListScreen(stringResource(title(screen.section)), null, model.list(screen), openAlbum, back, caption(screen.section))
+        is Screen.Releases -> ListScreen(stringResource(kindTitle(screen.kind)), screen.artistName, model.list(screen), openAlbum, back)
     }
 }

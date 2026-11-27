@@ -18,6 +18,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import io.github.mcrampon.pochette.Paged
 import io.github.mcrampon.pochette.R
 import io.github.mcrampon.pochette.core.AlbumCard
+import androidx.compose.ui.res.stringResource
 
 /** A long list of albums, as "See All" opens: a Discover section, or an artist's releases of one kind. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,13 +50,13 @@ fun ListScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = "Back")
+                        Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.back))
                     }
                 },
             )
         },
         contentWindowInsets = WindowInsets(0),
     ) { padding ->
-        PagedGrid(paged, onOpen, Modifier.fillMaxSize().padding(padding), empty = "No albums here.", caption = caption)
+        PagedGrid(paged, onOpen, Modifier.fillMaxSize().padding(padding), empty = stringResource(R.string.no_albums_here), caption = caption)
     }
 }

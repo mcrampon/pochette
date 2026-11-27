@@ -18,6 +18,7 @@ use crate::{
     covers,
     favorites::{Favorites, Heart, with_heart},
     format, history,
+    i18n::tr,
     navigation::{Destination, PageOutput},
     player::{Player, State, Status},
     plays::Plays,
@@ -129,7 +130,7 @@ impl Component for AlbumPage {
 
                     gtk::Button {
                         set_icon_name: "go-previous-symbolic",
-                        set_tooltip_text: Some("Back"),
+                        set_tooltip_text: Some(&tr!("back")),
                         set_halign: gtk::Align::Start,
                         add_css_class: "flat",
                         add_css_class: "circular",
@@ -173,7 +174,7 @@ impl Component for AlbumPage {
                                     },
                                     gtk::Label {
                                         #[watch]
-                                        set_label: if model.is_playing() { "Pause" } else { "Play" },
+                                        set_label: &if model.is_playing() { tr!("pause") } else { tr!("play") },
                                     },
                                 },
                             },
@@ -271,13 +272,13 @@ impl Component for AlbumPage {
 
                                 gtk::Label {
                                     #[watch]
-                                    set_label: &format!("Can't load the tracks: {}", model.error),
+                                    set_label: &tr!("album-cannot-load", error = model.error.as_str()),
                                     add_css_class: "dim-label",
                                     set_wrap: true,
                                     set_justify: gtk::Justification::Center,
                                 },
                                 gtk::Button {
-                                    set_label: "Try Again",
+                                    set_label: &tr!("try-again"),
                                     set_halign: gtk::Align::Center,
                                     connect_clicked => AlbumPageMsg::Retry,
                                 },
@@ -301,7 +302,7 @@ impl Component for AlbumPage {
                         set_visible: !model.review().is_empty(),
 
                         gtk::Label {
-                            set_label: "About This Album",
+                            set_label: &tr!("album-about"),
                             set_xalign: 0.0,
                             add_css_class: "pochette-heading",
                         },
@@ -497,7 +498,11 @@ impl AlbumPage {
             return String::new();
         };
         let last = format::ago(last, history::now());
-        format!("{} · last played {last}", format::play_count(plays.count))
+        tr!(
+            "album-played",
+            plays = format::play_count(plays.count),
+            last = last
+        )
     }
 
     fn highlight_playing_track(&self) {
@@ -576,7 +581,7 @@ impl AlbumPage {
             let kind = album
                 .release_type
                 .as_deref()
-                .map_or("Album", format::release_type);
+                .map_or_else(|| format::release_type(""), format::release_type);
             match album.year() {
                 Some(year) => format!("{kind} · {year}").to_uppercase(),
                 None => kind.to_uppercase(),
@@ -615,8 +620,8 @@ impl AlbumPage {
             let quality =
                 format::audio_quality(album.maximum_bit_depth, album.maximum_sampling_rate);
             match (album.hires_streamable, quality) {
-                (true, Some(quality)) => format!("Hi-Res · {quality}"),
-                (true, None) => "Hi-Res".to_owned(),
+                (true, Some(quality)) => format!("{} · {quality}", tr!("hi-res")),
+                (true, None) => tr!("hi-res"),
                 (false, Some(quality)) => quality,
                 (false, None) => String::new(),
             }
@@ -668,7 +673,7 @@ fn fill_track_list(
             work = None;
             if several_discs {
                 list.append(&heading(
-                    &format!("Disc {}", track.media_number),
+                    &tr!("album-disc", number = track.media_number),
                     "pochette-disc",
                 ));
             }
@@ -770,7 +775,7 @@ fn track_row(track: &Track, album_artist: &str) -> gtk::ListBoxRow {
 
     if !track.streamable {
         row.add_css_class("pochette-unavailable");
-        row.set_tooltip_text(Some("Not available for streaming"));
+        row.set_tooltip_text(Some(&tr!("track-unavailable")));
     }
     row
 }

@@ -70,6 +70,13 @@ android {
         includeInBundle = false
     }
 
+    // Every language in every install: the settings pick one at any time, with no download.
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
+
     buildFeatures {
         compose = true
     }

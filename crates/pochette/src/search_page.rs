@@ -14,6 +14,7 @@ use crate::{
     album_tile::{self, AlbumItem},
     artist_page::artist_row,
     covers::VisibleCovers,
+    i18n::tr,
     navigation::{Destination, PageOutput},
     playback::CoverActions,
 };
@@ -114,13 +115,13 @@ impl Component for SearchPage {
 
                 gtk::Button {
                     set_icon_name: "go-previous-symbolic",
-                    set_tooltip_text: Some("Back"),
+                    set_tooltip_text: Some(&tr!("back")),
                     add_css_class: "flat",
                     connect_clicked => SearchPageMsg::Back,
                 },
                 gtk::Label {
                     #[watch]
-                    set_label: &format!("\u{201c}{}\u{201d}", model.query.trim()),
+                    set_label: &tr!("search-query", query = model.query.trim()),
                     set_ellipsize: gtk::pango::EllipsizeMode::End,
                     add_css_class: "pochette-heading",
                 },
@@ -172,12 +173,12 @@ impl Component for SearchPage {
                     #[watch]
                     set_visible: !model.loading(),
                     #[watch]
-                    set_label: if model.error.is_some() {
-                        "Can't Search Qobuz"
+                    set_label: &if model.error.is_some() {
+                        tr!("search-failed")
                     } else if model.artists.is_empty() {
-                        "Nothing Found"
+                        tr!("search-nothing-found")
                     } else {
-                        "No Albums Found"
+                        tr!("search-no-albums")
                     },
                     add_css_class: "pochette-heading",
                 },
@@ -343,7 +344,7 @@ impl SearchPage {
         self.artists = artists;
         if !self.artists.is_empty() {
             let sender = sender.clone();
-            let row = artist_row("Artists", &self.artists, move |index| {
+            let row = artist_row(&tr!("search-artists"), &self.artists, move |index| {
                 sender.input(SearchPageMsg::OpenArtist(index));
             });
             row.set_hexpand(true);

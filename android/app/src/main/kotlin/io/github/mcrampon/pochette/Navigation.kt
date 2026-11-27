@@ -1,5 +1,6 @@
 package io.github.mcrampon.pochette
 
+import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -57,11 +58,11 @@ sealed interface Screen {
 }
 
 /** The tabs, at the bottom: each keeps its own stack of screens. */
-enum class Tab(val label: String, val root: Screen, val icon: Int) {
-    Albums("Albums", Screen.Albums, R.drawable.ic_album),
-    Discover("Discover", Screen.Discover, R.drawable.ic_explore),
-    Search("Search", Screen.Search, R.drawable.ic_search),
-    Stats("Stats", Screen.Stats, R.drawable.ic_bar_chart),
+enum class Tab(@StringRes val label: Int, val root: Screen, val icon: Int) {
+    Albums(R.string.tab_albums, Screen.Albums, R.drawable.ic_album),
+    Discover(R.string.tab_discover, Screen.Discover, R.drawable.ic_explore),
+    Search(R.string.tab_search, Screen.Search, R.drawable.ic_search),
+    Stats(R.string.tab_stats, Screen.Stats, R.drawable.ic_bar_chart),
 }
 
 /** The tab shown, and each tab's stack, the last screen on top. */

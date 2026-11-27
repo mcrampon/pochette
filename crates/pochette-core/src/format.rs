@@ -1,24 +1,6 @@
-//! How values read in the UI.
+//! How values read in the UI, in the language [`crate::i18n::set_languages`] set.
 
-use crate::time;
-
-const MONTHS: [&str; 12] = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
-const FULL_MONTHS: [&str; 12] = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-];
+use crate::{i18n::tr, time};
 
 /// A track length: "3:33", or "1:02:05" past an hour.
 #[must_use]
@@ -37,9 +19,9 @@ pub fn album_duration(seconds: u32) -> String {
     // Rounded to the nearest minute.
     let minutes = (seconds + 30) / 60;
     match (minutes / 60, minutes % 60) {
-        (0, minutes) => format!("{minutes} min"),
-        (hours, 0) => format!("{hours} h"),
-        (hours, minutes) => format!("{hours} h {minutes} min"),
+        (0, minutes) => tr!("duration-minutes", minutes = minutes),
+        (hours, 0) => tr!("duration-hours", hours = hours),
+        (hours, minutes) => tr!("duration-hours-minutes", hours = hours, minutes = minutes),
     }
 }
 
@@ -49,18 +31,17 @@ pub fn audio_quality(bit_depth: Option<u32>, sampling_rate_khz: Option<f32>) -> 
     let (bits, rate) = (bit_depth?, sampling_rate_khz?);
     // 44.1 stays 44.1, 96.0 reads 96.
     let rate = format!("{rate:.1}");
-    let rate = rate.strip_suffix(".0").unwrap_or(&rate);
-    Some(format!("{bits}-bit / {rate} kHz"))
+    let rate = rate.strip_suffix(".0").map_or_else(
+        || rate.replace('.', &tr!("number-decimal-separator")),
+        str::to_owned,
+    );
+    Some(tr!("audio-quality", bits = bits, rate = rate))
 }
 
 /// "1 track", "12 tracks".
 #[must_use]
 pub fn track_count(count: u32) -> String {
-    if count == 1 {
-        "1 track".to_owned()
-    } else {
-        format!("{count} tracks")
-    }
+    tr!("track-count", count = count)
 }
 
 /// Plain text from the simple HTML of Qobuz reviews: paragraphs and line breaks kept,
@@ -153,14 +134,14 @@ fn decode_entity(entity: &str) -> Option<char> {
 
 /// What kind of release Qobuz's `release_type` is: "Album", "EP", "Single"…
 #[must_use]
-pub fn release_type(release_type: &str) -> &'static str {
+pub fn release_type(release_type: &str) -> String {
     match release_type {
-        "single" => "Single",
-        "epk" | "ep" => "EP",
-        "live" => "Live",
-        "compilation" => "Compilation",
-        "boxset" | "box-set" => "Box Set",
-        _ => "Album",
+        "single" => tr!("release-type-single"),
+        "epk" | "ep" => tr!("release-type-ep"),
+        "live" => tr!("release-type-live"),
+        "compilation" => tr!("release-type-compilation"),
+        "boxset" | "box-set" => tr!("release-type-box-set"),
+        _ => tr!("release-type-album"),
     }
 }
 
@@ -172,11 +153,17 @@ pub fn release_date(date: &str) -> String {
         return date.to_owned();
     };
     let month = month
-        .parse::<usize>()
+        .parse::<i32>()
         .ok()
-        .and_then(|month| MONTHS.get(month.checked_sub(1)?));
+        .filter(|month| (1..=12).contains(month));
     match (month, day.parse::<u8>()) {
-        (Some(month), Ok(day)) => format!("{day} {month} {year}"),
+        (Some(number), Ok(day)) => tr!(
+            "release-date",
+            day = day,
+            month = short_month(number),
+            number = number,
+            year = year.to_owned(),
+        ),
         _ => date.to_owned(),
     }
 }
@@ -184,11 +171,7 @@ pub fn release_date(date: &str) -> String {
 /// "1 play", "12 plays".
 #[must_use]
 pub fn play_count(count: u32) -> String {
-    if count == 1 {
-        "1 play".to_owned()
-    } else {
-        format!("{count} plays")
-    }
+    tr!("play-count", count = count)
 }
 
 /// Time spent listening: "45 min", "12 h", or "1,204 h" past a thousand hours.
@@ -196,14 +179,18 @@ pub fn play_count(count: u32) -> String {
 pub fn listening_time(seconds: u64) -> String {
     let minutes = (seconds + 30) / 60;
     if minutes < 60 {
-        return format!("{minutes} min");
+        return tr!("duration-minutes", minutes = minutes);
     }
     let hours = (minutes + 30) / 60;
     let (thousands, rest) = (hours / 1000, hours % 1000);
     if thousands > 0 {
-        format!("{thousands},{rest:03} h")
+        let separator = tr!("number-group-separator");
+        tr!(
+            "duration-hours",
+            hours = format!("{thousands}{separator}{rest:03}")
+        )
     } else {
-        format!("{hours} h")
+        tr!("duration-hours", hours = hours)
     }
 }
 
@@ -217,19 +204,20 @@ pub fn ago(at: i64, now: i64) -> String {
         time::local_unix(year, month, day, 12).map_or(0, |noon| noon / 86_400)
     };
     let days = day(today) - day(then);
-    let (year, month, _) = then;
-    let month_name = FULL_MONTHS
-        .get(usize::try_from(month - 1).unwrap_or_default())
-        .copied()
-        .unwrap_or_default();
+    let (year, number, _) = then;
     match days {
-        ..=0 => "today".to_owned(),
-        1 => "yesterday".to_owned(),
-        2..=6 => format!("{days} days ago"),
-        7..=13 => "a week ago".to_owned(),
-        14..=31 => format!("{} weeks ago", days / 7),
-        _ if year == today.0 => format!("in {month_name}"),
-        _ => format!("in {month_name} {year}"),
+        ..=0 => tr!("ago-today"),
+        1 => tr!("ago-yesterday"),
+        2..=6 => tr!("ago-days", days = days),
+        7..=13 => tr!("ago-week"),
+        14..=31 => tr!("ago-weeks", weeks = days / 7),
+        _ if year == today.0 => tr!("ago-month", month = month(number), number = number),
+        _ => tr!(
+            "ago-month-year",
+            month = month(number),
+            number = number,
+            year = year.to_string(),
+        ),
     }
 }
 
@@ -238,37 +226,31 @@ pub fn ago(at: i64, now: i64) -> String {
 #[must_use]
 pub fn since(at: i64, now: i64) -> String {
     match now - at {
-        ..60 => "just now".to_owned(),
-        seconds @ ..3600 => match seconds / 60 {
-            1 => "a minute ago".to_owned(),
-            minutes => format!("{minutes} minutes ago"),
-        },
-        seconds @ ..86_400 => match seconds / 3600 {
-            1 => "an hour ago".to_owned(),
-            hours => format!("{hours} hours ago"),
-        },
+        ..60 => tr!("since-now"),
+        seconds @ ..3600 => tr!("since-minutes", minutes = seconds / 60),
+        seconds @ ..86_400 => tr!("since-hours", hours = seconds / 3600),
         _ => ago(at, now),
     }
 }
 
-/// A month by its number, from 1: "January".
+/// A month by its number, from 1: "January"; empty for no month.
 #[must_use]
-pub fn month(month: i32) -> &'static str {
-    usize::try_from(month - 1)
-        .ok()
-        .and_then(|index| FULL_MONTHS.get(index))
-        .copied()
-        .unwrap_or_default()
+pub fn month(month: i32) -> String {
+    if (1..=12).contains(&month) {
+        crate::i18n::text(&format!("month-{month}"), None)
+    } else {
+        String::new()
+    }
 }
 
-/// A month by its number, from 1: "Jan".
+/// A month by its number, from 1: "Jan"; empty for no month.
 #[must_use]
-pub fn short_month(month: i32) -> &'static str {
-    usize::try_from(month - 1)
-        .ok()
-        .and_then(|index| MONTHS.get(index))
-        .copied()
-        .unwrap_or_default()
+pub fn short_month(month: i32) -> String {
+    if (1..=12).contains(&month) {
+        crate::i18n::text(&format!("month-short-{month}"), None)
+    } else {
+        String::new()
+    }
 }
 
 #[cfg(test)]

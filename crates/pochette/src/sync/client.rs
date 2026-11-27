@@ -8,15 +8,16 @@ use std::{
 };
 
 use super::{INTERFACE, OBJECT_PATH, Status, bus_name};
+use crate::i18n::tr;
 
 /// How long the service may take to start.
 const START_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("Syncing needs a D-Bus session bus: {0}")]
+    #[error("{}", tr!("sync-no-bus", error = .0.to_string()))]
     Bus(#[from] zbus::Error),
-    #[error("Can't start syncing: {0}")]
+    #[error("{}", tr!("sync-cannot-start", error = .0))]
     Start(String),
 }
 
@@ -57,7 +58,7 @@ impl Client {
                 return Ok(());
             }
         }
-        Err(Error::Start("it didn't answer".to_owned()))
+        Err(Error::Start(tr!("sync-no-answer")))
     }
 
     async fn call<R>(

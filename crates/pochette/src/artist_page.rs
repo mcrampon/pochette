@@ -17,6 +17,7 @@ use crate::{
     album_tile::{self, AlbumWidgets},
     covers::{self, VisibleCovers},
     format,
+    i18n::tr,
     navigation::{Destination, PageOutput},
     playback::CoverActions,
     tile_strip::TileStrip,
@@ -126,7 +127,7 @@ impl Component for ArtistPage {
 
                 gtk::Button {
                     set_icon_name: "go-previous-symbolic",
-                    set_tooltip_text: Some("Back"),
+                    set_tooltip_text: Some(&tr!("back")),
                     set_halign: gtk::Align::Start,
                     set_margin_start: 24,
                     add_css_class: "flat",
@@ -155,7 +156,7 @@ impl Component for ArtistPage {
                         set_hexpand: true,
 
                         gtk::Label {
-                            set_label: "ARTIST",
+                            set_label: &tr!("artist-kicker").to_uppercase(),
                             set_xalign: 0.0,
                             add_css_class: "pochette-kicker",
                         },
@@ -188,7 +189,7 @@ impl Component for ArtistPage {
                         },
                         gtk::Button {
                             #[watch]
-                            set_label: if model.biography_unfolded { "Less" } else { "More" },
+                            set_label: &if model.biography_unfolded { tr!("artist-less") } else { tr!("artist-more") },
                             #[watch]
                             set_visible: model.biography_folds(),
                             set_halign: gtk::Align::Start,
@@ -217,14 +218,14 @@ impl Component for ArtistPage {
 
                         gtk::Label {
                             #[watch]
-                            set_label: &format!("Can't load this artist: {}", model.error),
+                            set_label: &tr!("artist-cannot-load", error = model.error.as_str()),
                             add_css_class: "dim-label",
                             set_wrap: true,
                             set_max_width_chars: 50,
                             set_justify: gtk::Justification::Center,
                         },
                         gtk::Button {
-                            set_label: "Try Again",
+                            set_label: &tr!("try-again"),
                             set_halign: gtk::Align::Center,
                             connect_clicked => ArtistPageMsg::Retry,
                         },
@@ -399,7 +400,7 @@ impl ArtistPage {
             let albums: Vec<Rc<Album>> = albums.albums.into_iter().map(Rc::new).collect();
             let (open, see_all) = (sender.clone(), sender.clone());
             let (row, tiles) = album_tile::album_row(
-                release_kind_title(kind),
+                &release_kind_title(kind),
                 &albums,
                 |_| None,
                 (&self.covers, &self.actions),
@@ -416,7 +417,7 @@ impl ArtistPage {
         }
         if self.releases.is_empty() {
             let none = gtk::Label::builder()
-                .label("No albums to stream from this artist.")
+                .label(tr!("artist-no-albums"))
                 .css_classes(["dim-label"])
                 .margin_start(36)
                 .xalign(0.0)
@@ -428,7 +429,7 @@ impl ArtistPage {
         if !self.similar.is_empty() {
             let sender = sender.clone();
             self.rows.append(&artist_row(
-                "Similar Artists",
+                &tr!("artist-similar"),
                 &self.similar,
                 move |index| {
                     sender.input(ArtistPageMsg::OpenSimilar(index));
@@ -440,13 +441,13 @@ impl ArtistPage {
 }
 
 /// What a kind of releases is called, as a row's title.
-pub fn release_kind_title(kind: ReleaseKind) -> &'static str {
+pub fn release_kind_title(kind: ReleaseKind) -> String {
     match kind {
-        ReleaseKind::Album => "Albums",
-        ReleaseKind::EpSingle => "EPs & Singles",
-        ReleaseKind::Live => "Live",
-        ReleaseKind::Compilation => "Compilations",
-        ReleaseKind::Other => "Other Releases",
+        ReleaseKind::Album => tr!("releases-albums"),
+        ReleaseKind::EpSingle => tr!("releases-eps-singles"),
+        ReleaseKind::Live => tr!("releases-live"),
+        ReleaseKind::Compilation => tr!("releases-compilations"),
+        ReleaseKind::Other => tr!("releases-other"),
     }
 }
 

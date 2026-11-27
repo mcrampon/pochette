@@ -16,6 +16,7 @@ use relm4::{
 };
 
 use crate::{
+    i18n::tr,
     lyrics::{self, Line, Lyrics, Song},
     player::{Player, State, Status},
 };
@@ -241,11 +242,13 @@ impl LyricsView {
                     .build()
                     .upcast_ref(),
             )),
-            Shown::Failed => self.lines_box.append(&message("Can't load the lyrics")),
+            Shown::Failed => self.lines_box.append(&message(&tr!("lyrics-failed"))),
             Shown::Lyrics(Lyrics::Missing) => {
-                self.lines_box.append(&message("No lyrics for this track"));
+                self.lines_box.append(&message(&tr!("lyrics-none")));
             }
-            Shown::Lyrics(Lyrics::Instrumental) => self.lines_box.append(&message("Instrumental")),
+            Shown::Lyrics(Lyrics::Instrumental) => {
+                self.lines_box.append(&message(&tr!("lyrics-instrumental")));
+            }
             Shown::Lyrics(Lyrics::Plain(text)) => {
                 let label = gtk::Label::builder()
                     .label(text)
