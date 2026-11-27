@@ -78,6 +78,19 @@ in your keyring through the Secret Service API (GNOME Keyring, KWallet, KeePassX
 Pochette talks to Qobuz the way its web player does, with the web player's own credentials.
 Qobuz could change that at any time, which would break Pochette until it's updated.
 
+## Opening Qobuz links
+
+Pochette opens Qobuz's links to albums and artists, as Qobuz shares them
+(`https://open.qobuz.com/album/…`). A link to a single track leads to its album: Pochette
+plays albums, whole.
+
+- **Linux:** Pochette opens the `qobuzapp://` links that Qobuz's pages hand to its desktop
+  app, so a Qobuz link clicked anywhere opens in Pochette, through the browser. `pochette`
+  also takes a link on the command line, and hands it to the Pochette already open.
+- **Android:** share a Qobuz link to Pochette, from Qobuz's app or anywhere else. For links
+  to open in Pochette when tapped, allow them once in Android's settings: Apps › Pochette ›
+  Open by default › Add links. Only Qobuz could let Android do it on its own.
+
 ## Paying the artists
 
 Qobuz pays artists and labels for their plays, from what its apps tell it was heard. Pochette

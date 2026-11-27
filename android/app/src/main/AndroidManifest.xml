@@ -37,6 +37,26 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="io.github.mcrampon.pochette" android:host="signed-in" />
             </intent-filter>
+            <!-- Qobuz's links to albums, artists and tracks. Only Qobuz could vouch for the app
+                 opening them, so from Android 12 on, they open here once allowed in the app's
+                 settings: Open by default, Add links. Not autoVerify: qobuz.com can't vouch. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="open.qobuz.com" />
+                <data android:host="play.qobuz.com" />
+                <data android:pathPrefix="/album/" />
+                <data android:pathPrefix="/artist/" />
+                <data android:pathPrefix="/track/" />
+            </intent-filter>
+            <!-- A Qobuz link shared to the app, alone or in a text, as Qobuz's app shares them. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
         <!-- Exported: the system's media controls, headphones and cars connect to it. -->
         <service

@@ -207,3 +207,11 @@ stats-day =
     }
 stats-bar = { $name }: { $time }
 stats-share = { $percent }%
+
+## Track
+
+track-heading = Pojedynczy utwór?
+track-albums-only = Pochette uważa, że utwory należą do swoich albumów, w kolejności wybranej przez artystę. Wyjęcie jednego to jak czytanie tylko jednego rozdziału powieści.
+track-on-album = „{ $track }” czeka na ciebie na albumie { $album }, dokładnie tam, gdzie umieścił go artysta.
+track-open-album = Otwórz album
+track-cannot-load = Nie można znaleźć albumu tego utworu: { $error }

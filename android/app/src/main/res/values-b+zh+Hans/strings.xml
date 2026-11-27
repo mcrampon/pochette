@@ -184,4 +184,11 @@
     <string name="forget">忘记</string>
     <string name="forget_device">忘记 %1$s？</string>
     <string name="forget_device_detail">此手机将停止与它同步。已共享的播放记录会保留。重新配对即可再次同步。</string>
+    <!-- Track -->
+    <string name="track_heading">只听一首？</string>
+    <string name="track_albums_only">Pochette 认为，歌曲应当留在它们的专辑里，按照艺人安排的顺序聆听。单独拿出一首，就像只读小说中的一章。</string>
+    <string name="track_on_album">“%1$s”正在《%2$s》里等你，就在艺人安排的位置。</string>
+    <string name="track_open_album">打开专辑</string>
+    <string name="track_cant_load">找不到这首曲目所在的专辑：%1$s</string>
+    <string name="not_a_qobuz_link">这里没有 Qobuz 专辑、艺人或曲目的链接。</string>
 </resources>

@@ -200,3 +200,11 @@ stats-day = { $day } { $month }
 stats-bar = { $name }: { $time }
 # A genre's share of the time listened.
 stats-share = { $percent }%
+
+## Track
+
+track-heading = A Track on Its Own?
+track-albums-only = Pochette believes songs belong with their albums, in the order the artist chose. Taking one out would be like reading a single chapter of a novel.
+track-on-album = “{ $track }” is waiting for you on { $album }, right where the artist put it.
+track-open-album = Open the Album
+track-cannot-load = Can't find the album this track is on: { $error }

@@ -8,6 +8,7 @@ pub mod format;
 pub mod history;
 pub mod i18n;
 pub mod library;
+pub mod link;
 pub mod listening;
 pub mod lyrics;
 pub mod resume;

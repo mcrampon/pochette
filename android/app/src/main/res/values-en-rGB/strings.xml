@@ -188,4 +188,11 @@
     <string name="forget">Forget</string>
     <string name="forget_device">Forget %1$s?</string>
     <string name="forget_device_detail">This phone stops syncing with it. The plays already shared stay. Pair again to sync again.</string>
+    <!-- Track -->
+    <string name="track_heading">A Track on Its Own?</string>
+    <string name="track_albums_only">Pochette believes songs belong with their albums, in the order the artist chose. Taking one out would be like reading a single chapter of a novel.</string>
+    <string name="track_on_album">“%1$s” is waiting for you on %2$s, right where the artist put it.</string>
+    <string name="track_open_album">Open the Album</string>
+    <string name="track_cant_load">Can\'t find the album this track is on: %1$s</string>
+    <string name="not_a_qobuz_link">No link to a Qobuz album, artist or track here.</string>
 </resources>

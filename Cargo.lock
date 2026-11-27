@@ -2256,6 +2256,7 @@ dependencies = [
  "tracing",
  "unic-langid",
  "unicode-normalization",
+ "url",
  "uuid",
 ]
 

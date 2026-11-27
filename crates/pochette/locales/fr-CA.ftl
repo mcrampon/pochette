@@ -192,3 +192,11 @@ stats-day =
     } { $month }
 stats-bar = { $name } : { $time }
 stats-share = { $percent } %
+
+## Track
+
+track-heading = Une piste toute seule?
+track-albums-only = Pochette croit que chaque piste a sa place dans son album, dans l'ordre choisi par l'artiste. L'en sortir, ce serait comme ne lire qu'un seul chapitre d'un roman.
+track-on-album = « { $track } » vous attend sur { $album }, là où l'artiste l'a placée.
+track-open-album = Ouvrir l'album
+track-cannot-load = Impossible de trouver l'album de cette piste : { $error }

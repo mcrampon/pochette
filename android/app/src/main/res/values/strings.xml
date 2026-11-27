@@ -85,6 +85,17 @@
     <string name="explicit">E</string>
     <string name="about_album">About This Album</string>
 
+    <!-- A track, from a link: Pochette plays albums, whole, so it offers the track's album. -->
+    <string name="track_heading">A Track on Its Own?</string>
+    <string name="track_albums_only">Pochette believes songs belong with their albums, in the order the artist chose. Taking one out would be like reading a single chapter of a novel.</string>
+    <!-- %1$s: the track's title, %2$s: its album's. -->
+    <string name="track_on_album">“%1$s” is waiting for you on %2$s, right where the artist put it.</string>
+    <string name="track_open_album">Open the Album</string>
+    <!-- %1$s: why, from Qobuz. -->
+    <string name="track_cant_load">Can\'t find the album this track is on: %1$s</string>
+    <!-- When something shared to the app has no link to a Qobuz album, artist or track. -->
+    <string name="not_a_qobuz_link">No link to a Qobuz album, artist or track here.</string>
+
     <!-- An artist. -->
     <!-- Over the artist's name. -->
     <string name="artist_kicker">ARTIST</string>

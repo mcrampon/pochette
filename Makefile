@@ -14,6 +14,11 @@ CARGO ?= cargo
 BINDIR := $(DESTDIR)$(PREFIX)/bin
 DATADIR := $(DESTDIR)$(PREFIX)/share
 
+# So the desktop knows at once that Pochette opens qobuzapp:// links. Packages (DESTDIR set)
+# leave it to the system's own triggers.
+UPDATE_DESKTOP_DATABASE = @if [ -z "$(DESTDIR)" ] && command -v update-desktop-database >/dev/null; then \
+	update-desktop-database -q "$(DATADIR)/applications"; fi
+
 .PHONY: all install uninstall
 
 all:
@@ -31,6 +36,7 @@ install:
 		install -Dm644 data/icons/hicolor/$$size/apps/$(APP_ID).svg \
 			"$(DATADIR)/icons/hicolor/$$size/apps/$(APP_ID).svg" || exit 1; \
 	done
+	$(UPDATE_DESKTOP_DATABASE)
 
 uninstall:
 	rm -f "$(BINDIR)/pochette" \
@@ -41,3 +47,4 @@ uninstall:
 	for size in $(ICON_SIZES); do \
 		rm -f "$(DATADIR)/icons/hicolor/$$size/apps/$(APP_ID).svg"; \
 	done
+	$(UPDATE_DESKTOP_DATABASE)

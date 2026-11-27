@@ -7,6 +7,7 @@
 
 mod error;
 mod library;
+mod link;
 mod playback;
 mod records;
 mod session;

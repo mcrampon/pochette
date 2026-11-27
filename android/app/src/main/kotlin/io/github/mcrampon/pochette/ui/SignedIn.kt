@@ -189,7 +189,15 @@ private fun Screen(model: AppModel, screen: Screen, now: NowPlaying?, back: () -
                     load = { model.artist(screen.id) },
                     openAlbum = openAlbum,
                     openArtist = openArtist,
-                    seeAll = { model.open(Screen.Releases(screen.id, screen.name, it)) },
+                    seeAll = { kind, name -> model.open(Screen.Releases(screen.id, name, kind)) },
+                    back = back,
+                ),
+            )
+        is Screen.Track ->
+            TrackScreen(
+                TrackActions(
+                    load = { model.track(screen.id) },
+                    openAlbum = { model.open(Screen.Album(it)) },
                     back = back,
                 ),
             )

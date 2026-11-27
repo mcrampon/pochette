@@ -46,6 +46,11 @@ sealed interface Screen {
         override val key = "artist/$id"
     }
 
+    /** A track, from a link: the page offers its album. */
+    data class Track(val id: ULong) : Screen {
+        override val key = "track/$id"
+    }
+
     /** All the albums of a Discover section, in the genres picked. */
     data class Section(val section: io.github.mcrampon.pochette.core.Section, val genres: List<ULong>) : Screen {
         override val key = "section/$section/${genres.joinToString(",")}"

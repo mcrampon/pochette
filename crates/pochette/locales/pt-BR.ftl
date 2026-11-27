@@ -189,3 +189,11 @@ stats-by-day = Por dia
 stats-day = { $day } de { $month }
 stats-bar = { $name }: { $time }
 stats-share = { $percent }%
+
+## Track
+
+track-heading = Uma faixa sozinha?
+track-albums-only = O Pochette acredita que as músicas pertencem aos seus álbuns, na ordem que o artista escolheu. Tirar uma de lá seria como ler um único capítulo de um romance.
+track-on-album = “{ $track }” está esperando por você em { $album }, bem onde o artista a colocou.
+track-open-album = Abrir o álbum
+track-cannot-load = Não foi possível encontrar o álbum desta faixa: { $error }

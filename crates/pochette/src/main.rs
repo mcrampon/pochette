@@ -38,6 +38,7 @@ mod stats_view;
 mod sync;
 mod tile_grid;
 mod tile_strip;
+mod track_page;
 
 use std::{process::ExitCode, sync::OnceLock};
 
@@ -115,6 +116,54 @@ fn tell_core_the_platform() {
     });
 }
 
+/// Where the Qobuz links Pochette is asked to open go, to the main window.
+static LINKS: relm4::MessageBroker<app::Msg> = relm4::MessageBroker::new();
+
+/// The application, which also opens the Qobuz links the desktop hands it, as
+/// `qobuzapp://album/<id>`, which Qobuz's pages open, or given on the command line. A second
+/// `pochette` hands them to the one running.
+fn application() -> relm4::gtk::Application {
+    use relm4::gtk::{self, gio, prelude::*};
+
+    // As RelmApp::new does, for what's set up before the app runs.
+    gtk::init().expect("GTK starts, which needs a display");
+    let app = gtk::Application::builder()
+        .application_id(app_id())
+        .flags(gio::ApplicationFlags::HANDLES_OPEN)
+        .build();
+    app.connect_open(|app, files, _| {
+        // Opened with links, the app isn't activated, which shows the window.
+        app.activate();
+        for file in files {
+            LINKS.send(app::Msg::OpenLink(file.uri().into()));
+        }
+    });
+    app
+}
+
+/// Whether Pochette runs already, under this app id, on the session bus.
+fn is_running() -> bool {
+    use relm4::gtk::{gio, glib, prelude::*};
+
+    let Ok(bus) = gio::bus_get_sync(gio::BusType::Session, None::<&gio::Cancellable>) else {
+        return false;
+    };
+    bus.call_sync(
+        Some("org.freedesktop.DBus"),
+        "/org/freedesktop/DBus",
+        "org.freedesktop.DBus",
+        "NameHasOwner",
+        Some(&(app_id(),).to_variant()),
+        Some(glib::VariantTy::new("(b)").expect("a valid type")),
+        gio::DBusCallFlags::NONE,
+        1000,
+        None::<&gio::Cancellable>,
+    )
+    .ok()
+    .and_then(|reply| reply.get::<(bool,)>())
+    .is_some_and(|(owned,)| owned)
+}
+
 fn main() -> ExitCode {
     // Before GTK, which would need a display and reject these options.
     match std::env::args().nth(1).as_deref() {
@@ -124,7 +173,7 @@ fn main() -> ExitCode {
         }
         Some("--help" | "-h") => {
             println!(
-                "Usage: pochette [--version | --help | --sync]\n\n\
+                "Usage: pochette [--version | --help | --sync | <Qobuz link>]\n\n\
                  A native Linux player for Qobuz, built around albums.\n\n\
                  --sync  sync the plays with the paired devices, without a window"
             );
@@ -146,7 +195,18 @@ fn main() -> ExitCode {
     if let Some(instance) = instance() {
         tracing::info!("running as the separate instance {instance}");
     }
-    let relm = relm4::RelmApp::new(app_id());
+    let app = application();
+    // Pochette runs already: this one only hands it the links, or has it show its window,
+    // and goes, without Relm4, which would then wait for events that never come.
+    if is_running() {
+        use relm4::gtk::prelude::*;
+        return if app.run() == relm4::gtk::glib::ExitCode::SUCCESS {
+            ExitCode::SUCCESS
+        } else {
+            ExitCode::FAILURE
+        };
+    }
+    let relm = relm4::RelmApp::from_app(app).with_broker(&LINKS);
     show_icon();
     relm4::set_global_css(include_str!("style.css"));
     accent::follow();

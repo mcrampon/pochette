@@ -189,4 +189,11 @@
     <string name="forget">Dissocia</string>
     <string name="forget_device">Dissociare %1$s?</string>
     <string name="forget_device_detail">Questo telefono smetterà di sincronizzarsi con il dispositivo. Gli ascolti già condivisi restano. Associalo di nuovo per riprendere la sincronizzazione.</string>
+    <!-- Track -->
+    <string name="track_heading">Un brano da solo?</string>
+    <string name="track_albums_only">Pochette crede che le canzoni stiano bene nei loro album, nell\'ordine scelto dall\'artista. Toglierne una sarebbe come leggere un solo capitolo di un romanzo.</string>
+    <string name="track_on_album">«%1$s» ti aspetta su %2$s, proprio dove l\'ha messo l\'artista.</string>
+    <string name="track_open_album">Apri l\'album</string>
+    <string name="track_cant_load">Impossibile trovare l\'album di questo brano: %1$s</string>
+    <string name="not_a_qobuz_link">Qui non c\'è nessun link a un album, un artista o un brano di Qobuz.</string>
 </resources>

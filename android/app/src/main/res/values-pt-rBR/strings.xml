@@ -172,4 +172,11 @@
     <string name="forget">Esquecer</string>
     <string name="forget_device">Esquecer %1$s?</string>
     <string name="forget_device_detail">Este celular deixa de sincronizar com ele. As reproduções já compartilhadas continuam. Faça o pareamento de novo para voltar a sincronizar.</string>
+    <!-- Track -->
+    <string name="track_heading">Uma faixa sozinha?</string>
+    <string name="track_albums_only">O Pochette acredita que as músicas pertencem aos seus álbuns, na ordem que o artista escolheu. Tirar uma de lá seria como ler um único capítulo de um romance.</string>
+    <string name="track_on_album">“%1$s” está esperando por você em %2$s, bem onde o artista a colocou.</string>
+    <string name="track_open_album">Abrir o álbum</string>
+    <string name="track_cant_load">Não foi possível encontrar o álbum desta faixa: %1$s</string>
+    <string name="not_a_qobuz_link">Nenhum link para um álbum, artista ou faixa do Qobuz aqui.</string>
 </resources>

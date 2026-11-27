@@ -208,6 +208,12 @@ impl Pochette {
         .await
     }
 
+    /// A track, from a link, with the album it's on.
+    pub async fn track(&self, id: u64) -> Result<crate::link::LinkedTrack> {
+        let inner = Arc::clone(&self.inner);
+        run(async move { Ok(inner.client()?.track(id).await?.into()) }).await
+    }
+
     pub async fn artist(&self, id: u64) -> Result<ArtistPage> {
         let inner = Arc::clone(&self.inner);
         run(async move { Ok((&inner.client()?.artist(id).await?).into()) }).await

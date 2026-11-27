@@ -2,6 +2,7 @@
 
 use std::{sync::Arc, time::Duration};
 
+use pochette_core::link::{self, Link};
 use qobuz::models::Album;
 use relm4::{
     Component, ComponentController, ComponentParts, ComponentSender, Controller, RelmWidgetExt,
@@ -50,6 +51,8 @@ enum Screen {
 
 pub struct App {
     screen: Screen,
+    /// A Qobuz link opened before signing in, to open once signed in.
+    pending_link: Option<Link>,
     http: reqwest::Client,
     store: Option<Arc<SessionStore>>,
     account: Option<Account>,
@@ -114,6 +117,9 @@ pub enum Msg {
     OpenAlbum(Box<Album>),
     /// Bring the window to the front, as the desktop's media controls ask.
     Raise,
+    /// Open what a Qobuz link points to, as the desktop hands it to Pochette: once signed
+    /// in, if need be.
+    OpenLink(String),
     // Results of background tasks.
     Started(Arc<SessionStore>, Result<Option<Account>, account::Error>),
     SignInPageReady(String),
@@ -373,6 +379,7 @@ impl Component for App {
         mpris::start(player.clone(), move || raise.emit(Msg::Raise));
         let mut model = Self {
             screen: Screen::Starting,
+            pending_link: None,
             http: account::http_client(),
             store: None,
             account: None,
@@ -557,6 +564,7 @@ impl Component for App {
             Msg::TabClickedAgain => self.home(),
             Msg::LibraryShown => self.library_shown(),
             Msg::OpenAlbum(album) => self.open_album(*album),
+            Msg::OpenLink(uri) => self.open_uri(&uri),
         }
     }
 }
@@ -618,7 +626,38 @@ impl App {
     /// Search the catalog in the tab shown.
     /// Open the page of `album` in what the library shows: a tab, or the search results.
     fn open_album(&mut self, album: Album) {
-        let destination = Destination::Album(Box::new(album));
+        self.open(Destination::Album(Box::new(album)));
+    }
+
+    /// Open what `uri`, a Qobuz link, points to, now or once signed in.
+    fn open_uri(&mut self, uri: &str) {
+        tracing::info!("asked to open {uri}");
+        match link::parse(uri) {
+            Some(link) if self.account.is_some() => self.open_link(link),
+            Some(link) => self.pending_link = Some(link),
+            None => tracing::warn!("cannot open {uri}: not a Qobuz album, artist or track"),
+        }
+    }
+
+    /// Open what `link` points to, as an album from the pane is.
+    fn open_link(&mut self, link: Link) {
+        self.open(match link {
+            // The pages fill in the rest as they load.
+            Link::Album(id) => Destination::Album(Box::new(Album {
+                id,
+                ..Album::default()
+            })),
+            Link::Artist(id) => Destination::Artist {
+                id,
+                name: String::new(),
+            },
+            Link::Track(id) => Destination::Track(id),
+        });
+    }
+
+    /// Open `destination` over the tab shown, or over Albums when what's shown has no
+    /// pages.
+    fn open(&mut self, destination: Destination) {
         let shown = self
             .library
             .as_ref()
@@ -627,7 +666,7 @@ impl App {
             Some("search") => self.search_view.emit(SearchViewMsg::OpenPage(destination)),
             Some("discover") => self.discover.emit(DiscoverMsg::OpenPage(destination)),
             Some("stats") => self.stats.emit(StatsViewMsg::OpenPage(destination)),
-            // The settings have no pages over them: the album opens in Albums.
+            // The settings have no pages over them: it opens in Albums.
             Some("settings") => {
                 self.show("albums");
                 self.albums.emit(AlbumsMsg::OpenPage(destination));
@@ -738,6 +777,9 @@ impl App {
         self.take_up_listening(account.client.clone());
         self.account = Some(account);
         self.screen = Screen::SignedIn;
+        if let Some(link) = self.pending_link.take() {
+            self.open_link(link);
+        }
     }
 
     /// Get the album that was playing when the app last quit ready to play again, paused

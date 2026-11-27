@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import io.github.mcrampon.pochette.core.findLink
 import io.github.mcrampon.pochette.ui.SignedIn
 import io.github.mcrampon.pochette.ui.PochetteTheme
 import io.github.mcrampon.pochette.ui.SignInScreen
@@ -39,6 +41,8 @@ class MainActivity : ComponentActivity() {
         Language.tell(this)
         enableEdgeToEdge()
         comeBackOnceRedirected()
+        // Not again when shown again, as after picking a language: it's been opened already.
+        if (savedInstanceState == null) openLink(intent)
         setContent {
             PochetteTheme {
                 Surface(Modifier.fillMaxSize()) {
@@ -58,6 +62,27 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        openLink(intent)
+    }
+
+    /** Open what the Qobuz link `intent` brings points to: opened, or shared to the app. */
+    private fun openLink(intent: Intent) {
+        val text =
+            when (intent.action) {
+                Intent.ACTION_VIEW -> intent.dataString
+                Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
+                else -> null
+            } ?: return
+        val link = findLink(text)
+        when {
+            link != null -> model.openLink(link)
+            // A link opened that isn't Qobuz's, as the one back from signing in, is for others.
+            intent.action == Intent.ACTION_SEND -> Toast.makeText(this, R.string.not_a_qobuz_link, Toast.LENGTH_LONG).show()
         }
     }
 

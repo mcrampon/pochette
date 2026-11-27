@@ -191,4 +191,11 @@
     <string name="forget">Zapomnij</string>
     <string name="forget_device">Zapomnieć urządzenie %1$s?</string>
     <string name="forget_device_detail">Ten telefon przestanie się z nim synchronizować. Już udostępnione odtworzenia pozostaną. Sparuj ponownie, aby znów synchronizować.</string>
+    <!-- Track -->
+    <string name="track_heading">Pojedynczy utwór?</string>
+    <string name="track_albums_only">Pochette uważa, że utwory należą do swoich albumów, w kolejności wybranej przez artystę. Wyjęcie jednego to jak czytanie tylko jednego rozdziału powieści.</string>
+    <string name="track_on_album">„%1$s” czeka na ciebie na albumie %2$s, dokładnie tam, gdzie umieścił go artysta.</string>
+    <string name="track_open_album">Otwórz album</string>
+    <string name="track_cant_load">Nie można znaleźć albumu tego utworu: %1$s</string>
+    <string name="not_a_qobuz_link">Brak tu linku do albumu, wykonawcy ani utworu w Qobuz.</string>
 </resources>

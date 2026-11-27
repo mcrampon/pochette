@@ -3,10 +3,12 @@ Type=Application
 Name=Pochette
 GenericName=Music Player
 Comment=Listen to Qobuz, album by album
-Exec=pochette
+Exec=pochette %u
 Icon=io.github.mcrampon.Pochette
 Terminal=false
 Categories=Audio;AudioVideo;Player;GTK;
+# The links Qobuz's pages hand to its desktop app, as open.qobuz.com links do.
+MimeType=x-scheme-handler/qobuzapp;
 Keywords=Qobuz;Music;Album;Streaming;Hi-Res;
 StartupNotify=true
 StartupWMClass=io.github.mcrampon.Pochette

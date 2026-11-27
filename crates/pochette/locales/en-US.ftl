@@ -137,6 +137,15 @@ hi-res = Hi-Res
 album-disc = Disc { $number }
 track-unavailable = Not available for streaming
 
+## A track, from a link: Pochette plays albums, whole, so it offers the track's album
+
+track-heading = A Track on Its Own?
+track-albums-only = Pochette believes songs belong with their albums, in the order the artist chose. Taking one out would be like reading a single chapter of a novel.
+# $track is the track's title, $album its album's.
+track-on-album = “{ $track }” is waiting for you on { $album }, right where the artist put it.
+track-open-album = Open the Album
+track-cannot-load = Can't find the album this track is on: { $error }
+
 ## An artist
 
 # Above the artist's name, in capitals.

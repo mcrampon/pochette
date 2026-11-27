@@ -11,6 +11,8 @@ import androidx.lifecycle.viewModelScope
 import io.github.mcrampon.pochette.core.Account
 import io.github.mcrampon.pochette.core.AlbumCard
 import io.github.mcrampon.pochette.core.AlbumPage
+import io.github.mcrampon.pochette.core.LinkedTrack
+import io.github.mcrampon.pochette.core.QobuzLink
 import io.github.mcrampon.pochette.core.ArtistCard
 import io.github.mcrampon.pochette.core.ArtistPage
 import io.github.mcrampon.pochette.core.Discover
@@ -238,6 +240,25 @@ class AppModel(app: Application) : AndroidViewModel(app) {
 
     suspend fun artist(id: ULong): ArtistPage = artists[id] ?: ask { core.artist(id) }.also { artists[id] = it }
 
+    /** A track, from a link, with the album it's on. */
+    suspend fun track(id: ULong): LinkedTrack = ask { core.track(id) }
+
+    /** A Qobuz link opened before signing in, to open once signed in. */
+    private var pendingLink: QobuzLink? = null
+
+    /** Open what a Qobuz link points to, now or once signed in. */
+    fun openLink(link: QobuzLink) {
+        if (_stage.value is Stage.SignedIn) open(screenOf(link)) else pendingLink = link
+    }
+
+    private fun screenOf(link: QobuzLink): Screen =
+        when (link) {
+            is QobuzLink.Album -> Screen.Album(link.id)
+            // The page shows the name once loaded.
+            is QobuzLink.Artist -> Screen.Artist(link.id, "")
+            is QobuzLink.Track -> Screen.Track(link.id)
+        }
+
     /** The lyrics of the track playing, from LRCLIB the first time. */
     suspend fun lyrics(now: NowPlaying): Lyrics {
         val trackId = now.trackId ?: return Lyrics.Missing
@@ -417,6 +438,10 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     private suspend fun signedIn(account: Account) {
         core.session()?.let(sessions::save)
         _stage.value = Stage.SignedIn(account)
+        pendingLink?.let {
+            pendingLink = null
+            open(screenOf(it))
+        }
         takeUpListening()
         refresh()
     }

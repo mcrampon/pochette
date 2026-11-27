@@ -188,4 +188,11 @@
     <string name="forget">Entkoppeln</string>
     <string name="forget_device">%1$s entkoppeln?</string>
     <string name="forget_device_detail">Dieses Smartphone synchronisiert nicht mehr damit. Bereits geteilte Wiedergaben bleiben erhalten. Kopple erneut, um wieder zu synchronisieren.</string>
+    <!-- Track -->
+    <string name="track_heading">Ein Titel ganz allein?</string>
+    <string name="track_albums_only">Pochette findet, dass Songs zu ihren Alben gehören, in der Reihenfolge, die die Künstler gewählt haben. Einen herauszunehmen wäre, als würdest du nur ein einziges Kapitel eines Romans lesen.</string>
+    <string name="track_on_album">„%1$s“ wartet auf %2$s auf dich, genau dort, wo die Künstler ihn hingelegt haben.</string>
+    <string name="track_open_album">Album öffnen</string>
+    <string name="track_cant_load">Das Album zu diesem Titel lässt sich nicht finden: %1$s</string>
+    <string name="not_a_qobuz_link">Hier ist kein Link zu einem Album, Künstler oder Titel auf Qobuz.</string>
 </resources>

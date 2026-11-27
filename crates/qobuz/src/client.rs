@@ -10,7 +10,7 @@ use tokio::sync::Mutex;
 use crate::{
     API_URL, Error, Result,
     auth::Session,
-    models::{Album, Page, User},
+    models::{Album, Page, Track, User},
     web_player::fetch_web_player,
 };
 
@@ -125,6 +125,16 @@ impl Client {
         let response = self
             .get("album/get")
             .query(&[("album_id", id)])
+            .send()
+            .await?;
+        read_json(response).await
+    }
+
+    /// A track, with the album it's on.
+    pub async fn track(&self, id: u64) -> Result<Track> {
+        let response = self
+            .get("track/get")
+            .query(&[("track_id", id)])
             .send()
             .await?;
         read_json(response).await

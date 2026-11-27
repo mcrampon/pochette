@@ -16,6 +16,7 @@ use crate::{
     player::Player,
     releases_page::{ReleasesPage, ReleasesPageMsg},
     search_page::{SearchPage, SearchPageMsg},
+    track_page::{TrackPage, TrackPageMsg},
 };
 
 /// A page to open.
@@ -34,6 +35,8 @@ pub enum Destination {
     },
     /// What a search of the catalog finds.
     Search(String),
+    /// A track, by its id, from a link: the page offers its album.
+    Track(u64),
 }
 
 /// What a page asks of the navigator.
@@ -57,6 +60,7 @@ enum Page {
     Artist(Controller<ArtistPage>),
     Releases(Controller<ReleasesPage>),
     Search(Controller<SearchPage>),
+    Track(Controller<TrackPage>),
 }
 
 /// What a page shows, to tell when what's opened is already shown.
@@ -66,6 +70,7 @@ enum Shows {
     Artist(u64),
     Releases(u64, ReleaseKind),
     Search,
+    Track(u64),
 }
 
 impl Destination {
@@ -77,6 +82,7 @@ impl Destination {
                 artist_id, kind, ..
             } => Shows::Releases(*artist_id, *kind),
             Self::Search(_) => Shows::Search,
+            Self::Track(id) => Shows::Track(*id),
         }
     }
 }
@@ -88,6 +94,7 @@ impl Page {
             Self::Artist(page) => page.widget().clone().upcast(),
             Self::Releases(page) => page.widget().clone().upcast(),
             Self::Search(page) => page.widget().clone().upcast(),
+            Self::Track(page) => page.widget().clone().upcast(),
         }
     }
 }
@@ -230,6 +237,13 @@ impl Navigator {
                     .connect_receiver(to_navigator(&self.forward));
                 page.emit(SearchPageMsg::Show { client, query });
                 Page::Search(page)
+            }
+            Destination::Track(id) => {
+                let page = TrackPage::builder()
+                    .launch(())
+                    .connect_receiver(to_navigator(&self.forward));
+                page.emit(TrackPageMsg::Show { client, id });
+                Page::Track(page)
             }
         };
         let widget = page.widget();

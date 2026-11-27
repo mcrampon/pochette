@@ -67,7 +67,7 @@ pub struct Page<T> {
     pub items: Vec<T>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct Album {
     pub id: String,
     pub title: String,
@@ -123,14 +123,14 @@ impl Album {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct ArtistSummary {
     pub id: u64,
     pub name: String,
 }
 
 /// The cover, in several sizes.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct AlbumImage {
     /// 50 px.
     pub thumbnail: Option<String>,
@@ -185,6 +185,24 @@ pub struct Track {
     pub maximum_sampling_rate: Option<f32>,
     #[serde(default)]
     pub parental_warning: bool,
+    /// The album it's on. Only from `track/get`.
+    pub album: Option<TrackAlbum>,
+}
+
+/// The album a track is on.
+#[derive(Debug, Clone, Deserialize)]
+pub struct TrackAlbum {
+    pub id: String,
+    pub title: String,
+    pub version: Option<String>,
+}
+
+impl TrackAlbum {
+    /// The title, with the version when there is one: "Abbey Road (Remastered)".
+    #[must_use]
+    pub fn full_title(&self) -> String {
+        with_version(&self.title, self.version.as_deref())
+    }
 }
 
 const fn first() -> u32 {

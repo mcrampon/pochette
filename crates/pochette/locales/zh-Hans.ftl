@@ -200,3 +200,11 @@ stats-day = { $month }{ $day }日
 stats-bar = { $name }：{ $time }
 # 某流派占收听时长的比例。
 stats-share = { $percent }%
+
+## Track
+
+track-heading = 只听一首？
+track-albums-only = Pochette 认为，歌曲应当留在它们的专辑里，按照艺人安排的顺序聆听。单独拿出一首，就像只读小说中的一章。
+track-on-album = “{ $track }”正在《{ $album }》里等你，就在艺人安排的位置。
+track-open-album = 打开专辑
+track-cannot-load = 找不到这首曲目所在的专辑：{ $error }

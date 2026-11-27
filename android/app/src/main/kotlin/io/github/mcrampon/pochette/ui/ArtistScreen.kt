@@ -46,7 +46,8 @@ class ArtistActions(
     val load: suspend () -> ArtistPage,
     val openAlbum: (AlbumCard) -> Unit,
     val openArtist: (ArtistCard) -> Unit,
-    val seeAll: (ReleaseKind) -> Unit,
+    /** All the releases of a kind, of the artist named so. */
+    val seeAll: (ReleaseKind, name: String) -> Unit,
     val back: () -> Unit,
 )
 
@@ -101,7 +102,7 @@ fun ArtistScreen(name: String, actions: ArtistActions) {
                     for (releases in artist.releases.filter { it.albums.albums.isNotEmpty() }) {
                         item(key = releases.kind.name) {
                             Column {
-                                Heading(stringResource(kindTitle(releases.kind)), onSeeAll = { actions.seeAll(releases.kind) }.takeIf { releases.albums.hasMore })
+                                Heading(stringResource(kindTitle(releases.kind)), onSeeAll = { actions.seeAll(releases.kind, artist.name) }.takeIf { releases.albums.hasMore })
                                 AlbumShelf(releases.albums.albums, onOpen = actions.openAlbum)
                             }
                         }
