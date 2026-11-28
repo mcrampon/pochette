@@ -57,15 +57,7 @@ fun DiscoverScreen(discover: Load<Discover>, actions: DiscoverActions) {
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.tab_discover)) },
-                actions = {
-                    IconButton(onClick = { picking = true }) {
-                        Icon(
-                            painterResource(R.drawable.ic_filter_list),
-                            contentDescription = stringResource(R.string.genres),
-                            tint = if (picked.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                },
+                actions = { GenresButton(picked, onClick = { picking = true }) },
             )
         },
         contentWindowInsets = WindowInsets(0),
@@ -88,7 +80,7 @@ fun DiscoverScreen(discover: Load<Discover>, actions: DiscoverActions) {
             }
         }
     }
-    if (picking) GenresDialog(actions, picked, onDismiss = { picking = false })
+    if (picking) GenresDialog(actions.genres, picked, onPick = actions.pick, onDismiss = { picking = false })
 }
 
 private fun sections(discover: Discover): List<Pair<Section, AlbumList>> =
@@ -111,17 +103,37 @@ fun title(section: Section) =
         Section.IDEAL_DISCOGRAPHY -> R.string.ideal_discography
     }
 
+/** Opens the genres to show, colored when some are `picked`. */
+@Composable
+private fun GenresButton(picked: List<ULong>, onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Icon(
+            painterResource(R.drawable.ic_filter_list),
+            contentDescription = stringResource(R.string.genres),
+            tint = if (picked.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+        )
+    }
+}
+
+/** The genres to show, none for all: in Discover, and a section's "See All", which share them. */
+@Composable
+fun SectionGenres(genres: suspend () -> List<Genre>, picked: List<ULong>, onPick: (List<ULong>) -> Unit) {
+    var picking by remember { mutableStateOf(false) }
+    GenresButton(picked, onClick = { picking = true })
+    if (picking) GenresDialog(genres, picked, onPick, onDismiss = { picking = false })
+}
+
 /** The genres to show, none for all. */
 @Composable
-private fun GenresDialog(actions: DiscoverActions, picked: List<ULong>, onDismiss: () -> Unit) {
+private fun GenresDialog(genres: suspend () -> List<Genre>, picked: List<ULong>, onPick: (List<ULong>) -> Unit, onDismiss: () -> Unit) {
     val resources = LocalResources.current
-    val genres by produceState<Load<List<Pair<ULong, String>>>>(Load.Pending) {
+    val options by produceState<Load<List<Pair<ULong, String>>>>(Load.Pending) {
         value =
             try {
-                Load.Done(actions.genres().map { it.id to it.name })
+                Load.Done(genres().map { it.id to it.name })
             } catch (err: PochetteException) {
                 Load.Failed(resources.getString(R.string.cant_load_genres, err.message.orEmpty()))
             }
     }
-    ChecklistDialog(stringResource(R.string.genres), genres, picked, all = stringResource(R.string.all_genres), onPick = actions.pick, onDismiss = onDismiss)
+    ChecklistDialog(stringResource(R.string.genres), options, picked, all = stringResource(R.string.all_genres), onPick = onPick, onDismiss = onDismiss)
 }

@@ -258,7 +258,14 @@ private fun Screen(model: AppModel, screen: Screen, now: NowPlaying?, offline: B
                 ),
             )
         }
-        is Screen.Section -> ListScreen(stringResource(title(screen.section)), null, model.list(screen), openAlbum, back, caption(screen.section))
+        is Screen.Section ->
+            ListScreen(stringResource(title(screen.section)), null, model.list(screen), openAlbum, back, caption(screen.section)) {
+                // As in Discover, which shows the genres picked here too.
+                SectionGenres(model::genres, screen.genres) { picked ->
+                    model.pickGenres(picked)
+                    model.navigation.replaceTop(Screen.Section(screen.section, picked))
+                }
+            }
         is Screen.Releases -> ListScreen(stringResource(kindTitle(screen.kind)), screen.artistName, model.list(screen), openAlbum, back)
     }
 }

@@ -91,6 +91,12 @@ class Navigation {
         if (top.key != screen.key) stacks.getValue(tab).add(screen)
     }
 
+    /** Put `screen` in place of the one on top, as the same list with other filters. */
+    fun replaceTop(screen: Screen) {
+        val stack = stacks.getValue(tab)
+        stack[stack.lastIndex] = screen
+    }
+
     /** Show `tab`; when it's shown already, go back to its first screen. Returns the keys of the screens closed. */
     fun select(tab: Tab): List<String> {
         if (tab != this.tab) {

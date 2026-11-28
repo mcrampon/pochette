@@ -1,6 +1,7 @@
 package io.github.mcrampon.pochette.ui
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -30,6 +31,8 @@ fun ListScreen(
     onOpen: (AlbumCard) -> Unit,
     onBack: () -> Unit,
     caption: Caption = { null },
+    /** In the top bar, after the title: a filter. */
+    actions: @Composable RowScope.() -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -53,6 +56,7 @@ fun ListScreen(
                         Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.back))
                     }
                 },
+                actions = actions,
             )
         },
         contentWindowInsets = WindowInsets(0),
