@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="data/icons/hicolor/scalable/apps/io.github.mcrampon.Pochette.svg" alt="Pochette's icon" width="128">
+</p>
+
 # Pochette
 
 A [Qobuz](https://www.qobuz.com) player for Linux and Android, built around albums: your library of whole albums, played from the first track to the last.
@@ -8,8 +12,12 @@ and is not affiliated with Qobuz.
 ## Screenshots
 
 <p align="center">
+  <img src="data/screenshots/albums-light.png" alt="Your albums, in light mode" width="49%">
+  <img src="data/screenshots/playing-dark.png" alt="An album, playing, in dark mode" width="49%">
+</p>
+<p align="center">
   <img src="data/screenshots/discover-light.png" alt="Discover, in light mode" width="49%">
-  <img src="data/screenshots/playing-dark.png" alt="Playing an album, in dark mode" width="49%">
+  <img src="data/screenshots/stats-dark.png" alt="Listening stats, in dark mode" width="49%">
 </p>
 <p align="center">
   <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" alt="Albums, on Android" width="24%">
@@ -21,20 +29,24 @@ and is not affiliated with Qobuz.
 ## Features
 
 - **Albums**: your saved albums, to search, filter by genre and decade, sort, or play at random
-- **Discover**: Qobuz's new releases, press awards and ideal discography, by genre
+- **Discover**: Qobuz's new releases, press awards, album of the week and ideal discography,
+  by genre
 - **Offline listening**, on Android: download albums, on Wi-Fi or not, in a quality of their
   own, and play them with no connection
 - **Takes up where you left off**: reopened, Pochette has the album you were playing ready,
   paused where you were in the track
 - **Listening stats**: your top albums, artists and genres, and how much you listened, by
-  month or year
+  day, month or year
 - **Devices**: your plays synced between your computers and your phone on the same network,
   even while Pochette is closed
+- **Share** albums, and open Qobuz's links to albums and artists in Pochette
 - **Lyrics** that follow the song, looked up on [LRCLIB](https://lrclib.net) while you show them
 - **Hi-Res** streaming, up to what your subscription allows
 - **Plays reported to Qobuz**, as its own apps do, so the artists get paid for what you hear
 - **Media keys** and desktop media controls, through MPRIS; on Android, the system's media
   controls, headphones and cars
+- **Ten languages**: English (US and UK), German, Spanish, French (France and Canada),
+  Italian, Polish, Portuguese (Brazil) and Chinese (Simplified)
 - Your desktop's **accent color**, light and dark modes
 
 The desktop app is built with GTK 4 and Relm4, the Android app with Jetpack Compose and Media3.
