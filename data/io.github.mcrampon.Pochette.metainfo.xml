@@ -77,6 +77,13 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="2.0.2" date="2026-11-28">
+      <description>
+        <ul>
+          <li>Fixed: an album opened from a Qobuz link now shows its cover</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.0.1" date="2026-11-28">
       <description>
         <ul>
