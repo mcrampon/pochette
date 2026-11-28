@@ -33,21 +33,13 @@ and is not affiliated with Qobuz.
   by genre
 - **Offline listening**, on Android: download albums, on Wi-Fi or not, in a quality of their
   own, and play them with no connection
-- **Takes up where you left off**: reopened, Pochette has the album you were playing ready,
-  paused where you were in the track
 - **Listening stats**: your top albums, artists and genres, and how much you listened, by
   day, month or year
-- **Devices**: your plays synced between your computers and your phone on the same network,
-  even while Pochette is closed
-- **Share** albums, and open Qobuz's links to albums and artists in Pochette
 - **Lyrics** that follow the song, looked up on [LRCLIB](https://lrclib.net) while you show them
 - **Hi-Res** streaming, up to what your subscription allows
 - **Plays reported to Qobuz**, as its own apps do, so the artists get paid for what you hear
-- **Media keys** and desktop media controls, through MPRIS; on Android, the system's media
-  controls, headphones and cars
 - **Ten languages**: English (US and UK), German, Spanish, French (France and Canada),
   Italian, Polish, Portuguese (Brazil) and Chinese (Simplified)
-- Your desktop's **accent color**, light and dark modes
 
 The desktop app is built with GTK 4 and Relm4, the Android app with Jetpack Compose and Media3.
 They share a core written in Rust: the play history, stats, library sorting and syncing.
