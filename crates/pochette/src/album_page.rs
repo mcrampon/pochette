@@ -465,6 +465,14 @@ impl Component for AlbumPage {
                 self.task = None;
                 match result {
                     Ok(album) => {
+                        // Opened from its id alone, as from a link, its cover is known now.
+                        if self
+                            .album
+                            .as_ref()
+                            .is_none_or(|shown| shown.image.large.is_none())
+                        {
+                            self.show_cover(&album, &sender);
+                        }
                         self.rows = fill_track_list(&self.track_list, &album, &sender);
                         self.highlight_playing_track();
                         self.album = Some(album);
