@@ -191,4 +191,28 @@
     <string name="track_open_album">打开专辑</string>
     <string name="track_cant_load">找不到这首曲目所在的专辑：%1$s</string>
     <string name="not_a_qobuz_link">这里没有 Qobuz 专辑、艺人或曲目的链接。</string>
+
+    <!-- 下载，用于离线收听：在专辑页、设置中，以及离线时。 -->
+    <string name="download">下载</string>
+    <string name="download_waiting">等待下载：点按即可取消</string>
+    <string name="downloading_cancel">正在下载：点按即可取消</string>
+    <string name="downloaded_remove">已下载：点按即可删除</string>
+    <string name="remove_download_question">删除已下载的专辑？</string>
+    <string name="remove_download_detail">删除后，播放这张专辑将再次需要网络连接。</string>
+    <string name="remove">删除</string>
+    <string name="downloads">下载</string>
+    <string name="downloading">正在下载“%1$s”</string>
+    <string name="cant_download">无法下载“%1$s”：%2$s</string>
+    <string name="downloaded">已下载</string>
+    <string name="download_quality">下载音质</string>
+    <string name="download_quality_detail">在你的订阅允许范围内，每首曲目都以其最佳音质下载，最高不超过此设置。</string>
+    <string name="download_on_mobile_data">使用移动数据下载</string>
+    <string name="download_on_mobile_data_detail">否则，专辑会等到连接 Wi-Fi 时再下载。</string>
+    <string name="downloads_space">已用空间</string>
+    <string name="remove_all_downloads">全部删除</string>
+    <string name="remove_all_downloads_question">删除所有已下载的专辑？</string>
+    <string name="remove_all_downloads_detail">删除后，播放这些专辑将再次需要网络连接。</string>
+    <string name="offline">离线</string>
+    <string name="offline_downloads">离线：你已下载的专辑。</string>
+    <string name="needs_connection">此功能需要连接到 Qobuz。你已下载的专辑在“专辑”标签页中。</string>
 </resources>

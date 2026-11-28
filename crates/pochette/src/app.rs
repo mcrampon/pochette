@@ -775,6 +775,11 @@ impl App {
         self.stats
             .emit(StatsViewMsg::SetClient(Some(account.client.clone())));
         self.take_up_listening(account.client.clone());
+        // What Qobuz couldn't hear of while out of reach.
+        let client = account.client.clone();
+        relm4::spawn(async move {
+            pochette_core::reports::send_kept(&client).await;
+        });
         self.account = Some(account);
         self.screen = Screen::SignedIn;
         if let Some(link) = self.pending_link.take() {

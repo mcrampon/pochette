@@ -198,4 +198,28 @@
     <string name="track_open_album">Otwórz album</string>
     <string name="track_cant_load">Nie można znaleźć albumu tego utworu: %1$s</string>
     <string name="not_a_qobuz_link">Brak tu linku do albumu, wykonawcy ani utworu w Qobuz.</string>
+
+    <!-- Pobrane, do słuchania offline: na albumie, w ustawieniach i bez połączenia. -->
+    <string name="download">Pobierz</string>
+    <string name="download_waiting">Czeka na pobranie: dotknij, aby anulować</string>
+    <string name="downloading_cancel">Pobieranie: dotknij, aby anulować</string>
+    <string name="downloaded_remove">Pobrano: dotknij, aby usunąć</string>
+    <string name="remove_download_question">Usunąć pobrany album?</string>
+    <string name="remove_download_detail">Album znów będzie wymagał połączenia do odtwarzania.</string>
+    <string name="remove">Usuń</string>
+    <string name="downloads">Pobrane</string>
+    <string name="downloading">Pobieranie „%1$s”</string>
+    <string name="cant_download">Nie można pobrać „%1$s”: %2$s</string>
+    <string name="downloaded">Pobrane</string>
+    <string name="download_quality">Jakość pobierania</string>
+    <string name="download_quality_detail">Każdy utwór pobiera się w najlepszej dostępnej jakości, nie wyższej niż wybrana i niż pozwala twoja subskrypcja.</string>
+    <string name="download_on_mobile_data">Pobieraj przez dane mobilne</string>
+    <string name="download_on_mobile_data_detail">W przeciwnym razie albumy pobierają się dopiero przez Wi-Fi.</string>
+    <string name="downloads_space">Zajęte miejsce</string>
+    <string name="remove_all_downloads">Usuń wszystko</string>
+    <string name="remove_all_downloads_question">Usunąć wszystkie pobrane albumy?</string>
+    <string name="remove_all_downloads_detail">Albumy znów będą wymagały połączenia do odtwarzania.</string>
+    <string name="offline">Offline</string>
+    <string name="offline_downloads">Offline: twoje pobrane albumy.</string>
+    <string name="needs_connection">Do tego potrzebne jest połączenie z Qobuz. Pobrane albumy znajdziesz na karcie Albumy.</string>
 </resources>

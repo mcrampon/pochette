@@ -157,7 +157,7 @@ fun NowPlayingScreen(now: NowPlaying, actions: NowPlayingActions) {
         }
     }
     if (choosingQuality) {
-        QualityDialog(actions.quality(), onChoose = actions.setQuality, onDismiss = { choosingQuality = false })
+        QualityDialog(R.string.best_quality, R.string.best_quality_detail, actions.quality(), onChoose = actions.setQuality, onDismiss = { choosingQuality = false })
     }
 }
 
@@ -421,17 +421,23 @@ private fun Message(text: String) {
     }
 }
 
-/** The best quality to stream in. */
+/** The best quality to stream or download in, as `title` and `detail` say. */
 @Composable
-private fun QualityDialog(saved: Quality, onChoose: (Quality) -> Unit, onDismiss: () -> Unit) {
+internal fun QualityDialog(
+    @StringRes title: Int,
+    @StringRes detail: Int,
+    saved: Quality,
+    onChoose: (Quality) -> Unit,
+    onDismiss: () -> Unit,
+) {
     var chosen by remember { mutableStateOf(saved) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.best_quality)) },
+        title = { Text(stringResource(title)) },
         text = {
             Column {
                 Text(
-                    stringResource(R.string.best_quality_detail),
+                    stringResource(detail),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 8.dp),
@@ -457,7 +463,7 @@ private fun QualityDialog(saved: Quality, onChoose: (Quality) -> Unit, onDismiss
 }
 
 @StringRes
-private fun qualityName(quality: Quality) =
+internal fun qualityName(quality: Quality) =
     when (quality) {
         Quality.MP3 -> R.string.quality_mp3
         Quality.CD -> R.string.quality_cd

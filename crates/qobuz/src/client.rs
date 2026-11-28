@@ -306,10 +306,18 @@ pub enum Quality {
 impl Quality {
     /// From the lowest to the highest.
     pub const ALL: [Self; 4] = [Self::Mp3, Self::Cd, Self::HiRes96, Self::HiRes192];
+
+    /// The quality of a [`FileUrl::format_id`].
+    #[must_use]
+    pub fn of_format(format_id: u32) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|quality| *quality as u32 == format_id)
+    }
 }
 
 /// Where a track streams from.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct FileUrl {
     pub url: String,
     /// The [`Quality`] Qobuz picked.

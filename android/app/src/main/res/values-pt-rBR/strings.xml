@@ -179,4 +179,33 @@
     <string name="track_open_album">Abrir o álbum</string>
     <string name="track_cant_load">Não foi possível encontrar o álbum desta faixa: %1$s</string>
     <string name="not_a_qobuz_link">Nenhum link para um álbum, artista ou faixa do Qobuz aqui.</string>
+
+    <!-- Downloads, para ouvir offline: num álbum, nas Configurações e offline. -->
+    <string name="download">Baixar</string>
+    <string name="download_waiting">Aguardando download: toque para cancelar</string>
+    <string name="downloading_cancel">Baixando: toque para cancelar</string>
+    <string name="downloaded_remove">Baixado: toque para remover</string>
+    <string name="remove_download_question">Remover o download?</string>
+    <string name="remove_download_detail">O álbum vai precisar de conexão de novo para tocar.</string>
+    <string name="remove">Remover</string>
+    <!-- O canal de uma notificação, e a seção das Configurações. -->
+    <string name="downloads">Downloads</string>
+    <!-- A notificação durante o download. %1$s: o título do álbum. -->
+    <string name="downloading">Baixando “%1$s”</string>
+    <!-- %1$s: o título do álbum, %2$s: o motivo. -->
+    <string name="cant_download">Não foi possível baixar “%1$s”: %2$s</string>
+    <!-- Um filtro dos álbuns: os baixados. -->
+    <string name="downloaded">Baixados</string>
+    <string name="download_quality">Qualidade do download</string>
+    <string name="download_quality_detail">Cada faixa é baixada na melhor qualidade disponível, até este limite, conforme sua assinatura permitir.</string>
+    <string name="download_on_mobile_data">Baixar usando dados móveis</string>
+    <string name="download_on_mobile_data_detail">Caso contrário, os álbuns esperam o Wi-Fi para baixar.</string>
+    <string name="downloads_space">Espaço usado</string>
+    <string name="remove_all_downloads">Remover tudo</string>
+    <string name="remove_all_downloads_question">Remover todos os downloads?</string>
+    <string name="remove_all_downloads_detail">Os álbuns vão precisar de conexão de novo para tocar.</string>
+    <!-- Fora do alcance do Qobuz, com álbuns baixados. -->
+    <string name="offline">Offline</string>
+    <string name="offline_downloads">Offline: seus álbuns baixados.</string>
+    <string name="needs_connection">Isto precisa de conexão com o Qobuz. Seus álbuns baixados estão em Álbuns.</string>
 </resources>

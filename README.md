@@ -22,6 +22,8 @@ and is not affiliated with Qobuz.
 
 - **Albums**: your saved albums, to search, filter by genre and decade, sort, or play at random
 - **Discover**: Qobuz's new releases, press awards and ideal discography, by genre
+- **Offline listening**, on Android: download albums, on Wi-Fi or not, in a quality of their
+  own, and play them with no connection
 - **Takes up where you left off**: reopened, Pochette has the album you were playing ready,
   paused where you were in the track
 - **Listening stats**: your top albums, artists and genres, and how much you listened, by
@@ -96,7 +98,8 @@ plays albums, whole.
 Qobuz pays artists and labels for their plays, from what its apps tell it was heard. Pochette
 tells it the same way, on Linux and Android: when a track starts, then each stretch of it you
 listened to, up to a pause, a seek or the next track. So what you play in Pochette counts for
-the artists just as it would in Qobuz's own apps.
+the artists just as it would in Qobuz's own apps. What Qobuz can't hear of when it's out of
+reach, as albums downloaded and played offline, is kept and told to it once it's back.
 
 ## Syncing devices
 
@@ -142,7 +145,8 @@ the computer's name, for the others to find it.
 
 On Android, the plays are kept in the app's own storage, and go with Android's backup of the
 app's data, if you have it on. The Qobuz session, encrypted with a key kept in the phone's
-keystore, and the phone's sync key stay on the phone.
+keystore, and the phone's sync key stay on the phone. Albums downloaded stay in the app's own
+storage, out of other apps' reach and out of backups.
 
 ## Layout
 

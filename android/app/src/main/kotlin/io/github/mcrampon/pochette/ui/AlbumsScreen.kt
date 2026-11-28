@@ -77,11 +77,14 @@ class AlbumsActions(
     val open: (AlbumCard) -> Unit,
 )
 
-/** The user's albums, as a grid of covers, searched, filtered and sorted: tap one to open it. */
+/**
+ * The user's albums, as a grid of covers, searched, filtered and sorted: tap one to open it.
+ * `offline`, out of Qobuz's reach: the albums downloaded, which `anyDownloaded` says there are.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AlbumsScreen(library: Library, view: LibraryView, actions: AlbumsActions) {
-    val filtered = view.query.isNotBlank() || view.genres.isNotEmpty() || view.decades.isNotEmpty()
+fun AlbumsScreen(library: Library, view: LibraryView, offline: Boolean, anyDownloaded: Boolean, actions: AlbumsActions) {
+    val filtered = view.query.isNotBlank() || view.genres.isNotEmpty() || view.decades.isNotEmpty() || (view.downloadedOnly && !offline)
     Scaffold(
         topBar = {
             TopAppBar(
@@ -125,7 +128,10 @@ fun AlbumsScreen(library: Library, view: LibraryView, actions: AlbumsActions) {
             ) {
                 // The search and filters scroll away with the albums, leaving the screen to them.
                 item(key = "controls", span = { GridItemSpan(maxLineSpan) }) {
-                    Column(Modifier.fullBleed(16.dp)) { Controls(view, actions) }
+                    Column(Modifier.fullBleed(16.dp)) {
+                        if (offline) OfflineNote(onRetry = actions.refresh)
+                        Controls(view, showDownloaded = anyDownloaded && !offline, actions)
+                    }
                 }
                 items(library.albums, key = { it.id }) { album -> AlbumTile(album, onClick = { actions.open(album) }) }
                 if (library.albums.isEmpty() && filtered) {
@@ -133,7 +139,7 @@ fun AlbumsScreen(library: Library, view: LibraryView, actions: AlbumsActions) {
                         Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(stringResource(R.string.no_matching_albums), style = MaterialTheme.typography.titleMedium)
                             TextButton(
-                                onClick = { actions.show(view.copy(query = "", genres = emptyList(), decades = emptyList())) },
+                                onClick = { actions.show(view.copy(query = "", genres = emptyList(), decades = emptyList(), downloadedOnly = false)) },
                                 modifier = Modifier.padding(top = 8.dp),
                             ) { Text(stringResource(R.string.clear_search_and_filters)) }
                         }
@@ -163,9 +169,26 @@ private fun Menu(actions: AlbumsActions) {
     }
 }
 
-/** The search, the genre and decade filters, and the sort. */
+/** Out of Qobuz's reach: the downloads are what shows. */
 @Composable
-private fun Controls(view: LibraryView, actions: AlbumsActions) {
+private fun OfflineNote(onRetry: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            stringResource(R.string.offline_downloads),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onRetry) { Text(stringResource(R.string.try_again)) }
+    }
+}
+
+/** The search, the genre, decade and download filters, the latter if `showDownloaded`, and the sort. */
+@Composable
+private fun Controls(view: LibraryView, showDownloaded: Boolean, actions: AlbumsActions) {
     val focus = LocalFocusManager.current
     val resources = LocalResources.current
     var picking by remember { mutableStateOf<Filter?>(null) }
@@ -212,6 +235,17 @@ private fun Controls(view: LibraryView, actions: AlbumsActions) {
                 on = view.decades.isNotEmpty(),
                 onClick = { picking = Filter.Decades },
             )
+            if (showDownloaded || view.downloadedOnly) {
+                // On or off: no menu.
+                FilterChip(
+                    selected = view.downloadedOnly,
+                    onClick = { actions.show(view.copy(downloadedOnly = !view.downloadedOnly)) },
+                    label = { Text(stringResource(R.string.downloaded), maxLines = 1) },
+                    leadingIcon = {
+                        Icon(painterResource(R.drawable.ic_download_done), contentDescription = null, Modifier.size(FilterChipDefaults.IconSize))
+                    },
+                )
+            }
             SortChip(view, actions.show)
         }
     }

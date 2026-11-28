@@ -31,7 +31,8 @@ private const val FRESH_FOR_MS = 30 * 60 * 1000L
 
 /**
  * Where each track streams from, asked of Qobuz when the player opens it, not when it's
- * queued: an address fetched before a long pause would have expired.
+ * queued: an address fetched before a long pause would have expired. A track downloaded
+ * plays from its file.
  */
 @UnstableApi
 class Streams(private val core: Pochette, private val quality: () -> Quality) : ResolvingDataSource.Resolver {
@@ -59,6 +60,11 @@ class Streams(private val core: Pochette, private val quality: () -> Quality) : 
     }
 
     private fun fresh(trackId: ULong): Stream {
+        // Downloaded, it plays from its file, offline too.
+        core.downloadedStream(trackId)?.let {
+            fetched[trackId] = Fetched(it, SystemClock.elapsedRealtime())
+            return it
+        }
         fetched[trackId]?.takeIf { SystemClock.elapsedRealtime() - it.at < FRESH_FOR_MS }?.let { return it.stream }
         val stream =
             try {

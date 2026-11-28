@@ -173,6 +173,11 @@ impl Inner {
     async fn sign_in(&self, mut client: Client) -> Result<Account> {
         let user = client.login().await?;
         let account = Account::from(&user);
+        // What Qobuz couldn't hear of while out of reach.
+        let reporting = client.clone();
+        crate::runtime().spawn(async move {
+            pochette_core::reports::send_kept(&reporting).await;
+        });
         *lock(&self.account) = Some(SignedIn {
             client,
             account: account.clone(),

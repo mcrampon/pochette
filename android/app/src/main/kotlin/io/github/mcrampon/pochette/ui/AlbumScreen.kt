@@ -1,7 +1,13 @@
 package io.github.mcrampon.pochette.ui
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +26,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,6 +54,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -73,8 +82,55 @@ class AlbumActions(
     val play: (AlbumPage, from: ULong?) -> Unit,
     val playPause: () -> Unit,
     val openArtist: (id: ULong, name: String) -> Unit,
+    val download: (AlbumCard) -> Unit,
+    /** Stop downloading the album, and remove what's there of it. */
+    val cancelDownload: () -> Unit,
+    val removeDownload: () -> Unit,
     val back: () -> Unit,
 )
+
+/** Where the album's download is. */
+sealed interface DownloadState {
+    data object None : DownloadState
+
+    /** Waiting to start, as for Wi-Fi. */
+    data object Waiting : DownloadState
+
+    /** How much is there, from 0 to 1. */
+    data class Going(val fraction: Float) : DownloadState
+
+    data object Done : DownloadState
+}
+
+/** Download the album, see how it goes and stop it, or remove it once downloaded. */
+@Composable
+private fun DownloadButton(state: DownloadState, onDownload: () -> Unit, onCancel: () -> Unit, onRemove: () -> Unit) {
+    when (state) {
+        DownloadState.None ->
+            IconButton(onClick = onDownload) {
+                Icon(painterResource(R.drawable.ic_download), contentDescription = stringResource(R.string.download))
+            }
+        DownloadState.Waiting, is DownloadState.Going -> {
+            val description =
+                stringResource(if (state is DownloadState.Waiting) R.string.download_waiting else R.string.downloading_cancel)
+            IconButton(onClick = onCancel, modifier = Modifier.semantics { contentDescription = description }) {
+                if (state is DownloadState.Going) {
+                    CircularProgressIndicator(progress = { state.fraction }, modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
+                } else {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
+                }
+            }
+        }
+        DownloadState.Done ->
+            IconButton(onClick = onRemove) {
+                Icon(
+                    painterResource(R.drawable.ic_download_done),
+                    contentDescription = stringResource(R.string.downloaded_remove),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+    }
+}
 
 /** Offer to send `card`'s link, with a word on it, through the apps that can. */
 private fun shareAlbum(context: Context, card: AlbumCard) {
@@ -104,8 +160,24 @@ fun AlbumScreen(
     now: NowPlaying?,
     /** Changes as the plays do, here or on another device. */
     playsVersion: Int,
+    downloadState: DownloadState,
     actions: AlbumActions,
 ) {
+    var removing by remember { mutableStateOf(false) }
+    if (removing) {
+        AlertDialog(
+            onDismissRequest = { removing = false },
+            title = { Text(stringResource(R.string.remove_download_question)) },
+            text = { Text(stringResource(R.string.remove_download_detail)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    removing = false
+                    actions.removeDownload()
+                }) { Text(stringResource(R.string.remove)) }
+            },
+            dismissButton = { TextButton(onClick = { removing = false }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
     var attempt by remember { mutableIntStateOf(0) }
     val load by produceState<Load>(Load.Pending, id, attempt) {
         value =
@@ -120,6 +192,16 @@ fun AlbumScreen(
     var favorite by rememberSaveable(id) { mutableStateOf(actions.isFavorite()) }
     val ours = now?.albumId == id
     val context = LocalContext.current
+    // The download's notification, which Android 13 and later ask leave for: it downloads either way.
+    val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    val download = { album: AlbumCard ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        actions.download(album)
+    }
 
     Scaffold(
         topBar = {
@@ -131,6 +213,9 @@ fun AlbumScreen(
                     }
                 },
                 actions = {
+                    if (card != null && card.streamable) {
+                        DownloadButton(downloadState, onDownload = { download(card) }, onCancel = actions.cancelDownload, onRemove = { removing = true })
+                    }
                     if (card != null) {
                         IconButton(onClick = { shareAlbum(context, card) }) {
                             Icon(painterResource(R.drawable.ic_share), contentDescription = stringResource(R.string.share_album))

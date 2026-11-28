@@ -13,6 +13,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -67,7 +68,8 @@ class PlaybackService : MediaSessionService() {
                 // Hi-res FLAC decoded to floats, not cut down to 16 bits.
                 .Builder(this, DefaultRenderersFactory(this).setEnableAudioFloatOutput(true))
                 .setMediaSourceFactory(
-                    DefaultMediaSourceFactory(ResolvingDataSource.Factory(DefaultHttpDataSource.Factory(), streams)),
+                    // Over the network, or from a download's file.
+                    DefaultMediaSourceFactory(ResolvingDataSource.Factory(DefaultDataSource.Factory(this, DefaultHttpDataSource.Factory()), streams)),
                 ).setAudioAttributes(
                     AudioAttributes
                         .Builder()

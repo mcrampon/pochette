@@ -31,7 +31,17 @@ class Settings(context: Context) {
         get() = prefs.getString(LANGUAGE, null)
         set(value) = prefs.edit { putString(LANGUAGE, value) }
 
-    /** How the library sorts and which genres and decades it shows: the search isn't kept. */
+    /** The best quality to download albums in, apart from streaming's: smaller files keep more albums. */
+    var downloadQuality: Quality
+        get() = prefs.getString(DOWNLOAD_QUALITY, null)?.let { saved -> Quality.entries.find { it.name == saved } } ?: Quality.CD
+        set(value) = prefs.edit { putString(DOWNLOAD_QUALITY, value.name) }
+
+    /** Whether albums download on mobile data too, not only on Wi-Fi. */
+    var downloadOnMobileData: Boolean
+        get() = prefs.getBoolean(DOWNLOAD_ON_MOBILE_DATA, false)
+        set(value) = prefs.edit { putBoolean(DOWNLOAD_ON_MOBILE_DATA, value) }
+
+    /** How the library sorts and which albums it shows: the search isn't kept. */
     var libraryView: LibraryView
         get() =
             LibraryView(
@@ -40,6 +50,7 @@ class Settings(context: Context) {
                 decades = prefs.getString(LIBRARY_DECADES, null).orEmpty().split(',').mapNotNull { it.toUShortOrNull() },
                 sort = prefs.getString(LIBRARY_SORT, null)?.let { saved -> Sort.entries.find { it.name == saved } } ?: Sort.DATE_ADDED,
                 reversed = prefs.getBoolean(LIBRARY_REVERSED, false),
+                downloadedOnly = prefs.getBoolean(LIBRARY_DOWNLOADED_ONLY, false),
             )
         set(value) =
             prefs.edit {
@@ -47,6 +58,7 @@ class Settings(context: Context) {
                 putString(LIBRARY_DECADES, value.decades.joinToString(","))
                 putString(LIBRARY_SORT, value.sort.name)
                 putBoolean(LIBRARY_REVERSED, value.reversed)
+                putBoolean(LIBRARY_DOWNLOADED_ONLY, value.downloadedOnly)
             }
 
     /** Call `action` when the quality changes: keep what this returns for as long as it should be called. */
@@ -63,5 +75,8 @@ class Settings(context: Context) {
         const val LIBRARY_DECADES = "library_decades"
         const val LIBRARY_SORT = "library_sort"
         const val LIBRARY_REVERSED = "library_reversed"
+        const val LIBRARY_DOWNLOADED_ONLY = "library_downloaded_only"
+        const val DOWNLOAD_QUALITY = "download_quality"
+        const val DOWNLOAD_ON_MOBILE_DATA = "download_on_mobile_data"
     }
 }

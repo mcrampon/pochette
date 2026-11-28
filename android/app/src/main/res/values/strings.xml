@@ -167,6 +167,35 @@
     <string name="language">Language</string>
     <string name="language_system">System default</string>
 
+    <!-- Downloads, to listen offline: on an album, in Settings, and offline. -->
+    <string name="download">Download</string>
+    <string name="download_waiting">Waiting to download: tap to cancel</string>
+    <string name="downloading_cancel">Downloading: tap to cancel</string>
+    <string name="downloaded_remove">Downloaded: tap to remove</string>
+    <string name="remove_download_question">Remove the Download?</string>
+    <string name="remove_download_detail">The album will need a connection again to play.</string>
+    <string name="remove">Remove</string>
+    <!-- A notification's channel, and the Settings section. -->
+    <string name="downloads">Downloads</string>
+    <!-- The notification while it downloads. %1$s: the album's title. -->
+    <string name="downloading">Downloading %1$s</string>
+    <!-- %1$s: the album's title, %2$s: why. -->
+    <string name="cant_download">Can\'t download “%1$s”: %2$s</string>
+    <!-- A filter of the albums: those downloaded. -->
+    <string name="downloaded">Downloaded</string>
+    <string name="download_quality">Download Quality</string>
+    <string name="download_quality_detail">Each track downloads in the best it has, up to this, as your subscription allows.</string>
+    <string name="download_on_mobile_data">Download on Mobile Data</string>
+    <string name="download_on_mobile_data_detail">Otherwise, albums wait for Wi-Fi to download.</string>
+    <string name="downloads_space">Space Used</string>
+    <string name="remove_all_downloads">Remove All</string>
+    <string name="remove_all_downloads_question">Remove All Downloads?</string>
+    <string name="remove_all_downloads_detail">The albums will need a connection again to play.</string>
+    <!-- Out of Qobuz's reach, with albums downloaded. -->
+    <string name="offline">Offline</string>
+    <string name="offline_downloads">Offline: your downloaded albums.</string>
+    <string name="needs_connection">This needs a connection to Qobuz. Your downloaded albums are in Albums.</string>
+
     <!-- Settings: the devices. -->
     <string name="devices">Devices</string>
     <!-- %1$s: this phone's name. -->

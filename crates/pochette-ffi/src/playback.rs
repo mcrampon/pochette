@@ -63,10 +63,12 @@ pub struct Stream {
     pub sample: bool,
     /// "24-bit / 96 kHz", "MP3 · 320 kbps".
     pub quality: Option<String>,
+    /// From a download, on the device: `url` is its file.
+    pub local: bool,
 }
 
 impl Stream {
-    fn new(track_id: u64, file: FileUrl) -> Self {
+    pub(crate) fn new(track_id: u64, file: FileUrl) -> Self {
         let quality = if file.format_id == qobuz::Quality::Mp3 as u32 {
             Some("MP3 \u{b7} 320 kbps".to_owned())
         } else {
@@ -82,6 +84,7 @@ impl Stream {
             blob: file.blob,
             sample: file.sample,
             quality,
+            local: false,
         }
     }
 
@@ -160,7 +163,12 @@ impl Pochette {
     /// The track started playing from `stream`: Qobuz hears of it. The album is one whose
     /// page was loaded, by [`Pochette::album`].
     pub fn start_listening(&self, album_id: &str, stream: &Stream) -> Result<Arc<Listening>> {
-        let client = self.inner.client()?;
+        // Offline, a download's reports wait for Qobuz to be in reach.
+        let client = if stream.local {
+            self.inner.client().ok()
+        } else {
+            Some(self.inner.client()?)
+        };
         let album = lock(&self.inner.albums)
             .get(album_id)
             .cloned()
@@ -181,7 +189,10 @@ impl Pochette {
             .ok_or_else(|| PochetteError::Failed {
                 message: format!("Track {} isn't on album {album_id}", stream.track_id),
             })?;
-        let mut report = Report::start(client, &tracks[index], &stream.file());
+        let mut report = match client {
+            Some(client) if !stream.local => Report::start(client, &tracks[index], &stream.file()),
+            client => Report::start_downloaded(client, &tracks[index], stream.format_id),
+        };
         send(&mut report);
         Ok(Arc::new(Listening {
             inner: Arc::clone(&self.inner),

@@ -1,6 +1,8 @@
 package io.github.mcrampon.pochette
 
 import android.app.Application
+import android.net.ConnectivityManager
+import android.net.Network
 import android.util.Log
 import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
@@ -22,6 +24,7 @@ import io.github.mcrampon.pochette.core.Lyrics
 import io.github.mcrampon.pochette.core.Period
 import io.github.mcrampon.pochette.core.Plays
 import io.github.mcrampon.pochette.core.PochetteException
+import io.github.mcrampon.pochette.core.Quality
 import io.github.mcrampon.pochette.core.Sort
 import io.github.mcrampon.pochette.core.Stats
 import io.github.mcrampon.pochette.playback.NowPlaying
@@ -34,6 +37,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import kotlin.random.Random
 
 /** Where the app is: signing in, or in the user's library. */
@@ -46,8 +51,14 @@ sealed interface Stage {
     /** The kept session couldn't be checked, as without a network. */
     data class Unreachable(val error: String) : Stage
 
+    /** Out of Qobuz's reach, with albums downloaded: they're what shows, until it's back. */
+    data object Offline : Stage
+
     data class SignedIn(val account: Account) : Stage
 }
+
+/** The albums downloaded, and those downloading, with how far: none while waiting, as for Wi-Fi. */
+data class Downloads(val done: Set<String> = emptySet(), val going: Map<String, Float?> = emptyMap())
 
 /** The user's albums, as the library shows them: `any` when there are some, shown or not. */
 data class Library(
@@ -123,10 +134,121 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         filtering = viewModelScope.launch { reshow() }
     }
 
-    /** The genres and decades of the user's albums, to filter them by. */
-    fun libraryGenres(): List<String> = core.libraryGenres()
+    /** The genres and decades of the albums the library shows, to filter them by. */
+    fun libraryGenres(): List<String> = core.libraryGenres(shown().downloadedOnly)
 
-    fun libraryDecades(): List<UShort> = core.libraryDecades()
+    fun libraryDecades(): List<UShort> = core.libraryDecades(shown().downloadedOnly)
+
+    /** The view of the library: offline, of the albums downloaded. */
+    private fun shown(): LibraryView = if (offline) view.copy(downloadedOnly = true) else view
+
+    val offline: Boolean get() = _stage.value is Stage.Offline
+
+    private val _downloads = MutableStateFlow(Downloads(core.downloadedIds().toSet()))
+    val downloads: StateFlow<Downloads> = _downloads.asStateFlow()
+
+    /** Download `album`, to listen to offline. */
+    fun download(album: AlbumCard) = DownloadWorker.start(getApplication(), album.id, album.title, settings.downloadOnMobileData)
+
+    /** Stop downloading album `id`, and remove what's there of it. */
+    fun cancelDownload(id: String) {
+        DownloadWorker.cancel(getApplication(), id)
+        removeDownload(id)
+    }
+
+    fun removeDownload(id: String) {
+        try {
+            core.removeDownload(id)
+        } catch (err: PochetteException) {
+            _notice.value = err.message
+        }
+        downloadsChanged()
+    }
+
+    fun removeAllDownloads() {
+        DownloadWorker.cancelAll(getApplication())
+        try {
+            core.removeAllDownloads()
+        } catch (err: PochetteException) {
+            _notice.value = err.message
+        }
+        downloadsChanged()
+    }
+
+    /** How much room the downloads take, in bytes. */
+    fun downloadsSize(): Long = core.downloadsSize().toLong()
+
+    var downloadQuality: Quality
+        get() = settings.downloadQuality
+        set(value) {
+            settings.downloadQuality = value
+        }
+
+    /** Whether albums download on mobile data too: those waiting for Wi-Fi go on at once when it's allowed. */
+    var downloadOnMobileData: Boolean
+        get() = settings.downloadOnMobileData
+        set(value) {
+            settings.downloadOnMobileData = value
+            for ((id, _) in _downloads.value.going) {
+                val title = card(id)?.title ?: pages[id]?.card?.title ?: continue
+                DownloadWorker.start(getApplication(), id, title, value)
+            }
+        }
+
+    private fun downloadsChanged() {
+        _downloads.value = _downloads.value.copy(done = core.downloadedIds().toSet())
+        pages.clear()
+        // Offline with none left: back to saying Qobuz can't be reached.
+        if (offline && _downloads.value.done.isEmpty()) return resume()
+        if (shown().downloadedOnly) viewModelScope.launch { reshow() }
+    }
+
+    /** Follow the downloads, as WorkManager runs them: how far each goes, and those that end. */
+    private suspend fun followDownloads() {
+        // What's already over when the app opens isn't news.
+        val seen = HashMap<java.util.UUID, WorkInfo.State>()
+        var first = true
+        WorkManager.getInstance(getApplication()).getWorkInfosByTagFlow(DownloadWorker.WORK_TAG).collect { works ->
+            val going = HashMap<String, Float?>()
+            var ended = false
+            for (work in works) {
+                val id = DownloadWorker.albumOf(work) ?: continue
+                when (work.state) {
+                    WorkInfo.State.RUNNING -> going[id] = work.progress.getFloat(DownloadWorker.PROGRESS, 0f)
+                    WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED -> going[id] = null
+                    else -> {}
+                }
+                val before = seen.put(work.id, work.state)
+                if (!first && before != work.state && work.state.isFinished) {
+                    ended = true
+                    if (work.state == WorkInfo.State.FAILED) {
+                        val title = work.outputData.getString(DownloadWorker.TITLE).orEmpty()
+                        val error = work.outputData.getString(DownloadWorker.ERROR).orEmpty()
+                        _notice.value = text(R.string.cant_download, title, error)
+                    }
+                }
+            }
+            first = false
+            _downloads.value = _downloads.value.copy(going = going)
+            if (ended) downloadsChanged()
+        }
+    }
+
+    /** Offline, waits for the network to come back, to get back to Qobuz. */
+    private val networkBack =
+        object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                viewModelScope.launch { if (offline) resume() }
+            }
+        }
+    private var watchingNetwork = false
+
+    private fun watchNetwork(on: Boolean) {
+        if (on == watchingNetwork) return
+        val connectivity = getApplication<Application>().getSystemService(ConnectivityManager::class.java)
+        if (on) connectivity.registerDefaultNetworkCallback(networkBack) else connectivity.unregisterNetworkCallback(networkBack)
+        watchingNetwork = on
+    }
 
     /** Play one of the albums shown, picked at random: another than the one playing, when there's another. */
     fun playRandom() {
@@ -159,6 +281,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
 
     init {
         resume()
+        viewModelScope.launch { followDownloads() }
         // Sorted by plays, the albums move as plays come, here or from another device.
         viewModelScope.launch {
             sync.plays.drop(1).collect {
@@ -195,15 +318,24 @@ class AppModel(app: Application) : AndroidViewModel(app) {
             _stage.value = Stage.SignedOut()
             return
         }
-        _stage.value = Stage.Starting
+        // Offline, the downloads stay in sight while Qobuz is asked again.
+        if (!offline) _stage.value = Stage.Starting
         viewModelScope.launch {
             try {
                 signedIn(core.restore(kept))
+                watchNetwork(false)
             } catch (expired: PochetteException.SignedOut) {
+                watchNetwork(false)
                 sessions.clear()
                 _stage.value = Stage.SignedOut(error = text(R.string.sign_in_again, expired.message.orEmpty()))
             } catch (err: PochetteException) {
-                _stage.value = Stage.Unreachable(err.message.orEmpty())
+                if (core.downloadedIds().isEmpty()) {
+                    _stage.value = Stage.Unreachable(err.message.orEmpty())
+                } else if (!offline) {
+                    _stage.value = Stage.Offline
+                    watchNetwork(true)
+                    reshow()
+                }
             }
         }
     }
@@ -386,10 +518,12 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     }
 
     override fun onCleared() {
+        watchNetwork(false)
         playback.release()
     }
 
     fun signOut() {
+        watchNetwork(false)
         playback.stop()
         core.signOut()
         pages.clear()
@@ -406,6 +540,8 @@ class AppModel(app: Application) : AndroidViewModel(app) {
 
     /** Get the user's albums from Qobuz again. */
     fun refresh() {
+        // Offline, try reaching Qobuz again instead.
+        if (offline) return resume()
         if (_library.value.refreshing) return
         _library.value = _library.value.copy(refreshing = true, error = null)
         viewModelScope.launch {
@@ -463,12 +599,12 @@ class AppModel(app: Application) : AndroidViewModel(app) {
 
     /** Show the albums the view picks. */
     private suspend fun reshow() {
-        val view = view
+        val view = shown()
         val (albums, any) =
             withContext(Dispatchers.Default) {
                 val albums = core.library(view)
                 // Whether none match, or there's none at all.
-                albums to (albums.isNotEmpty() || core.library(LibraryView("", emptyList(), emptyList(), Sort.DATE_ADDED, false)).isNotEmpty())
+                albums to (albums.isNotEmpty() || core.library(LibraryView("", emptyList(), emptyList(), Sort.DATE_ADDED, false, view.downloadedOnly)).isNotEmpty())
             }
         _library.value = _library.value.copy(albums = albums, any = any)
     }

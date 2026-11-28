@@ -7,7 +7,7 @@ use qobuz::models::Album;
 
 use crate::{
     AlbumCard, AlbumList, AlbumPage, ArtistCard, ArtistPage, Discover, Genre, Pochette,
-    ReleaseKind, Result, Section, lock, run,
+    ReleaseKind, Result, Section, downloads::with_local_cover, lock, run,
 };
 
 /// The orders the albums can go in.
@@ -47,6 +47,9 @@ pub struct LibraryView {
     pub sort: Sort,
     /// The other way round from the sort's natural order.
     pub reversed: bool,
+    /// Only the albums downloaded, as offline: those of the user's albums, and those no
+    /// longer among them.
+    pub downloaded_only: bool,
 }
 
 impl From<LibraryView> for View {
@@ -91,25 +94,25 @@ impl Pochette {
     /// The user's albums that `view` shows, in its order.
     #[must_use]
     pub fn library(&self, view: LibraryView) -> Vec<AlbumCard> {
-        let entries = self.entries();
+        let entries = self.entries(view.downloaded_only);
         let plays = self.inner.plays();
         View::from(view)
             .apply(&entries, plays.history())
             .into_iter()
-            .map(|entry| AlbumCard::from(&*entry.album))
+            .map(|entry| with_local_cover(&self.inner.downloads, AlbumCard::from(&*entry.album)))
             .collect()
     }
 
-    /// The genres of the user's albums, in alphabetical order.
+    /// The genres of the user's albums, or of those downloaded, in alphabetical order.
     #[must_use]
-    pub fn library_genres(&self) -> Vec<String> {
-        library::genres(&self.entries())
+    pub fn library_genres(&self, downloaded_only: bool) -> Vec<String> {
+        library::genres(&self.entries(downloaded_only))
     }
 
-    /// The decades of the user's albums, newest first.
+    /// The decades of the user's albums, or of those downloaded, newest first.
     #[must_use]
-    pub fn library_decades(&self) -> Vec<u16> {
-        library::decades(&self.entries())
+    pub fn library_decades(&self, downloaded_only: bool) -> Vec<u16> {
+        library::decades(&self.entries(downloaded_only))
     }
 
     #[must_use]
@@ -149,9 +152,14 @@ impl Pochette {
     pub async fn album(&self, id: String) -> Result<AlbumPage> {
         let inner = Arc::clone(&self.inner);
         run(async move {
-            let album = inner.client()?.album(&id).await?;
+            // Downloaded, it's there, offline too.
+            let album = match inner.downloads.album(&id) {
+                Some(album) => album,
+                None => inner.client()?.album(&id).await?,
+            };
             let plays = inner.plays().history().album(&id);
-            let page = AlbumPage::new(&album, plays);
+            let mut page = AlbumPage::new(&album, plays);
+            page.card = with_local_cover(&inner.downloads, page.card);
             lock(&inner.albums).insert(id, album);
             Ok(page)
         })
@@ -267,8 +275,30 @@ impl Pochette {
 
 impl Pochette {
     /// The favorites, as the library sorts and filters them.
-    fn entries(&self) -> Vec<Entry> {
-        let albums: Vec<Album> = lock(&self.inner.favorites).clone();
-        albums.into_iter().map(Entry::new).collect()
+    fn entries(&self, downloaded_only: bool) -> Vec<Entry> {
+        let favorites: Vec<Album> = lock(&self.inner.favorites).clone();
+        if !downloaded_only {
+            return favorites.into_iter().map(Entry::new).collect();
+        }
+        self.inner
+            .downloads
+            .albums()
+            .into_iter()
+            .map(|(mut album, downloaded)| {
+                // Added when it was to the user's albums, or else when it was downloaded,
+                // for the sort.
+                album.favorited_at = favorites
+                    .iter()
+                    .find(|favorite| favorite.id == album.id)
+                    .and_then(|favorite| favorite.favorited_at)
+                    .or_else(|| {
+                        downloaded
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .ok()
+                            .and_then(|since| i64::try_from(since.as_secs()).ok())
+                    });
+                Entry::new(album)
+            })
+            .collect()
     }
 }

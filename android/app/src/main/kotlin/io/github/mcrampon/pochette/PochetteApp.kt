@@ -30,6 +30,8 @@ class PochetteApp : Application() {
                     stateDir = noBackupFilesDir.resolve("sync").path,
                     deviceName = deviceName(),
                     appVersion = packageManager.getPackageInfo(packageName, 0).versionName.orEmpty(),
+                    // Large, and Qobuz's again once the app is back: not backed up.
+                    downloadDir = noBackupFilesDir.resolve("downloads").path,
                 ),
             )
         Language.tell(this)

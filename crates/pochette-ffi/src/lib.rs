@@ -5,6 +5,7 @@
 //! engine. Its `async` methods become Kotlin `suspend` functions, which run on this
 //! library's own Tokio runtime.
 
+mod downloads;
 mod error;
 mod library;
 mod link;
@@ -28,6 +29,7 @@ use std::{
 use pochette_core::{history, sync::Engine};
 use qobuz::{Client, models::Album};
 
+pub use downloads::DownloadProgress;
 pub use error::PochetteError;
 pub use library::LibraryView;
 pub use playback::{Listening, Stream};
@@ -51,6 +53,8 @@ pub struct Config {
     pub device_name: String,
     /// The app's version, which has its own: "1.0.0".
     pub app_version: String,
+    /// Where downloaded albums go: room that isn't backed up.
+    pub download_dir: String,
 }
 
 /// Pochette, as the Android app sees it. Create one, for the whole app.
@@ -72,6 +76,7 @@ pub(crate) struct Inner {
     /// The sync engine, or why there's none.
     engine: Result<Engine, String>,
     sync: sync::State,
+    downloads: pochette_core::downloads::Downloads,
 }
 
 #[uniffi::export]
@@ -102,6 +107,9 @@ impl Pochette {
                 log: Mutex::default(),
                 engine,
                 sync: sync::State::default(),
+                downloads: pochette_core::downloads::Downloads::new(PathBuf::from(
+                    &config.download_dir,
+                )),
             }),
         }))
     }

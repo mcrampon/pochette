@@ -2,9 +2,9 @@
 //!
 //! Fields are optional unless Qobuz always sends them: its responses vary between accounts.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct User {
     pub id: u64,
     pub login: Option<String>,
@@ -39,7 +39,7 @@ impl User {
 }
 
 /// The user's subscription.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Credential {
     /// The plan's name, such as "Studio".
     pub label: Option<String>,
@@ -47,7 +47,7 @@ pub struct Credential {
     pub parameters: Option<CredentialParameters>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CredentialParameters {
     #[serde(default)]
     pub lossy_streaming: bool,
@@ -59,7 +59,7 @@ pub struct CredentialParameters {
 }
 
 /// One page of a longer list.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Page<T> {
     pub offset: usize,
     pub limit: usize,
@@ -67,7 +67,7 @@ pub struct Page<T> {
     pub items: Vec<T>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Album {
     pub id: String,
     pub title: String,
@@ -123,14 +123,14 @@ impl Album {
     }
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct ArtistSummary {
     pub id: u64,
     pub name: String,
 }
 
 /// The cover, in several sizes.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct AlbumImage {
     /// 50 px.
     pub thumbnail: Option<String>,
@@ -140,24 +140,24 @@ pub struct AlbumImage {
     pub large: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Genre {
     pub id: u64,
     pub name: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Award {
     pub name: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Label {
     pub id: u64,
     pub name: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Track {
     pub id: u64,
     pub title: String,
@@ -190,7 +190,7 @@ pub struct Track {
 }
 
 /// The album a track is on.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TrackAlbum {
     pub id: String,
     pub title: String,

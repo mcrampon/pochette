@@ -58,7 +58,8 @@ class MainActivity : ComponentActivity() {
                                 onSignIn = { model.signIn(::openSignInPage) },
                                 onCancel = model::cancelSignIn,
                             )
-                        is Stage.SignedIn -> SignedIn(model)
+                        // Offline, the downloads.
+                        is Stage.SignedIn, Stage.Offline -> SignedIn(model, offline = current is Stage.Offline)
                     }
                 }
             }

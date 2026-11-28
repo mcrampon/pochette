@@ -196,4 +196,33 @@
     <string name="track_open_album">Ouvrir l\'album</string>
     <string name="track_cant_load">Impossible de trouver l\'album de ce titre : %1$s</string>
     <string name="not_a_qobuz_link">Aucun lien vers un album, un artiste ou un titre Qobuz ici.</string>
+
+    <!-- Téléchargements, pour écouter hors connexion : sur un album, dans les paramètres, et hors connexion. -->
+    <string name="download">Télécharger</string>
+    <string name="download_waiting">En attente de téléchargement : appuyez pour annuler</string>
+    <string name="downloading_cancel">Téléchargement en cours : appuyez pour annuler</string>
+    <string name="downloaded_remove">Téléchargé : appuyez pour supprimer</string>
+    <string name="remove_download_question">Supprimer le téléchargement ?</string>
+    <string name="remove_download_detail">L\'album aura de nouveau besoin d\'une connexion pour être lu.</string>
+    <string name="remove">Supprimer</string>
+    <!-- Le canal d'une notification, et la section des paramètres. -->
+    <string name="downloads">Téléchargements</string>
+    <!-- La notification pendant le téléchargement. %1$s : le titre de l'album. -->
+    <string name="downloading">Téléchargement de « %1$s »</string>
+    <!-- %1$s : le titre de l'album, %2$s : pourquoi. -->
+    <string name="cant_download">Impossible de télécharger « %1$s » : %2$s</string>
+    <!-- Un filtre des albums : ceux qui sont téléchargés. -->
+    <string name="downloaded">Téléchargés</string>
+    <string name="download_quality">Qualité de téléchargement</string>
+    <string name="download_quality_detail">Chaque titre est téléchargé dans sa meilleure qualité, jusqu\'à celle-ci, selon ce que permet votre abonnement.</string>
+    <string name="download_on_mobile_data">Télécharger avec les données mobiles</string>
+    <string name="download_on_mobile_data_detail">Sinon, les albums attendent le Wi-Fi pour se télécharger.</string>
+    <string name="downloads_space">Espace utilisé</string>
+    <string name="remove_all_downloads">Tout supprimer</string>
+    <string name="remove_all_downloads_question">Supprimer tous les téléchargements ?</string>
+    <string name="remove_all_downloads_detail">Les albums auront de nouveau besoin d\'une connexion pour être lus.</string>
+    <!-- Hors de portée de Qobuz, avec des albums téléchargés. -->
+    <string name="offline">Hors connexion</string>
+    <string name="offline_downloads">Hors connexion : vos albums téléchargés.</string>
+    <string name="needs_connection">Cette page a besoin d\'une connexion à Qobuz. Vos albums téléchargés sont dans Albums.</string>
 </resources>

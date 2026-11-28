@@ -195,4 +195,31 @@
     <string name="track_open_album">Album öffnen</string>
     <string name="track_cant_load">Das Album zu diesem Titel lässt sich nicht finden: %1$s</string>
     <string name="not_a_qobuz_link">Hier ist kein Link zu einem Album, Künstler oder Titel auf Qobuz.</string>
+
+    <!-- Downloads, um offline zu hören: auf einem Album, in den Einstellungen und offline. -->
+    <string name="download">Herunterladen</string>
+    <string name="download_waiting">Wartet auf Download: Tippe zum Abbrechen</string>
+    <string name="downloading_cancel">Wird heruntergeladen: Tippe zum Abbrechen</string>
+    <string name="downloaded_remove">Heruntergeladen: Tippe zum Entfernen</string>
+    <string name="remove_download_question">Download entfernen?</string>
+    <string name="remove_download_detail">Das Album braucht zum Abspielen dann wieder eine Verbindung.</string>
+    <string name="remove">Entfernen</string>
+    <string name="downloads">Downloads</string>
+    <!-- %1$s: der Titel des Albums. -->
+    <string name="downloading">%1$s wird heruntergeladen</string>
+    <!-- %1$s: der Titel des Albums, %2$s: der Grund. -->
+    <string name="cant_download">„%1$s“ kann nicht heruntergeladen werden: %2$s</string>
+    <!-- Ein Filter der Alben: die heruntergeladenen. -->
+    <string name="downloaded">Heruntergeladen</string>
+    <string name="download_quality">Download-Qualität</string>
+    <string name="download_quality_detail">Jeder Titel wird in seiner besten Qualität heruntergeladen, höchstens in dieser und soweit dein Abo es zulässt.</string>
+    <string name="download_on_mobile_data">Über mobile Daten herunterladen</string>
+    <string name="download_on_mobile_data_detail">Sonst werden Alben erst im WLAN heruntergeladen.</string>
+    <string name="downloads_space">Belegter Speicher</string>
+    <string name="remove_all_downloads">Alle entfernen</string>
+    <string name="remove_all_downloads_question">Alle Downloads entfernen?</string>
+    <string name="remove_all_downloads_detail">Die Alben brauchen zum Abspielen dann wieder eine Verbindung.</string>
+    <string name="offline">Offline</string>
+    <string name="offline_downloads">Offline: deine heruntergeladenen Alben.</string>
+    <string name="needs_connection">Dafür ist eine Verbindung zu Qobuz nötig. Deine heruntergeladenen Alben findest du im Tab „Alben“.</string>
 </resources>

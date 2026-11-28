@@ -27,10 +27,11 @@ class CoreTest {
     fun startsSignedOut() {
         val dir = Files.createTempDirectory("pochette-test").toFile()
         try {
-            val core = Pochette(Config(dir.resolve("plays").path, dir.resolve("sync").path, "Test", "1.0.0"))
+            val core = Pochette(Config(dir.resolve("plays").path, dir.resolve("sync").path, "Test", "1.0.0", dir.resolve("downloads").path))
             assertNull(core.account())
             assertNull(core.session())
-            assertTrue(core.library(LibraryView("", emptyList(), emptyList(), Sort.DATE_ADDED, false)).isEmpty())
+            assertTrue(core.library(LibraryView("", emptyList(), emptyList(), Sort.DATE_ADDED, false, false)).isEmpty())
+            assertTrue(core.downloadedIds().isEmpty())
             assertEquals(0uL, core.stats(Period.All).time)
             assertEquals("Test", core.syncStatus().name)
             // A suspend call, on the core's runtime: a session it can't read.

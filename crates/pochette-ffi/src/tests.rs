@@ -66,6 +66,7 @@ fn works_offline() {
         state_dir: dir.join("state").to_string_lossy().into_owned(),
         device_name: "Test Phone".to_owned(),
         app_version: "1.0.0".to_owned(),
+        download_dir: dir.join("downloads").to_string_lossy().into_owned(),
     })
     .unwrap();
 
@@ -82,6 +83,7 @@ fn works_offline() {
         blob: None,
         sample: false,
         quality: None,
+        local: false,
     };
     assert!(pochette.start_listening("b", &stream).is_err());
 
@@ -145,8 +147,8 @@ fn works_offline() {
         }),
         ["c"]
     );
-    assert_eq!(pochette.library_genres(), ["Jazz", "Rock"]);
-    assert_eq!(pochette.library_decades(), [2020, 2000, 1990]);
+    assert_eq!(pochette.library_genres(false), ["Jazz", "Rock"]);
+    assert_eq!(pochette.library_decades(false), [2020, 2000, 1990]);
     assert!(pochette.is_favorite("a") && !pochette.is_favorite("z"));
 
     // A track heard to its end: into the log, the plays and the stats.

@@ -2,7 +2,14 @@ package io.github.mcrampon.pochette.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,16 +34,20 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.mcrampon.pochette.AppModel
 import io.github.mcrampon.pochette.Language
+import io.github.mcrampon.pochette.R
 import io.github.mcrampon.pochette.Screen
 import io.github.mcrampon.pochette.Tab
 import io.github.mcrampon.pochette.core.AlbumCard
 import io.github.mcrampon.pochette.core.ArtistCard
 import io.github.mcrampon.pochette.playback.NowPlaying
 
-/** The signed-in app: the tabs, the screen on top of the shown one, what's playing, and messages. */
+/**
+ * The signed-in app: the tabs, the screen on top of the shown one, what's playing, and
+ * messages. `offline`, out of Qobuz's reach, with the downloads.
+ */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
-fun SignedIn(model: AppModel) {
+fun SignedIn(model: AppModel, offline: Boolean) {
     val now by model.playback.now.collectAsStateWithLifecycle()
     val notice by model.notice.collectAsStateWithLifecycle()
     val snackbars = remember { SnackbarHostState() }
@@ -86,7 +97,7 @@ fun SignedIn(model: AppModel) {
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             saved.SaveableStateProvider(navigation.topKey) {
-                Screen(model, navigation.top, now, back = { back() })
+                Screen(model, navigation.top, now, offline, back = { back() })
             }
         }
     }
@@ -94,7 +105,7 @@ fun SignedIn(model: AppModel) {
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
-private fun Screen(model: AppModel, screen: Screen, now: NowPlaying?, back: () -> Unit) {
+private fun Screen(model: AppModel, screen: Screen, now: NowPlaying?, offline: Boolean, back: () -> Unit) {
     // Changes as the plays do, here or as another device's arrive.
     val plays by model.sync.plays.collectAsStateWithLifecycle()
     val openAlbum = { album: AlbumCard -> model.open(Screen.Album(album.id, album)) }
@@ -102,9 +113,12 @@ private fun Screen(model: AppModel, screen: Screen, now: NowPlaying?, back: () -
     when (screen) {
         Screen.Albums -> {
             val library by model.library.collectAsStateWithLifecycle()
+            val downloads by model.downloads.collectAsStateWithLifecycle()
             AlbumsScreen(
                 library,
                 model.view,
+                offline,
+                anyDownloaded = downloads.done.isNotEmpty(),
                 AlbumsActions(
                     refresh = model::refresh,
                     show = model::show,
@@ -117,7 +131,10 @@ private fun Screen(model: AppModel, screen: Screen, now: NowPlaying?, back: () -
                 ),
             )
         }
-        Screen.Discover ->
+        // What needs Qobuz says so, offline.
+        Screen.Discover, Screen.Search -> if (offline) {
+            NeedsConnection(onRetry = model::resume)
+        } else if (screen == Screen.Discover) {
             DiscoverScreen(
                 model.discover,
                 DiscoverActions(
@@ -129,7 +146,9 @@ private fun Screen(model: AppModel, screen: Screen, now: NowPlaying?, back: () -
                     open = openAlbum,
                 ),
             )
-        Screen.Search -> SearchScreen(model.found, onSearch = model::search, onOpenAlbum = openAlbum, onOpenArtist = openArtist)
+        } else {
+            SearchScreen(model.found, onSearch = model::search, onOpenAlbum = openAlbum, onOpenArtist = openArtist)
+        }
         Screen.Stats ->
             StatsScreen(
                 model.statsPeriod,
@@ -165,12 +184,21 @@ private fun Screen(model: AppModel, screen: Screen, now: NowPlaying?, back: () -
                 )
             }
         }
-        is Screen.Album ->
+        is Screen.Album -> {
+            val downloads by model.downloads.collectAsStateWithLifecycle()
+            val going = screen.id in downloads.going
+            val download =
+                when {
+                    screen.id in downloads.done -> DownloadState.Done
+                    going -> downloads.going[screen.id]?.let { DownloadState.Going(it) } ?: DownloadState.Waiting
+                    else -> DownloadState.None
+                }
             AlbumScreen(
                 screen.id,
                 screen.preview,
                 now,
                 plays,
+                download,
                 AlbumActions(
                     load = { model.album(screen.id) },
                     plays = { model.plays(screen.id) },
@@ -179,9 +207,13 @@ private fun Screen(model: AppModel, screen: Screen, now: NowPlaying?, back: () -
                     play = model.playback::play,
                     playPause = model.playback::playPause,
                     openArtist = { id, name -> model.open(Screen.Artist(id, name)) },
+                    download = model::download,
+                    cancelDownload = { model.cancelDownload(screen.id) },
+                    removeDownload = { model.removeDownload(screen.id) },
                     back = back,
                 ),
             )
+        }
         is Screen.Artist ->
             ArtistScreen(
                 screen.name,
@@ -216,11 +248,35 @@ private fun Screen(model: AppModel, screen: Screen, now: NowPlaying?, back: () -
                     forget = model::forget,
                     background = { model.syncInBackground },
                     setBackground = { model.syncInBackground = it },
+                    downloadQuality = { model.downloadQuality },
+                    setDownloadQuality = { model.downloadQuality = it },
+                    mobileData = { model.downloadOnMobileData },
+                    setMobileData = { model.downloadOnMobileData = it },
+                    downloadsSize = model::downloadsSize,
+                    removeAllDownloads = model::removeAllDownloads,
                     back = back,
                 ),
             )
         }
         is Screen.Section -> ListScreen(stringResource(title(screen.section)), null, model.list(screen), openAlbum, back, caption(screen.section))
         is Screen.Releases -> ListScreen(stringResource(kindTitle(screen.kind)), screen.artistName, model.list(screen), openAlbum, back)
+    }
+}
+
+/** In place of what needs Qobuz, offline. */
+@Composable
+private fun NeedsConnection(onRetry: () -> Unit) {
+    Column(
+        Modifier.fillMaxSize().statusBarsPadding().padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+    ) {
+        Text(stringResource(R.string.offline), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+        Text(
+            stringResource(R.string.needs_connection),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        TextButton(onClick = onRetry) { Text(stringResource(R.string.try_again)) }
     }
 }

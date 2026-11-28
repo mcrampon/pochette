@@ -4,6 +4,7 @@
 //!
 //! Each app calls [`init`] first, with where it keeps things and what the device is called.
 
+pub mod downloads;
 pub mod format;
 pub mod history;
 pub mod i18n;
@@ -11,6 +12,7 @@ pub mod library;
 pub mod link;
 pub mod listening;
 pub mod lyrics;
+pub mod reports;
 pub mod resume;
 pub mod sync;
 pub mod time;

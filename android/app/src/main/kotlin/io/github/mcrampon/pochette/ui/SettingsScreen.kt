@@ -1,5 +1,6 @@
 package io.github.mcrampon.pochette.ui
 
+import android.text.format.Formatter
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -32,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -44,6 +46,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.github.mcrampon.pochette.R
+import io.github.mcrampon.pochette.core.Quality
 import io.github.mcrampon.pochette.core.Pairing
 import io.github.mcrampon.pochette.core.PairingStage
 import io.github.mcrampon.pochette.core.Peer
@@ -56,6 +59,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.RadioButton
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -80,6 +84,14 @@ class SettingsActions(
     val forget: (String) -> Unit,
     val background: () -> Boolean,
     val setBackground: (Boolean) -> Unit,
+    val downloadQuality: () -> Quality,
+    val setDownloadQuality: (Quality) -> Unit,
+    /** Whether albums download on mobile data too, not only on Wi-Fi. */
+    val mobileData: () -> Boolean,
+    val setMobileData: (Boolean) -> Unit,
+    /** How much room the downloads take, in bytes. */
+    val downloadsSize: () -> Long,
+    val removeAllDownloads: () -> Unit,
     val back: () -> Unit,
 )
 
@@ -150,6 +162,7 @@ fun SettingsScreen(status: SyncStatus, actions: SettingsActions) {
                     )
                 }
             }
+            item(key = "downloads") { Downloads(actions) }
             item(key = "devices") { Section(stringResource(R.string.devices)) }
             item(key = "about") {
                 Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -215,6 +228,64 @@ fun SettingsScreen(status: SyncStatus, actions: SettingsActions) {
 }
 
 /** A section of the settings, over its own headings. */
+/** The quality albums download in, whether on mobile data too, and the room they take. */
+@Composable
+private fun Downloads(actions: SettingsActions) {
+    val context = LocalContext.current
+    var quality by remember { mutableStateOf(actions.downloadQuality()) }
+    var choosingQuality by remember { mutableStateOf(false) }
+    var mobileData by remember { mutableStateOf(actions.mobileData()) }
+    var size by remember { mutableLongStateOf(actions.downloadsSize()) }
+    var removing by remember { mutableStateOf(false) }
+    Column {
+        Section(stringResource(R.string.downloads))
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.download_quality)) },
+            supportingContent = { Text(stringResource(qualityName(quality))) },
+            trailingContent = { Icon(painterResource(R.drawable.ic_expand_more), contentDescription = null) },
+            modifier = Modifier.clickable { choosingQuality = true },
+        )
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.download_on_mobile_data)) },
+            supportingContent = { Text(stringResource(R.string.download_on_mobile_data_detail)) },
+            trailingContent = {
+                Switch(checked = mobileData, onCheckedChange = {
+                    mobileData = it
+                    actions.setMobileData(it)
+                })
+            },
+        )
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.downloads_space)) },
+            supportingContent = { Text(Formatter.formatShortFileSize(context, size)) },
+            trailingContent = {
+                TextButton(onClick = { removing = true }, enabled = size > 0) { Text(stringResource(R.string.remove_all_downloads)) }
+            },
+        )
+    }
+    if (choosingQuality) {
+        QualityDialog(R.string.download_quality, R.string.download_quality_detail, quality, onChoose = {
+            quality = it
+            actions.setDownloadQuality(it)
+        }, onDismiss = { choosingQuality = false })
+    }
+    if (removing) {
+        AlertDialog(
+            onDismissRequest = { removing = false },
+            title = { Text(stringResource(R.string.remove_all_downloads_question)) },
+            text = { Text(stringResource(R.string.remove_all_downloads_detail)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    removing = false
+                    actions.removeAllDownloads()
+                    size = actions.downloadsSize()
+                }) { Text(stringResource(R.string.remove)) }
+            },
+            dismissButton = { TextButton(onClick = { removing = false }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+}
+
 @Composable
 private fun Section(title: String) {
     Text(

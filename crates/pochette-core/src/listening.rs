@@ -8,23 +8,33 @@ use std::{
 };
 
 use qobuz::{
-    Client, FileUrl, StreamingEnd,
+    Client, FileUrl,
     models::{Album, Track},
 };
 
-use crate::history::{AlbumRecord, Listen};
+use crate::{
+    history::{AlbumRecord, Listen},
+    reports::{self, Pending},
+};
 
 /// A report to Qobuz, for the app to send on its runtime.
 pub type Sending = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 
 /// What we tell Qobuz about the listening of one track: that it started, then each stretch
 /// listened to without interruption. The reports pile up for the app to send: see
-/// [`Report::take_sending`].
+/// [`Report::take_sending`]. Those Qobuz can't get, offline, are kept for later: see
+/// [`reports`].
 pub struct Report {
-    client: Client,
+    /// None offline.
+    client: Option<Client>,
     track_id: u64,
-    /// What Qobuz needs to hear about it; without it, nothing is told.
+    format_id: u32,
+    /// What Qobuz needs to hear about it: asked when sending, for a download.
     blob: Option<String>,
+    /// Whether Qobuz is told at all: not of a stream it gave nothing to report with.
+    told: bool,
+    /// Streamed, rather than played from a download.
+    online: bool,
     /// Ties the stretches of this play together.
     play_id: String,
     duration: Duration,
@@ -38,28 +48,61 @@ pub struct Report {
 impl Report {
     /// Report that `track` started, if Qobuz gave something to report it with.
     pub fn start(client: Client, track: &Track, file: &FileUrl) -> Self {
-        let (track_id, format_id) = (track.id, file.format_id);
-        let blob = file.blob.clone();
-        let mut to_send: Vec<Sending> = Vec::new();
-        if blob.is_some() {
-            let reporting = client.clone();
-            to_send.push(Box::pin(async move {
-                if let Err(err) = reporting.report_streaming_start(track_id, format_id).await {
-                    tracing::warn!("cannot report the start of track {track_id}: {err}");
-                }
-            }));
-        } else {
-            tracing::debug!("no blob to report the streaming of track {track_id}");
+        if file.blob.is_none() {
+            tracing::debug!("no blob to report the streaming of track {}", track.id);
         }
-        Self {
+        Self::new(
+            Some(client),
+            track,
+            file.format_id,
+            file.blob.clone(),
+            file.blob.is_some(),
+            true,
+        )
+    }
+
+    /// Report that `track` started, played from a download in the quality of `format_id`,
+    /// with `client`, or later if there's none, offline.
+    #[must_use]
+    pub fn start_downloaded(client: Option<Client>, track: &Track, format_id: u32) -> Self {
+        Self::new(client, track, format_id, None, true, false)
+    }
+
+    fn new(
+        client: Option<Client>,
+        track: &Track,
+        format_id: u32,
+        blob: Option<String>,
+        told: bool,
+        online: bool,
+    ) -> Self {
+        let mut report = Self {
             client,
-            track_id,
+            track_id: track.id,
+            format_id,
             blob,
+            told,
+            online,
             play_id: uuid::Uuid::new_v4().to_string(),
             duration: Duration::from_secs(track.duration.into()),
             heard: Duration::ZERO,
             stretch: Some((SystemTime::now(), Duration::ZERO)),
-            to_send,
+            to_send: Vec::new(),
+        };
+        report.tell(Pending::Start {
+            track_id: report.track_id,
+            format_id,
+        });
+        report
+    }
+
+    /// Have `pending` sent, if Qobuz is told of this track.
+    fn tell(&mut self, pending: Pending) {
+        if self.told {
+            self.to_send.push(Box::pin(reports::send_or_keep(
+                self.client.clone(),
+                pending,
+            )));
         }
     }
 
@@ -77,24 +120,19 @@ impl Report {
         };
         let stretch = position.saturating_sub(started_from).min(self.duration);
         self.heard += stretch;
-        let duration = stretch.as_secs();
-        let Some(blob) = self.blob.clone().filter(|_| duration > 0) else {
+        let seconds = stretch.as_secs();
+        if seconds == 0 {
             return;
-        };
-        let event = StreamingEnd {
-            blob,
-            track_context_uuid: self.play_id.clone(),
-            start_stream: humantime::format_rfc3339_millis(started_at).to_string(),
-            online: true,
-            local: false,
-            duration,
-        };
-        let (client, track_id) = (self.client.clone(), self.track_id);
-        self.to_send.push(Box::pin(async move {
-            if let Err(err) = client.report_streaming_end(&event).await {
-                tracing::warn!("cannot report the listening of track {track_id}: {err}");
-            }
-        }));
+        }
+        self.tell(Pending::End {
+            track_id: self.track_id,
+            format_id: self.format_id,
+            blob: self.blob.clone(),
+            play_id: self.play_id.clone(),
+            started: humantime::format_rfc3339_millis(started_at).to_string(),
+            seconds,
+            online: self.online,
+        });
     }
 
     /// The track played to its end.
