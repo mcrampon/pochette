@@ -50,6 +50,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import io.github.mcrampon.pochette.Library
@@ -196,7 +197,7 @@ private fun Controls(view: LibraryView, showDownloaded: Boolean, actions: Albums
         OutlinedTextField(
             value = view.query,
             onValueChange = { actions.show(view.copy(query = it)) },
-            placeholder = { Text(stringResource(R.string.search_library)) },
+            placeholder = { Text(stringResource(R.string.search_library), maxLines = 1, overflow = TextOverflow.Ellipsis) },
             leadingIcon = { Icon(painterResource(R.drawable.ic_search), contentDescription = null) },
             trailingIcon = {
                 if (view.query.isNotEmpty()) {
