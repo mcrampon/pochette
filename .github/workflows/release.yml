@@ -1,0 +1,97 @@
+# The desktop app's tarballs, on a GitHub release for each of its tags (v2.0.2, not the
+# Android app's android-v…): built for x86_64 and arm64 on Ubuntu 24.04, the oldest release
+# with GTK 4.14, so they run on the distributions of the time; and the sources with their
+# crates, to build offline.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The tag to release, as v2.0.2"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  binary:
+    strategy:
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+      - name: Install the libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake pkg-config \
+            libgtk-4-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+      # With this workflow's Makefile, which an older tag's may predate.
+      - run: git show "$GITHUB_SHA:Makefile" > "$RUNNER_TEMP/release.mk" && make -f "$RUNNER_TEMP/release.mk" dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.runner }}
+          path: dist/*.tar.gz
+
+  source:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+      - run: git show "$GITHUB_SHA:Makefile" > "$RUNNER_TEMP/release.mk" && make -f "$RUNNER_TEMP/release.mk" dist-source
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source
+          path: dist/*.tar.gz
+
+  publish:
+    needs: [binary, source]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Checksums
+        run: cd artifacts && sha256sum -- *.tar.gz > SHA256SUMS && cat SHA256SUMS
+      - name: Release notes, from the metainfo
+        run: |
+          python3 - "${TAG#v}" > notes.md <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          version = sys.argv[1]
+          root = ET.parse("data/io.github.mcrampon.Pochette.metainfo.xml").getroot()
+          release = next(r for r in root.iter("release") if r.get("version") == version)
+          for item in release.iter("li"):
+              print(f"- {''.join(item.itertext()).strip()}")
+          print()
+          print("Built for Linux on x86_64 and arm64, with GTK 4.14 or later and GStreamer's base and")
+          print("good plugins: unpack it, then `sudo make install`. The `-vendored` tarball has the sources")
+          print("and every crate they need, to build offline. See the README.")
+          PY
+          cat notes.md
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" artifacts/* --clobber
+          else
+            gh release create "$TAG" artifacts/* --verify-tag --latest=false \
+              --title "Pochette ${TAG#v}" --notes-file notes.md
+          fi

@@ -54,7 +54,21 @@ nix run github:mcrampon/pochette
 
 or add `github:mcrampon/pochette` as a flake input and install its `packages.<system>.default`.
 
+### Prebuilt
+
+Each `v…` release on [GitHub](https://github.com/mcrampon/pochette/releases) has Pochette
+built for Linux, on x86_64 and arm64: `pochette-<version>-<arch>-linux.tar.gz`. It needs GTK 4
+(4.14 or later), GStreamer with its base and good plugins, and `glib-networking`, as most
+distributions from 2024 on have them. Unpack it, then:
+
+```sh
+sudo make install    # into /usr/local; set PREFIX to change it
+```
+
 ### From source
+
+The `-vendored` tarball of each release has the sources and every crate they need, to build
+offline, as distributions' packages do.
 
 You need Rust 1.95 or later, the development files of GTK 4 (4.14 or later) and GStreamer
 with its base and good plugins, and `cmake`, a C compiler and `pkg-config` to build the TLS
