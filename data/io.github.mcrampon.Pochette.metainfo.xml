@@ -77,6 +77,13 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="2.0.1" date="2026-11-28">
+      <description>
+        <ul>
+          <li>A new icon: the sleeve square, its record over the corner</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.0.0" date="2026-11-28">
       <description>
         <ul>
