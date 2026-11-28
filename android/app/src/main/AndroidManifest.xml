@@ -34,13 +34,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Where the browser comes back to once signed in on Qobuz's page: AppModel.SIGNED_IN.
+            <!-- Where the browser comes back to once signed in on Qobuz's page: AppModel.signedIn.
                  singleTask then closes the page, which is above the app in its task. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="io.github.mcrampon.pochette" android:host="signed-in" />
+                <data android:scheme="${applicationId}" android:host="signed-in" />
             </intent-filter>
             <!-- Qobuz's links to albums, artists and tracks. Only Qobuz could vouch for the app
                  opening them, so from Android 12 on, they open here once allowed in the app's

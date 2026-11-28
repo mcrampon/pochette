@@ -182,6 +182,9 @@ gradle -p android :app:assembleDebug -Ppochette.abis=x86_64  # just the emulator
 gradle -p android :app:testDebugUnitTest :app:lintDebug
 ```
 
+A debug build is "Pochette Test" (`io.github.mcrampon.pochette.debug`): it installs beside the
+released app, with its own sign-in, plays and downloads, and syncs with it as another device.
+
 To release version X.Y.Z of the Android app: set `pochette.version` in
 `android/gradle.properties`, write `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`
 (1.2.3 is 10203), commit, and tag `android-vX.Y.Z`. The release build is signed when

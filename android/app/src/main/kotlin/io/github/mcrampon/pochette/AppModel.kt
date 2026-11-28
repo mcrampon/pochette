@@ -346,7 +346,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         signingIn =
             viewModelScope.launch {
                 try {
-                    val signIn = core.beginSignIn(SIGNED_IN)
+                    val signIn = core.beginSignIn(signedIn(getApplication<Application>()))
                     _stage.value = Stage.SignedOut(url = signIn.url())
                     open(signIn.url())
                     signIn.redirected()
@@ -610,7 +610,10 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     }
 
     companion object {
-        /** Opens the app: the browser goes there once signed in. See the manifest. */
-        const val SIGNED_IN = "io.github.mcrampon.pochette://signed-in"
+        /**
+         * Opens the app: the browser goes there once signed in. Its scheme is the app's id, which a
+         * test build has its own of. See the manifest.
+         */
+        fun signedIn(context: android.content.Context) = "${context.packageName}://signed-in"
     }
 }

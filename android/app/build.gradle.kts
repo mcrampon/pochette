@@ -62,6 +62,12 @@ android {
             // The same APK from the same sources, wherever it's built: see reproducible builds.
             vcsInfo.include = false
         }
+        // A test build installs beside the real one, with data of its own: see src/debug for
+        // its name.
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
     }
 
     dependenciesInfo {
