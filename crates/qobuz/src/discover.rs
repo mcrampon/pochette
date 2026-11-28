@@ -1,5 +1,5 @@
-//! Qobuz's editorial sections: new releases, albums the press awarded, the ideal
-//! discography.
+//! Qobuz's editorial sections: new releases, albums the press awarded, its albums of the
+//! week, the ideal discography.
 
 use serde::Deserialize;
 
@@ -14,6 +14,8 @@ pub enum Section {
     NewReleases,
     /// Albums the press awarded: Télérama, Pitchfork, Diapason…
     PressAwards,
+    /// Qobuz's album of each week, the latest first.
+    AlbumOfTheWeek,
     /// Qobuz's essential albums.
     IdealDiscography,
 }
@@ -23,6 +25,7 @@ impl Section {
         match self {
             Self::NewReleases => "discover/newReleases",
             Self::PressAwards => "discover/pressAward",
+            Self::AlbumOfTheWeek => "discover/albumOfTheWeek",
             Self::IdealDiscography => "discover/idealDiscography",
         }
     }
@@ -40,6 +43,7 @@ pub struct Albums {
 pub struct Discover {
     pub new_releases: Albums,
     pub press_awards: Albums,
+    pub album_of_the_week: Albums,
     pub ideal_discography: Albums,
 }
 
@@ -49,6 +53,7 @@ impl Discover {
         match section {
             Section::NewReleases => &self.new_releases,
             Section::PressAwards => &self.press_awards,
+            Section::AlbumOfTheWeek => &self.album_of_the_week,
             Section::IdealDiscography => &self.ideal_discography,
         }
     }
@@ -66,6 +71,7 @@ impl Client {
         struct Containers {
             new_releases: Option<Container>,
             press_awards: Option<Container>,
+            album_of_the_week: Option<Container>,
             ideal_discography: Option<Container>,
         }
         #[derive(Deserialize)]
@@ -85,6 +91,7 @@ impl Client {
         Ok(Discover {
             new_releases: albums(containers.new_releases),
             press_awards: albums(containers.press_awards),
+            album_of_the_week: albums(containers.album_of_the_week),
             ideal_discography: albums(containers.ideal_discography),
         })
     }

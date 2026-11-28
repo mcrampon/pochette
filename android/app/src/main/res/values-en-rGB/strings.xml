@@ -102,6 +102,7 @@
     <string name="cant_load_genres">Can\'t load the genres: %1$s</string>
     <string name="new_releases">New Releases</string>
     <string name="press_awards">Press Awards</string>
+    <string name="album_of_the_week">Album of the Week</string>
     <string name="ideal_discography">Ideal Discography</string>
 
     <!-- Search. -->

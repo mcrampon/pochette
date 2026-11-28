@@ -113,6 +113,7 @@ discover-section-cannot-load = 无法加载这些专辑
 discover-section-empty = 这里没有专辑
 discover-new-releases = 新发行
 discover-press-awards = 媒体奖项
+discover-album-of-the-week = 每周专辑
 discover-ideal-discography = 理想唱片库
 
 ## 搜索 Qobuz

@@ -219,6 +219,8 @@ pub struct Discover {
     pub new_releases: AlbumList,
     /// Albums the press awarded.
     pub press_awards: AlbumList,
+    /// Qobuz's album of each week, the latest first.
+    pub album_of_the_week: AlbumList,
     /// Qobuz's essential albums.
     pub ideal_discography: AlbumList,
 }
@@ -227,6 +229,7 @@ pub struct Discover {
 pub enum Section {
     NewReleases,
     PressAwards,
+    AlbumOfTheWeek,
     IdealDiscography,
 }
 
@@ -235,6 +238,7 @@ impl From<Section> for qobuz::discover::Section {
         match section {
             Section::NewReleases => Self::NewReleases,
             Section::PressAwards => Self::PressAwards,
+            Section::AlbumOfTheWeek => Self::AlbumOfTheWeek,
             Section::IdealDiscography => Self::IdealDiscography,
         }
     }

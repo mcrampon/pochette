@@ -95,6 +95,7 @@ private fun sections(discover: Discover): List<Pair<Section, AlbumList>> =
     listOf(
         Section.NEW_RELEASES to discover.newReleases,
         Section.PRESS_AWARDS to discover.pressAwards,
+        Section.ALBUM_OF_THE_WEEK to discover.albumOfTheWeek,
         Section.IDEAL_DISCOGRAPHY to discover.idealDiscography,
     ).filter { it.second.albums.isNotEmpty() }
 
@@ -106,6 +107,7 @@ fun title(section: Section) =
     when (section) {
         Section.NEW_RELEASES -> R.string.new_releases
         Section.PRESS_AWARDS -> R.string.press_awards
+        Section.ALBUM_OF_THE_WEEK -> R.string.album_of_the_week
         Section.IDEAL_DISCOGRAPHY -> R.string.ideal_discography
     }
 

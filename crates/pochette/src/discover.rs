@@ -28,9 +28,10 @@ use crate::{
 };
 
 /// The sections, in the order they're shown.
-const SECTIONS: [Section; 3] = [
+const SECTIONS: [Section; 4] = [
     Section::NewReleases,
     Section::PressAwards,
+    Section::AlbumOfTheWeek,
     Section::IdealDiscography,
 ];
 
@@ -716,6 +717,7 @@ fn title(section: Section) -> String {
     match section {
         Section::NewReleases => tr!("discover-new-releases"),
         Section::PressAwards => tr!("discover-press-awards"),
+        Section::AlbumOfTheWeek => tr!("discover-album-of-the-week"),
         Section::IdealDiscography => tr!("discover-ideal-discography"),
     }
 }

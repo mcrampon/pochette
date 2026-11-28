@@ -109,6 +109,7 @@ discover-section-cannot-load = No se pueden cargar estos álbumes
 discover-section-empty = No hay álbumes aquí
 discover-new-releases = Novedades
 discover-press-awards = Premios de la prensa
+discover-album-of-the-week = Álbum de la semana
 discover-ideal-discography = Discografía ideal
 
 ## Buscar en Qobuz

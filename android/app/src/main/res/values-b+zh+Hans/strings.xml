@@ -98,6 +98,7 @@
     <string name="cant_load_genres">无法加载流派：%1$s</string>
     <string name="new_releases">新发行</string>
     <string name="press_awards">媒体奖项</string>
+    <string name="album_of_the_week">每周专辑</string>
     <string name="ideal_discography">理想唱片库</string>
 
     <!-- 搜索。 -->

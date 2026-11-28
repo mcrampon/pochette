@@ -103,6 +103,7 @@
     <string name="cant_load_genres">Impossible de charger les genres : %1$s</string>
     <string name="new_releases">Nouveautés</string>
     <string name="press_awards">Distinctions de la presse</string>
+    <string name="album_of_the_week">Album de la semaine</string>
     <string name="ideal_discography">Discothèque idéale</string>
 
     <!-- Recherche. -->

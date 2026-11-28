@@ -175,6 +175,7 @@ impl Pochette {
             Ok(Discover {
                 new_releases: (&discover.new_releases).into(),
                 press_awards: (&discover.press_awards).into(),
+                album_of_the_week: (&discover.album_of_the_week).into(),
                 ideal_discography: (&discover.ideal_discography).into(),
             })
         })
