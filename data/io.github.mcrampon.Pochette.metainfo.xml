@@ -77,6 +77,21 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="2.0.0" date="2026-11-28">
+      <description>
+        <ul>
+          <li>Settings, in the main menu: the language, and the devices the plays sync with</li>
+          <li>In German, English (UK), Spanish, French (France and Canada), Italian, Polish, Portuguese (Brazil) and Chinese (Simplified)</li>
+          <li>Takes up the listening where it was when Pochette opens</li>
+          <li>Share an album: its Qobuz link, copied</li>
+          <li>Opens Qobuz's links to albums and artists; a link to a track leads to its album</li>
+          <li>Qobuz's Album of the Week, in Discover</li>
+          <li>Plays Qobuz couldn't hear of while out of reach are told to it once it's back</li>
+          <li>Every album played, at the bottom of the stats</li>
+          <li>Fixed: a second Pochette opened, as from a link, now hands over to the first and closes</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.2.3" date="2026-11-24">
       <description>
         <ul>
