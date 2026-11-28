@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Behind the sleeve and the record: light, as the desktop icon sits on light themes. -->
-    <color name="ic_launcher_background">#F6F5F4</color>
-</resources>

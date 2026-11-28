@@ -1,17 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">
-  <!-- The sleeve alone, drawn on whole pixels for this size: the record would be a smudge. -->
+  <!-- The scalable icon, drawn on whole pixels for this size, with less art. -->
   <defs>
     <linearGradient id="sleeve" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#ff8a3d"/>
       <stop offset="1" stop-color="#e0303a"/>
     </linearGradient>
+    <mask id="shape" maskUnits="userSpaceOnUse" x="0" y="0" width="22" height="22">
+      <rect x="1" y="1" width="20" height="20" rx="3.5" fill="#ffffff"/>
+    </mask>
   </defs>
-  <rect x="1" y="2" width="20" height="19" rx="1.5" fill="#a51d2d"/>
-  <rect x="1" y="1" width="20" height="19" rx="1.5" fill="url(#sleeve)"/>
-  <circle cx="11" cy="8" r="4.5" fill="#ffffff" fill-opacity="0.9"/>
-  <g fill="#ffffff" fill-opacity="0.5">
-    <rect x="5" y="14" width="12" height="1"/>
-    <rect x="7" y="16" width="8" height="1"/>
-    <rect x="9" y="18" width="4" height="1"/>
+  <g mask="url(#shape)">
+    <rect x="1" y="1" width="20" height="20" fill="url(#sleeve)"/>
+    <circle cx="8" cy="8" r="3.5" fill="#ffffff" fill-opacity="0.9"/>
+    <g fill="#ffffff" fill-opacity="0.5">
+      <rect x="3" y="13" width="9" height="1"/>
+      <rect x="3" y="15" width="7" height="1"/>
+      <rect x="3" y="17" width="4" height="1"/>
+    </g>
+    <circle cx="17.5" cy="17.5" r="6.8" fill="#000000" fill-opacity="0.18"/>
+    <circle cx="17.5" cy="17.5" r="6" fill="#1c1c1f"/>
+    <circle cx="17.5" cy="17.5" r="2" fill="#f6d32d"/>
   </g>
 </svg>

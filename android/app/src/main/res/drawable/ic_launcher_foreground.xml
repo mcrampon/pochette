@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The desktop icon (data/icons/hicolor/scalable), scaled into the adaptive icon's safe zone. -->
+<!-- The desktop icon's art on its 112 × 112 square (data/icons/hicolor/scalable), scaled to what
+     shows of the icon, the middle 72 of 108: the sun and lines, and the record over the corner. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
@@ -7,23 +8,36 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     <group
-        android:scaleX="0.47"
-        android:scaleY="0.47"
-        android:translateX="22.51"
-        android:translateY="22.98">
-        <!-- The record, sliding out of its sleeve. -->
+        android:scaleX="0.642857"
+        android:scaleY="0.642857"
+        android:translateX="18"
+        android:translateY="18">
+        <!-- A sun setting over lines. -->
+        <path
+            android:fillAlpha="0.85"
+            android:fillColor="#ffffff"
+            android:pathData="M18,36a18,18 0,1 0,36 0a18,18 0,1 0,-36 0z" />
+        <path
+            android:fillAlpha="0.35"
+            android:fillColor="#ffffff"
+            android:pathData="M12,64h48a2,2 0,0 1,0 4h-48a2,2 0,0 1,0 -4zM12,73h34a2,2 0,0 1,0 4h-34a2,2 0,0 1,0 -4zM12,82h20a2,2 0,0 1,0 4h-20a2,2 0,0 1,0 -4z" />
+        <!-- The record. -->
         <group
-            android:translateX="82"
-            android:translateY="66">
+            android:translateX="91"
+            android:translateY="91">
+            <path
+                android:fillAlpha="0.18"
+                android:fillColor="#000000"
+                android:pathData="M-36.25,0a36.25,36.25 0,1 0,72.5,0a36.25,36.25 0,1 0,-72.5,0z" />
             <path
                 android:fillColor="#1c1c1f"
-                android:pathData="M-42,0a42,42 0,1 0,84 0a42,42 0,1 0,-84 0z" />
-            <path android:pathData="M-42,0a42,42 0,1 0,84 0a42,42 0,1 0,-84 0z">
+                android:pathData="M-33.25,0a33.25,33.25 0,1 0,66.5,0a33.25,33.25 0,1 0,-66.5,0z" />
+            <path android:pathData="M-33.25,0a33.25,33.25 0,1 0,66.5,0a33.25,33.25 0,1 0,-66.5,0z">
                 <aapt:attr name="android:fillColor">
                     <gradient
                         android:centerX="0"
                         android:centerY="0"
-                        android:gradientRadius="42"
+                        android:gradientRadius="33.25"
                         android:type="radial">
                         <item android:color="#00ffffff" android:offset="0.55" />
                         <item android:color="#1fffffff" android:offset="0.75" />
@@ -32,41 +46,15 @@
                 </aapt:attr>
             </path>
             <path
-                android:pathData="M-37,0a37,37 0,1 0,74 0a37,37 0,1 0,-74 0zM-32,0a32,32 0,1 0,64 0a32,32 0,1 0,-64 0zM-27,0a27,27 0,1 0,54 0a27,27 0,1 0,-54 0zM-22,0a22,22 0,1 0,44 0a22,22 0,1 0,-44 0z"
+                android:pathData="M-28.5,0a28.5,28.5 0,1 0,57,0a28.5,28.5 0,1 0,-57,0zM-24,0a24,24 0,1 0,48,0a24,24 0,1 0,-48,0zM-19.5,0a19.5,19.5 0,1 0,39,0a19.5,19.5 0,1 0,-39,0zM-15,0a15,15 0,1 0,30,0a15,15 0,1 0,-30,0z"
                 android:strokeWidth="1"
                 android:strokeColor="#38383d" />
             <path
                 android:fillColor="#f6d32d"
-                android:pathData="M-14,0a14,14 0,1 0,28 0a14,14 0,1 0,-28 0z" />
+                android:pathData="M-11,0a11,11 0,1 0,22,0a11,11 0,1 0,-22,0z" />
             <path
                 android:fillColor="#1c1c1f"
-                android:pathData="M-2.5,0a2.5,2.5 0,1 0,5 0a2.5,2.5 0,1 0,-5 0z" />
+                android:pathData="M-2.5,0a2.5,2.5 0,1 0,5,0a2.5,2.5 0,1 0,-5,0z" />
         </group>
-        <!-- The sleeve: its edge, then its face. -->
-        <path
-            android:fillColor="#a51d2d"
-            android:pathData="M15,24h74a5,5 0,0 1,5 5v78a5,5 0,0 1,-5 5h-74a5,5 0,0 1,-5 -5v-78a5,5 0,0 1,5 -5z" />
-        <path android:pathData="M15,20h74a5,5 0,0 1,5 5v78a5,5 0,0 1,-5 5h-74a5,5 0,0 1,-5 -5v-78a5,5 0,0 1,5 -5z">
-            <aapt:attr name="android:fillColor">
-                <gradient
-                    android:endX="94"
-                    android:endY="108"
-                    android:startX="10"
-                    android:startY="20"
-                    android:type="linear">
-                    <item android:color="#ff8a3d" android:offset="0" />
-                    <item android:color="#e0303a" android:offset="1" />
-                </gradient>
-            </aapt:attr>
-        </path>
-        <!-- The sleeve's art: a sun setting over lines. -->
-        <path
-            android:fillAlpha="0.85"
-            android:fillColor="#ffffff"
-            android:pathData="M35,56a17,17 0,1 0,34 0a17,17 0,1 0,-34 0z" />
-        <path
-            android:fillAlpha="0.35"
-            android:fillColor="#ffffff"
-            android:pathData="M24,78h56a2,2 0,0 1,0 4h-56a2,2 0,0 1,0 -4zM32,87h40a2,2 0,0 1,0 4h-40a2,2 0,0 1,0 -4zM40,96h24a2,2 0,0 1,0 4h-24a2,2 0,0 1,0 -4z" />
     </group>
 </vector>
